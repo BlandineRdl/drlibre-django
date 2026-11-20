@@ -1,6 +1,6 @@
 ---
 objective: "One `docker compose up` starts the 6 services, and `GET /api/v1/health` crosses inbound adapter, use case, outbound port and adapter, with one green test per level and the boundary contracts enforced."
-status: pending
+status: implemented
 ---
 
 # Plan: Walking skeleton DrLibre-django
