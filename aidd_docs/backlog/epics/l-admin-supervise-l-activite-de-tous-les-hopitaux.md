@@ -1,6 +1,6 @@
 ---
 type: epic
-status: proposed
+status: ready
 source: aidd_docs/memory/external/drlibre-specs.md (§10 Dashboard, Appointments, Audit log, Settings ; §13)
 goal: aidd_docs/memory/project-brief.md
 depends_on:

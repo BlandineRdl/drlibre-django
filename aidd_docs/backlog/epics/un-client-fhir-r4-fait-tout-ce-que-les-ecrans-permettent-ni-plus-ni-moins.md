@@ -1,6 +1,6 @@
 ---
 type: epic
-status: proposed
+status: ready
 source: aidd_docs/memory/external/drlibre-specs.md (§15, §2 API client, 17.13)
 goal: aidd_docs/memory/project-brief.md
 depends_on: aidd_docs/backlog/epics/l-admin-supervise-l-activite-de-tous-les-hopitaux.md
