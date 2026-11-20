@@ -137,7 +137,7 @@ def attached_clinician(admin_client: Client) -> tuple[Any, Any]:
 def test_a_clinician_with_a_profile_is_neither_deleted_nor_moved_to_another_role(
     admin_client: Client,
 ) -> None:
-    """Décision E1 : un praticien rattaché garde son compte et son rôle tant que son profil vit."""
+    """Un praticien qui a un profil garde son compte et son rôle tant que ce profil existe."""
     clinician, _ = attached_clinician(admin_client)
 
     delete = admin_client.post(f"/console/users/{clinician.id}/delete")

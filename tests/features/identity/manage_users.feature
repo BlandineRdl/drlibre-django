@@ -77,13 +77,13 @@ Feature: L'admin gère les comptes utilisateurs
     Then no user "paul@example.org" exists
     And the audit holds "user.deleted" with only "role"
 
-  Scenario: Décision E1 : un praticien qui a un profil ne peut pas être supprimé ; le message invite à désactiver le compte
+  Scenario: Un praticien qui a un profil ne peut être ni supprimé ni changé de rôle tant que ce profil existe ; le refus le dit (suppression)
     Given a CLINICIAN account "ana@example.org"
     And "ana@example.org" has a clinician profile
     When the admin deletes "ana@example.org"
     Then the write is refused as "has_dependents" inviting to deactivate
 
-  Scenario: Décision E1 : un praticien qui a un profil ne peut pas changer de rôle
+  Scenario: Un praticien qui a un profil ne peut être ni supprimé ni changé de rôle tant que ce profil existe ; le refus le dit (changement de rôle)
     Given a CLINICIAN account "ana@example.org"
     And "ana@example.org" has a clinician profile
     When the admin edits "ana@example.org" setting role "PATIENT"
