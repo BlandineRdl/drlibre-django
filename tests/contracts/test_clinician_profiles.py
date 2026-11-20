@@ -96,6 +96,17 @@ def test_a_profile_is_found_by_id_and_by_its_clinician(stores: Stores) -> None:
     assert profile.weight == 1
 
 
+def test_a_deleted_profile_is_gone(stores: Stores) -> None:
+    """Règle §10 : un profil praticien sans rendez-vous est supprimé."""
+    profile = a_profile(stores)
+    stores.profiles.save(profile)
+
+    stores.profiles.delete(profile.id)
+
+    assert stores.profiles.get(profile.id) is None
+    assert stores.profiles.for_user(profile.user_id) is None
+
+
 def test_profiles_are_matched_by_department_specialty_and_default_room(stores: Stores) -> None:
     profile = a_profile(stores)
     stores.profiles.save(dataclasses.replace(profile, weight=3))

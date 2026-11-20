@@ -28,7 +28,7 @@ Feature: L'admin rattache un profil praticien
       | poids nul                        | weight          | 0     |
       | spécialité inconnue              | specialty_id    | nope  |
 
-  Scenario Outline: Le profil se rattache à un utilisateur praticien actif qui n'en a pas (<case>)
+  Scenario Outline: Règle §10 : le profil se rattache à un utilisateur praticien actif qui n'en a pas (<case>)
     Given <situation>
     When the admin attaches a profile to "<who>" in department "CARD" with specialty "CARDIO" and default room "R101"
     Then the save is refused as invalid on "user_id"

@@ -6,7 +6,7 @@ Feature: L'admin gère les comptes utilisateurs
   Background:
     Given the signed-in admin "admin@example.org"
 
-  Scenario: La liste se cherche par nom ou par email
+  Scenario: La liste se cherche par nom ou par email ; l'email est unique et enregistré en minuscules (recherche)
     Given a CLINICIAN account named "Ana Bel" with email "ana.bel@example.org"
     And a PATIENT account named "Paul Martin" with email "paul@example.org"
     When the admin searches users for "bel"
@@ -14,16 +14,16 @@ Feature: L'admin gère les comptes utilisateurs
     When the admin searches users for "paul@"
     Then the users found are "paul@example.org"
 
-  Scenario: L'email est enregistré en minuscules, avec un mot de passe temporaire à changer
+  Scenario: La liste se cherche par nom ou par email ; l'email est unique et enregistré en minuscules (enregistré en minuscules)
     When the admin creates the CLINICIAN "Ana Bel" with email "Ana@Example.org" and password "temporary-pass-1"
     Then the user "ana@example.org" exists and must change password
 
-  Scenario: L'email est unique, quelle que soit sa casse
+  Scenario: La liste se cherche par nom ou par email ; l'email est unique et enregistré en minuscules (unique, quelle que soit sa casse)
     Given a CLINICIAN account "ana@example.org"
     When the admin creates the PATIENT "Ana Bis" with email "ANA@example.org" and password "temporary-pass-1"
     Then the write is refused as invalid on "email"
 
-  Scenario: Le mot de passe temporaire respecte la règle de 10 à 72 caractères
+  Scenario: Règle §10 : le compte est créé avec un mot de passe temporaire, de 10 à 72 caractères
     When the admin creates the PATIENT "Paul" with email "paul@example.org" and password "short"
     Then the write is refused as invalid on "temporary_password"
 
@@ -73,13 +73,13 @@ Feature: L'admin gère les comptes utilisateurs
     Then no user "paul@example.org" exists
     And the audit holds "user.deleted" with only "role"
 
-  Scenario: Règle §3.2 : un praticien qui a un profil ne peut pas être supprimé ; le message invite à désactiver le compte
+  Scenario: Décision E1 : un praticien qui a un profil ne peut pas être supprimé ; le message invite à désactiver le compte
     Given a CLINICIAN account "ana@example.org"
     And "ana@example.org" has a clinician profile
     When the admin deletes "ana@example.org"
     Then the write is refused as "has_dependents" inviting to deactivate
 
-  Scenario: Règle §3.2 : un praticien qui a un profil ne peut pas changer de rôle
+  Scenario: Décision E1 : un praticien qui a un profil ne peut pas changer de rôle
     Given a CLINICIAN account "ana@example.org"
     And "ana@example.org" has a clinician profile
     When the admin edits "ana@example.org" setting role "PATIENT"

@@ -9,16 +9,16 @@ Feature: Le personnel se connecte par mot de passe et arrive dans son espace
     And an active PATIENT "patient@example.org" with password "patient-password-1"
     And an inactive CLINICIAN "gone@example.org" with password "gone-password-1"
 
-  Scenario Outline: Une connexion réussie mène chaque rôle à son espace (<role>)
+  Scenario Outline: Une connexion réussie mène l'admin à la console admin, le praticien à son espace, et le patient avec mot de passe à la page d'accueil du portail (<case>)
     When "<email>" signs in on the sign-in page with "<password>"
     Then they land on "<home>"
     And the page "<home>" opens
 
     Examples:
-      | role      | email                 | password           | home        |
-      | ADMIN     | admin@example.org     | admin-password-1   | /console/   |
-      | CLINICIAN | clinician@example.org | clinic-password-1  | /workspace/ |
-      | PATIENT   | patient@example.org   | patient-password-1 | /portal/    |
+      | case                    | email                 | password           | home        |
+      | admin                   | admin@example.org     | admin-password-1   | /console/   |
+      | praticien               | clinician@example.org | clinic-password-1  | /workspace/ |
+      | patient avec mot de passe | patient@example.org | patient-password-1 | /portal/    |
 
   Scenario Outline: Un email inconnu et un mauvais mot de passe donnent le même message, dans le même temps de réponse (<case>)
     When "<email>" signs in with "<password>"

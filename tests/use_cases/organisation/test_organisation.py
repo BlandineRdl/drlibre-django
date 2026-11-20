@@ -142,18 +142,19 @@ def audit_down(world: FakeWorld) -> None:
     world.audit.failing = True
 
 
-@given(parsers.parse('the room "{code}" is used by an availability rule'))
+@given(parsers.parse('the room "{code}" is used by an availability rule and an appointment'))
 def room_used(world: FakeWorld, code: str) -> None:
     world.schedule.by_room[find(world, "room", code).id] = (
         Dependent("availability_rule", Id(), "Lundi 09:00"),
+        Dependent("appointment", Id(), f"RDV {date(2026, 12, 1).isoformat()}"),
     )
 
 
-@given(parsers.parse('the appointment type "{code}" has an appointment'))
+@given(parsers.parse('the appointment type "{code}" has an appointment and a waitlist entry'))
 def type_used(world: FakeWorld, code: str) -> None:
-    label = f"RDV {date(2026, 12, 1).isoformat()}"
     world.schedule.by_appointment_type[find(world, "appointment_type", code).id] = (
-        Dependent("appointment", Id(), label),
+        Dependent("appointment", Id(), f"RDV {date(2026, 12, 1).isoformat()}"),
+        Dependent("waitlist_entry", Id(), f"Attente {date(2026, 12, 3).isoformat()}"),
     )
 
 

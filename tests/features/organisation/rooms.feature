@@ -22,9 +22,9 @@ Feature: L'admin gère les salles d'un département
       | pas un nombre   | two      |
 
   Scenario: Création, liste avec recherche et pagination par 20, modification et suppression avec confirmation (liste et recherche)
-    Given 20 room records exist, 1 of them named with "Bloc"
-    When the admin lists the room records on page 1
-    Then the page shows 20 rows out of 20
+    Given 21 room records exist, 1 of them named with "Bloc"
+    When the admin lists the room records on page 2
+    Then the page shows 1 rows out of 21
     When the admin lists the room records searching "bloc"
     Then the page shows 1 rows out of 1
 
@@ -44,9 +44,9 @@ Feature: L'admin gère les salles d'un département
 
   Scenario: Règle §10 : une salle ne peut pas être supprimée tant qu'elle a des rendez-vous ou des règles de disponibilité
     Given a room "R101" exists in department "CARD"
-    And the room "R101" is used by an availability rule
+    And the room "R101" is used by an availability rule and an appointment
     When the admin deletes the room "R101"
-    Then the delete is refused listing availability_rule "Lundi 09:00"
+    Then the delete is refused listing availability_rule "Lundi 09:00" and appointment "RDV 2026-12-01"
 
   Scenario: Règle §4 : un enregistrement absent donne not_found
     When the admin deletes an unknown room

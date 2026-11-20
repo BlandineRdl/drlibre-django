@@ -3,6 +3,7 @@ import pytest
 from drlibre.organisation.infrastructure.django.models import HospitalRecord
 from drlibre.organisation.infrastructure.queries import DjangoReferenceQueries
 from drlibre.organisation.infrastructure.repositories import DjangoDepartments, DjangoHospitals
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.pagination import PageRequest
 from tests import builders_organisation as build
 
@@ -59,3 +60,25 @@ def test_department_options_name_their_hospital() -> None:
     labels = {o.label for o in DjangoReferenceQueries().department_options()}
 
     assert f"Pédiatrie ({department.code}) · Hôpital Est" in labels
+
+
+def test_a_child_added_after_the_check_still_refuses_the_delete_with_its_label() -> None:
+    """Un hôpital qui a des départements ne peut pas être supprimé, même ajoutés entre-temps."""
+    hospital = build.hospital()
+    DjangoHospitals().save(hospital)
+    department = build.department(hospital.id, name="Urgences")
+    DjangoDepartments().save(department)
+
+    with pytest.raises(DomainError) as refused:
+        DjangoHospitals().delete(hospital.id)
+
+    assert refused.value.code is ErrorCode.HAS_DEPENDENTS
+    assert refused.value.details == {
+        "dependents": [
+            {
+                "kind": "department",
+                "id": str(department.id),
+                "label": f"Urgences ({department.code})",
+            }
+        ]
+    }

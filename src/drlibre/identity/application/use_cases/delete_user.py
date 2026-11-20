@@ -48,7 +48,7 @@ class DeleteUserUseCase(DeleteUser):
                 f"Vous ne pouvez pas supprimer votre compte. {DEACTIVATE_INSTEAD}",
             )
         with self._uow:
-            # Checked inside the unit, so the refusal and the delete see the same rows.
+            # Checked in the delete's transaction, next to the write it guards.
             self._dependents(user.id).refuse_if_any(
                 f"Ce compte est encore référencé. {DEACTIVATE_INSTEAD}"
             )

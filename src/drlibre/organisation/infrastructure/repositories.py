@@ -24,8 +24,25 @@ from drlibre.organisation.infrastructure.django.models import (
     SpecialtyRecord,
 )
 from drlibre.organisation.infrastructure.mapping import from_row, to_columns
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
+from drlibre.shared_kernel.dependents import Dependent, Dependents
+from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
+
+_KINDS: dict[type[models.Model], str] = {
+    DepartmentRecord: "department",
+    RoomRecord: "room",
+    AppointmentTypeRecord: "appointment_type",
+    ClinicianProfileRecord: "clinician",
+}
+
+
+def _as_dependent(row: models.Model) -> Dependent:
+    """A protecting row as a dependent: kind, id and its referential label, never a person."""
+    if isinstance(row, ClinicianProfileRecord):
+        label = row.title
+    else:
+        label = f"{getattr(row, 'name', '')} ({getattr(row, 'code', '')})"
+    return Dependent(_KINDS.get(type(row), type(row).__name__.lower()), Id(row.pk), label)
 
 
 class DjangoRecords[T]:
@@ -45,10 +62,12 @@ class DjangoRecords[T]:
         try:
             self._model._default_manager.filter(id=record_id.value).delete()
         except ProtectedError as error:
-            # A child inserted concurrently after the dependents check.
-            raise DomainError(
-                ErrorCode.HAS_DEPENDENTS, "Cet élément est encore utilisé.", {"dependents": []}
-            ) from error
+            # A child inserted after the dependents check still blocks the delete.
+            found = tuple(_as_dependent(row) for row in error.protected_objects)
+            try:
+                Dependents(found).refuse_if_any("Cet élément est encore utilisé.")
+            except DomainError as refused:
+                raise refused from error
 
     def code_taken(self, code: str, *, except_id: Id) -> bool:
         rows = self._model._default_manager.filter(code=code).exclude(id=except_id.value)

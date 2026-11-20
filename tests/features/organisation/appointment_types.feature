@@ -59,9 +59,9 @@ Feature: L'admin gère les types de RDV d'un département
 
   Scenario: Règle §10 : un type de RDV ne peut pas être supprimé tant qu'il a des rendez-vous ou des inscriptions en liste d'attente
     Given an appointment type "CONSULT" exists in department "CARD"
-    And the appointment type "CONSULT" has an appointment
+    And the appointment type "CONSULT" has an appointment and a waitlist entry
     When the admin deletes the appointment type "CONSULT"
-    Then the delete is refused listing appointment "RDV 2026-12-01"
+    Then the delete is refused listing appointment "RDV 2026-12-01" and waitlist_entry "Attente 2026-12-03"
 
   Scenario: Un département qui a des types ne peut pas être supprimé, et le refus le dit
     Given an appointment type "CONSULT" exists in department "CARD"

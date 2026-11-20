@@ -80,7 +80,7 @@ class RecordWrites:
     ) -> None:
         record = self.existing(records, record_id)
         with self._uow:
-            # Checked inside the unit, so the refusal and the delete see the same rows.
+            # Checked in the delete's transaction; the repository refuses rows added meanwhile.
             dependents(record).refuse_if_any(message)
             records.delete(record.id)
             self._record(actor, "deleted", record.id, {}, self._clock.now())

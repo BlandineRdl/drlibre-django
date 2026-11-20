@@ -55,7 +55,7 @@ def profiles(request: pytest.FixtureRequest) -> tuple[StaffProfiles, Id, Id]:
 def test_a_clinician_profile_is_seen_as_a_dependent_of_its_user(
     profiles: tuple[StaffProfiles, Id, Id],
 ) -> None:
-    """Règle §3.2 : supprimer le compte d'un praticien rattaché est refusé."""
+    """Décision E1 : supprimer le compte d'un praticien rattaché est refusé."""
     staff, holder, other = profiles
 
     found = staff.profile_of(holder)

@@ -29,7 +29,7 @@ class DeleteClinicianProfileUseCase(DeleteClinicianProfile):
         if profile is None:
             raise DomainError(ErrorCode.NOT_FOUND, "Profil introuvable.")
         with self._uow:
-            # Checked inside the unit, so the refusal and the delete see the same rows.
+            # Checked in the delete's transaction, next to the write it guards.
             Dependents(self._schedule.for_clinician_profile(profile.id)).refuse_if_any(
                 "Ce praticien a des rendez-vous."
             )
