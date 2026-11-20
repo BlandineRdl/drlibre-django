@@ -105,3 +105,8 @@ pythonpath = ["src", "."]
 testpaths = ["tests"]
 markers = ["integration: needs the compose PostgreSQL, Redis or Mailpit services"]
 addopts = "--strict-markers"
+
+[tool.python-doctor]
+profile = "web"
+# Pyrefly is configured above but not detected by Python Doctor.
+suppress = ["structure/no-type-checker"]
