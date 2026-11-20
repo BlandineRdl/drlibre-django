@@ -73,12 +73,17 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_TASK_IGNORE_RESULT = True
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
-        "OPTIONS": {"host": env.email_host, "port": env.email_port, "timeout": 10},
+
+def smtp_mailers() -> dict[str, dict[str, object]]:
+    return {
+        "default": {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {"host": env.email_host, "port": env.email_port, "timeout": 10},
+        }
     }
-}
+
+
+MAILERS = smtp_mailers()
 DEFAULT_FROM_EMAIL = "DrLibre <no-reply@drlibre.localhost>"
 
 LANGUAGE_CODE = "en-us"

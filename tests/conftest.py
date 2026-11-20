@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from config.settings import env
+from config.settings import env, smtp_mailers
 from drlibre.bootstrap.container import Container, use_container
 from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
 from tests.fakes.clock import FixedClock
@@ -32,10 +32,5 @@ def fake_container(fake_probe: InMemoryDatabaseProbe) -> Iterator[Container]:
 @pytest.fixture
 def mailpit_smtp(settings: Any) -> str:
     """Route the default mailer to Mailpit, undoing the test locmem swap; returns its API URL."""
-    settings.MAILERS = {
-        "default": {
-            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
-            "OPTIONS": {"host": env.email_host, "port": env.email_port, "timeout": 10},
-        }
-    }
+    settings.MAILERS = smtp_mailers()
     return f"http://{env.email_host}:8025/api/v1"
