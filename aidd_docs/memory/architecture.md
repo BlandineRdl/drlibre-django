@@ -37,6 +37,11 @@
 - The slot table is updated in the same transaction as each booking or hold.
 - Hold expiry is checked in the slot query, never left to a scheduled job.
 - Django stores session keys raw; the session store must keep only a hash.
+- Own session cookie `drlibre_session` (HttpOnly, SameSite=Lax, Secure with `HTTPS_ONLY`); `django.contrib.sessions` and `django.contrib.auth` stay uninstalled, Django's hashers work without them.
+- `SameOriginMiddleware` refuses unsafe methods from another origin, API included; CSRF stays on for web forms.
+- Dependents not modelled yet (appointments, availability rules, waitlist) are read through null adapters (`NoScheduleYet`, `NoAppointmentsYet`) that later Epics replace.
+- Web views catch `invalid_input` and `has_dependents` to re-render their form; other refusals become error pages through `DomainErrorPagesMiddleware`.
+- Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 
 ## Flow
 ```mermaid
