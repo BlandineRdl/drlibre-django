@@ -1,0 +1,10 @@
+.skip-link { position: absolute; left: -9999px; }
+.skip-link:focus { left: 1rem; top: 1rem; z-index: 10; padding: 0.5rem 1rem; background: var(--pico-background-color); }
+.inline-form { margin: 0; }
+.inline-form button { margin: 0; }
+.field-error { color: var(--pico-del-color); }
+.actions { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+.pagination { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+.section-nav ul { flex-wrap: wrap; }
+.error-summary { border-left: 0.25rem solid var(--pico-del-color); padding-left: 1rem; margin-bottom: 1rem; }
+caption { text-align: left; }

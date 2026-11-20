@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ confirm.title }}{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<h1>{{ confirm.title }}</h1>
+{% if confirm.refusal %}
+<div role="alert" class="error-summary">
+  <p><strong>Suppression refusée : {{ confirm.refusal }}</strong></p>
+  {% if confirm.dependents %}
+  <ul>{% for d in confirm.dependents %}<li>{{ d.kind }} : {{ d.label }}</li>{% endfor %}</ul>
+  {% endif %}
+</div>
+<p><a href="{{ confirm.cancel_url }}">Retour à la liste</a></p>
+{% else %}
+<p>Cette action est définitive.</p>
+<form method="post" action="{{ confirm.action }}" class="actions">
+  {% csrf_token %}
+  <button type="submit" class="contrast">Supprimer</button>
+  <a href="{{ confirm.cancel_url }}">Annuler</a>
+</form>
+{% endif %}
+{% endblock %}

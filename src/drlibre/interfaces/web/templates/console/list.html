@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ view.title }}{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<div class="actions">
+  <h1>{{ view.title }}</h1>
+  <a href="{{ view.base_url }}new" role="button">Ajouter</a>
+</div>
+{% if view.status %}<p role="status">{{ view.status }}</p>{% endif %}
+<search>
+<form method="get" action="{{ view.base_url }}">
+  <label for="search">{{ search_label }}</label>
+  <fieldset role="group">
+    <input type="search" id="search" name="search" value="{{ view.search }}">
+    <button type="submit">Rechercher</button>
+  </fieldset>
+</form>
+</search>
+{% if view.rows %}
+<div class="overflow-auto">
+  <table>
+    <caption>{{ view.title }} : {{ view.summary }}</caption>
+    <thead><tr>{% for header in view.headers %}<th scope="col">{{ header }}</th>{% endfor %}<th scope="col">Actions</th></tr></thead>
+    <tbody>
+    {% for row in view.rows %}
+      <tr>
+        {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+        <td class="actions">
+          <a href="{{ row.edit_url }}" aria-label="Modifier {{ row.label }}">Modifier</a>
+          {% if row.delete_url %}<a href="{{ row.delete_url }}" aria-label="Supprimer {{ row.label }}">Supprimer</a>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>{% if view.search %}Aucun résultat pour « {{ view.search }} ».{% else %}Aucun élément pour l'instant.{% endif %}</p>
+{% endif %}
+<nav aria-label="Pagination" class="pagination">
+  <p>{{ view.summary }}</p>
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Précédent</a>{% endif %}
+  {% if view.next_url %}<a href="{{ view.next_url }}">Suivant ›</a>{% endif %}
+</nav>
+{% endblock %}

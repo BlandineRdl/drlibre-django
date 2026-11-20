@@ -1,0 +1,5 @@
+<nav aria-label="Console" class="section-nav">
+  <ul>
+    {% for link in section_nav %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
+  </ul>
+</nav>

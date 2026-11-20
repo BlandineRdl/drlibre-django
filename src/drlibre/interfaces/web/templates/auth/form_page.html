@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ form.title }}{% endblock %}
+{% block content %}
+<article>
+  <h1>{{ form.title }}</h1>
+  {% if intro %}<p>{{ intro }}</p>{% endif %}
+  {% include "_form.html" %}
+</article>
+{% endblock %}
