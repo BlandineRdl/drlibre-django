@@ -2,12 +2,13 @@
 Points où la spec et les Epics sont muets, relevés en écrivant les Stories (2026-11-20). À trancher au plus tard au plan de l'Epic concerné ; une réponse change l'Acceptance de la Story visée.
 
 ## E2 Disponibilités et créneaux
-- Que deviennent les RDV futurs quand la plage qui les contient est modifiée ou supprimée ?
-- Modifier une plage remet-il sa date de début de validité à aujourd'hui ?
-- Que renvoie `GET /slots` au-delà de l'horizon de 90 jours de la table `slot` ?
-- Que renvoie `GET /slots` pour un type d'un autre département, un type inactif ou un praticien inactif ?
-- Quel code pour une plage qui en chevauche une autre ou une absence en double : `invalid_input` ou `conflict` ?
-- Que montrent le résumé hebdomadaire et le calendrier admin, et le calendrier se navigue-t-il ?
+Tranchées au plan E2 (`aidd_docs/tasks/2026_11/2026_11_20_e2-disponibilites-creneaux/plan.md`, Decisions).
+- Que deviennent les RDV futurs quand la plage qui les contient est modifiée ou supprimée ? → Rien : modifier ou supprimer une plage, comme une absence, ne touche jamais les RDV existants.
+- Modifier une plage remet-il sa date de début de validité à aujourd'hui ? → Non, elle garde sa date ; seule une nouvelle plage vaut à partir d'aujourd'hui.
+- Que renvoie `GET /slots` au-delà de l'horizon de 90 jours de la table `slot` ? → Rien d'autre : les créneaux au-delà sont simplement absents.
+- Que renvoie `GET /slots` pour un type d'un autre département, un type inactif ou un praticien inactif ? → `not_found` pour un type inconnu ou inactif, ou un praticien inconnu, inactif ou hors du département du type.
+- Quel code pour une plage qui en chevauche une autre ou une absence en double : `invalid_input` ou `conflict` ? → `invalid_input` sur le champ, message nommant le conflit ; `conflict` reste réservé aux chevauchements de RDV.
+- Que montrent le résumé hebdomadaire et le calendrier admin, et le calendrier se navigue-t-il ? → Résumé : jour et plages HH:MM–HH:MM par praticien. Calendrier : grille 07:00–19:00 par 30 minutes avec plages et absences, liens semaine précédente, cette semaine, suivante.
 
 ## E3 Recherche et réservation sans compte
 - La disponibilité et les règles de §5.3 sont-elles vérifiées dès la réservation provisoire, ou au code seulement ?

@@ -5,7 +5,7 @@
 .field-error { color: var(--pico-del-color); }
 .actions { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
 .pagination { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
-.section-nav ul { flex-wrap: wrap; }
+.section-nav ul, .main-nav, .main-nav ul { flex-wrap: wrap; }
 .error-summary { border-left: 0.25rem solid var(--pico-del-color); padding-left: 1rem; margin-bottom: 1rem; }
 caption { text-align: left; }
 .week-grid td { font-size: 0.8rem; white-space: nowrap; }

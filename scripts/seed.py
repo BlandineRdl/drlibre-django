@@ -204,8 +204,34 @@ def seed_clinician_profile(app: Container) -> None:
     )
 
 
+# Monday to Friday, local time of the hospital; weekday 0 is Sunday (spec §3.1).
+DEMO_RULES = tuple(
+    {"weekday": str(day), "start": start, "end": end, "step_minutes": "30"}
+    for day in range(1, 6)
+    for start, end in (("09:00", "12:00"), ("14:00", "17:00"))
+)
+
+
+def seed_availability(app: Container) -> None:
+    clinician = _user_id(app, "clinicien@drlibre.localhost")
+    profile = app.reference_queries.clinician_profile_of(clinician) if clinician else None
+    if clinician is None or profile is None:
+        return
+    existing = {
+        (str(r.weekday), f"{r.start:%H:%M}") for r in app.availability_queries.rules_of(profile.id)
+    }
+    for rule in DEMO_RULES:
+        if (rule["weekday"], rule["start"]) not in existing:
+            app.save_availability_rule.execute(actor=clinician, rule_id=None, fields=rule)
+
+
 # Each seeder gets or creates its rows, so the whole seed can run again safely.
-SEEDERS: list[Callable[[Container], None]] = [seed_users, seed_referential, seed_clinician_profile]
+SEEDERS: list[Callable[[Container], None]] = [
+    seed_users,
+    seed_referential,
+    seed_clinician_profile,
+    seed_availability,
+]
 
 
 def main() -> None:
