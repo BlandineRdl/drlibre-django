@@ -52,9 +52,13 @@ DATABASES = {
 
 REDIS_URL = str(env.redis_url)
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = env.email_host
-EMAIL_PORT = env.email_port
+MAILERS = {
+    "default": {
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        "OPTIONS": {"host": env.email_host, "port": env.email_port, "timeout": 10},
+    }
+}
+DEFAULT_FROM_EMAIL = "DrLibre <no-reply@drlibre.localhost>"
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = env.default_time_zone
