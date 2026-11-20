@@ -1,0 +1,25 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}DrLibre{% endblock %} · DrLibre</title>
+  <link rel="stylesheet" href="{% static 'vendor/pico-2.1.1.min.css' %}">
+  <link rel="stylesheet" href="{% static 'drlibre.css' %}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+  <header class="container">
+    <nav aria-label="Principale">
+      <ul><li><a href="/"><strong>DrLibre</strong></a></li></ul>
+      {% block nav %}{% include "_nav.html" %}{% endblock %}
+    </nav>
+  </header>
+  <main id="main" class="container" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="container">
+    <small>{% block timezone %}Heures affichées dans le fuseau {{ time_zone }}.{% endblock %}</small>
+  </footer>
+</body>
+</html>

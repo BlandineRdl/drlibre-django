@@ -7,6 +7,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "argon2-cffi>=25.1,<26",
     "celery[redis]>=5.6,<5.7",
     "django>=6.1,<6.2",
     "django-ninja>=1.8,<1.9",
@@ -14,6 +15,7 @@ dependencies = [
     "psycopg[binary]>=3.3.9",
     "pydantic>=2,<3",
     "pydantic-settings>=2.16.3",
+    "redis>=8.1,<9",
     "structlog>=26.1.0",
 ]
 
@@ -28,6 +30,7 @@ dev = [
     "pytest>=9.2.0",
     "pytest-bdd>=9.0.1",
     "pytest-django>=4.14.0",
+    "pytest-playwright>=0.10,<0.11",
     "python-doctor>=2026.5.11",
     "ruff>=0.17.6",
 ]
@@ -45,7 +48,8 @@ src = ["src", "."]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "S", "DJ", "N", "RUF", "PT"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "S105", "S106", "S107"]
+"**/migrations/*" = ["RUF012", "E501"]
 
 [tool.pyrefly]
 project-includes = ["src", "config", "tests", "scripts", "manage.py"]
@@ -97,15 +101,30 @@ allow_indirect_imports = true
 [[tool.importlinter.contracts]]
 name = "Each context layers infrastructure over application over domain"
 type = "layers"
-containers = ["drlibre.health", "drlibre.notifications"]
+containers = ["drlibre.audit", "drlibre.health", "drlibre.identity", "drlibre.notifications", "drlibre.organisation"]
 layers = ["infrastructure", "application", "(domain)"]
+
+[[tool.importlinter.contracts]]
+name = "Identity's core never imports organisation"
+type = "forbidden"
+source_modules = ["drlibre.identity.domain", "drlibre.identity.application"]
+forbidden_modules = ["drlibre.organisation"]
+
+[[tool.importlinter.contracts]]
+name = "Organisation's core reaches identity only through its own ports"
+type = "forbidden"
+source_modules = ["drlibre.organisation.domain", "drlibre.organisation.application"]
+forbidden_modules = ["drlibre.identity"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["src", "."]
 testpaths = ["tests"]
-markers = ["integration: needs the compose PostgreSQL, Redis or Mailpit services"]
-addopts = "--strict-markers"
+markers = [
+    "integration: needs the compose PostgreSQL, Redis or Mailpit services",
+    "e2e: Playwright journey against the compose web service; run with -m e2e",
+]
+addopts = "--strict-markers -m 'not e2e'"
 
 [tool.python-doctor]
 profile = "web"

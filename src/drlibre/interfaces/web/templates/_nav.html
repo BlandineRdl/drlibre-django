@@ -1,0 +1,11 @@
+{% if shell.signed_in %}
+<ul>
+  {% if shell.can_change_password %}<li><a href="/account/password">Mot de passe</a></li>{% endif %}
+  <li>
+    <form method="post" action="/sign-out" class="inline-form">
+      {% csrf_token %}
+      <button type="submit" class="secondary outline">Déconnexion</button>
+    </form>
+  </li>
+</ul>
+{% endif %}

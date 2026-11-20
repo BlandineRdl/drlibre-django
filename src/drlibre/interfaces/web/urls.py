@@ -1,0 +1,31 @@
+from django.urls import URLPattern, URLResolver, path
+
+from drlibre.interfaces.web.views import (
+    areas,
+    auth,
+    console_clinicians,
+    console_reference,
+    console_users,
+)
+
+urlpatterns: list[URLPattern | URLResolver] = [
+    path("", auth.home),
+    path("sign-in", auth.sign_in),
+    path("sign-out", auth.sign_out),
+    path("account/password", auth.change_password),
+    path("console/", areas.console_home),
+    path("workspace/", areas.workspace_home),
+    path("portal/", areas.portal_home),
+    path("console/users/", console_users.list_users),
+    path("console/users/new", console_users.create_user),
+    path("console/users/<uuid:record_id>/edit", console_users.edit_user),
+    path("console/users/<uuid:record_id>/delete", console_users.delete_user),
+    path("console/clinicians/", console_clinicians.list_clinicians),
+    path("console/clinicians/new", console_clinicians.attach_profile),
+    path("console/clinicians/<uuid:record_id>/edit", console_clinicians.edit_profile),
+    path("console/clinicians/<uuid:record_id>/delete", console_clinicians.delete_profile),
+    path("console/<slug:slug>/", console_reference.list_records),
+    path("console/<slug:slug>/new", console_reference.create_record),
+    path("console/<slug:slug>/<uuid:record_id>/edit", console_reference.edit_record),
+    path("console/<slug:slug>/<uuid:record_id>/delete", console_reference.delete_record),
+]

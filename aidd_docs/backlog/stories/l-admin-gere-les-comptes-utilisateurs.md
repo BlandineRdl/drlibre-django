@@ -14,6 +14,7 @@ depends_on: aidd_docs/backlog/stories/chaque-role-n-accede-qu-a-son-espace.md
 ## Acceptance
 - La liste se cherche par nom ou par email ; l'email est unique et enregistré en minuscules.
 - Le nom, l'email, le rôle et l'état actif sont modifiables.
+- Un praticien qui a un profil ne peut être ni supprimé ni changé de rôle tant que ce profil existe ; le refus le dit (décision PO 2026-11-20).
 - Un admin ne peut ni désactiver son propre compte, ni changer son propre rôle.
 - Désactiver un utilisateur coupe ses sessions immédiatement.
 - Un praticien qui a des RDV actifs à venir ne peut pas être désactivé ; le refus liste ces RDV.

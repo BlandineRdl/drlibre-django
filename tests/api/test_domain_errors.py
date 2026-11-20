@@ -1,13 +1,14 @@
+import dataclasses
 from collections.abc import Iterator
 
 import pytest
 from django.test import Client
 
-from drlibre.bootstrap.container import Container, use_container
+from drlibre.bootstrap.container import use_container
 from drlibre.health.application.ports.inbound import CheckHealth
 from drlibre.health.domain.health_report import HealthReport
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
-from tests.fakes.in_memory_mailer import InMemoryMailer
+from tests.fakes.world import FakeWorld
 
 
 class RejectingCheckHealth(CheckHealth):
@@ -16,8 +17,8 @@ class RejectingCheckHealth(CheckHealth):
 
 
 @pytest.fixture
-def rejecting_container() -> Iterator[None]:
-    use_container(Container(check_health=RejectingCheckHealth(), mailer=InMemoryMailer()))
+def rejecting_container(world: FakeWorld) -> Iterator[None]:
+    use_container(dataclasses.replace(world.app, check_health=RejectingCheckHealth()))
     yield
     use_container(None)
 
