@@ -16,4 +16,5 @@ parent: aidd_docs/backlog/epics/le-personnel-se-connecte-et-gere-le-referentiel-
 - Un utilisateur inactif ne peut pas se connecter.
 - La session dure 12 h pour un admin et 7 jours pour les autres ; elle repart pour une durée pleine quand il en reste moins de la moitié.
 - La déconnexion supprime la session.
+- La connexion et la déconnexion sont aussi disponibles par l'API `POST /auth/login` et `POST /auth/logout` (§14).
 - La réussite et l'échec sont audités avec seulement le domaine de l'email.

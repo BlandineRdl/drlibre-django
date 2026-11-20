@@ -29,6 +29,15 @@ Un visiteur cherche un praticien, un hôpital ou une spécialité, choisit un cr
   - Emails de code, de lien de connexion et de confirmation, sans lien qui connecte, sauf l'email du lien de connexion lui-même (§7.6).
   - Audit des événements de §7.7, avec le domaine de l'email seulement.
   - API publique correspondante (§14 [new]).
+  - Tri par distance à partir de la géolocalisation du navigateur seulement, sans service externe ; sans position, pas de tri par distance.
+  - En « premier disponible », le praticien est choisi à la création de la réservation provisoire ; sa date de dernière attribution n'est mise à jour qu'à la réservation.
+  - Un job Celery expire les réservations provisoires chaque minute et les audite ; le créneau redevient libre dès l'heure d'expiration, même avant le passage du job.
+  - Code correct mais placement en échec : le compte est créé et la session ouverte, l'échec s'affiche avec les créneaux à jour.
+  - Emails envoyés après la validation de la transaction, par une tâche Celery avec nouvelles tentatives ; un échec d'envoi n'annule rien, et le visiteur peut redemander un code.
+  - Limite de 20 requêtes par heure et par adresse réseau, pour chaque type : réservation provisoire, code, lien.
+  - Un seul email par réservation : l'email de confirmation.
+  - API `POST /appointments` pour un patient connecté (§14).
+  - Option « taille » du script de seed pour la charge (10 hôpitaux, 200 praticiens, 5k patients, 50k RDV), utilisée par le scénario Locust.
 - Excludes:
   - Liste et gestion des RDV du patient (annuler, déplacer), notifications in-app, rappels, emails de déplacement, d'annulation, de rappel et d'offre (Epic portail patient).
   - Réservation par le personnel (Epics espace praticien et supervision admin).
@@ -50,3 +59,4 @@ Un visiteur cherche un praticien, un hôpital ou une spécialité, choisit un cr
 | Calcul des créneaux libres | dependency | `depends_on` Epic 2 |
 | Valeurs proposées (horizon 90 j, 3 créneaux par résultat, réservation provisoire 10 min, lien 15 min) retenues telles quelles | assumption | acceptée (17.14) |
 | Contenu des conditions et de la notice de confidentialité à accepter | assumption | acceptée : texte fictif de démo |
+| Géolocalisation, choix du praticien, expiration, échec après code, emails, limite réseau, seed de charge | decision | prises : décision du rapport de zones d'ombre (aidd_docs/backlog/epics-shadow-report.md) |

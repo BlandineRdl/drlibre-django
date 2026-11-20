@@ -21,6 +21,7 @@ Un praticien définit ses plages hebdomadaires et ses absences ; le système en 
   - Plages en heure locale de l'hôpital, justes au changement d'heure (§4).
   - Côté admin : résumé hebdomadaire des disponibilités et calendrier de la semaine en lecture seule pour chaque praticien (§10).
   - Requête de créneaux réservée aux utilisateurs connectés (§14 `GET /slots`).
+  - Table `slot` précalculée (INSTALL.md), mise à jour dans la même transaction que chaque plage, absence, réservation provisoire, RDV et annulation ; horizon de 90 jours décalé chaque jour par un job.
 - Excludes:
   - Accès public aux créneaux, recherche, placement d'un RDV (Epic réservation sans compte).
   - Agenda du jour, calendrier praticien, statuts, notes, vue des salles (Epic espace praticien).
@@ -30,9 +31,11 @@ Un praticien définit ses plages hebdomadaires et ses absences ; le système en 
 - Scénarios BDD verts pour chaque règle de §5.1 (pas, buffer, absence, passé, plafond de 31 jours, union du département) et pour les contraintes de saisie de §9.
 - La semaine du changement d'heure, une plage 09:00–12:00 donne toujours des créneaux à 09:00 heure locale.
 - Le praticien de démo crée une plage puis une absence ; les créneaux renvoyés reflètent les deux immédiatement.
+- Écrans conformes WCAG 2.2 AA, de 375 à 1440 px (§16).
 
 ## Dependencies and Unknowns
 | Item | Kind | Handling |
 | --- | --- | --- |
 | Référentiel, profils praticiens, salles, types | dependency | `depends_on` Epic 1 |
 | Calcul vérifié contre des RDV actifs injectés en test, avant que la réservation existe | assumption | acceptée |
+| Table `slot` précalculée possédée par cet Epic | decision | prise : décision du rapport de zones d'ombre (aidd_docs/backlog/epics-shadow-report.md) |

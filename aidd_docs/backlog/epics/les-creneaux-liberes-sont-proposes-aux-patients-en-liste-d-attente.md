@@ -22,6 +22,7 @@ Quand un RDV est annulé, son créneau est proposé au patient en attente le plu
   - Notifications in-app et emails « créneau proposé » et « créneau réservé » (§11, §7.6).
   - Côté admin : liste filtrée par statut (les plus anciennes d'abord), ajout d'un patient, offre manuelle du premier créneau annulé à venir dans la fenêtre (§10, §5.8).
   - API `POST /waitlist` et `POST /waitlist/{id}/accept` (§14).
+  - Quand le créneau d'une offre `OFFERED` commence sans acceptation, l'entrée repasse en `WAITING`, ou en `EXPIRED` si sa fenêtre est passée ; le job d'expiration s'en charge.
 - Excludes:
   - Inscription par un praticien (interdite, §5.8).
   - Liste d'attente pour un visiteur non connecté (17.12).
@@ -38,3 +39,4 @@ Quand un RDV est annulé, son créneau est proposé au patient en attente le plu
 | Annulation, notifications et emails patient | dependency | `depends_on` Epic 4 |
 | Source du RDV créé par acceptation : `ONLINE` si le patient accepte, `STAFF` si c'est un admin (non spécifié) | assumption | acceptée |
 | Après un échec en `conflict`, l'entrée repasse en `WAITING` (non spécifié) | assumption | acceptée |
+| Sort d'une offre non acceptée | decision | prise : décision du rapport de zones d'ombre (aidd_docs/backlog/epics-shadow-report.md) |

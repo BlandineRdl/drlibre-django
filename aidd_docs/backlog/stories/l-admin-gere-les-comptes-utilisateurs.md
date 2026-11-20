@@ -16,5 +16,6 @@ depends_on: aidd_docs/backlog/stories/chaque-role-n-accede-qu-a-son-espace.md
 - Le nom, l'email, le rôle et l'état actif sont modifiables.
 - Un admin ne peut ni désactiver son propre compte, ni changer son propre rôle.
 - Désactiver un utilisateur coupe ses sessions immédiatement.
+- Un praticien qui a des RDV actifs à venir ne peut pas être désactivé ; le refus liste ces RDV.
 - La suppression est refusée pour son propre compte et pour un utilisateur qui est l'acteur d'entrées d'audit ; le message invite à désactiver le compte.
 - Chaque écriture laisse une entrée d'audit sans donnée personnelle.
