@@ -1,0 +1,112 @@
+[project]
+name = "drlibre"
+version = "0.1.0"
+description = "Hospital appointment scheduling, hexagonal Django back end."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "celery[redis]>=5.6,<5.7",
+    "django>=6.1,<6.2",
+    "django-ninja>=1.8,<1.9",
+    "gunicorn>=27.0.1",
+    "psycopg[binary]>=3.3.9",
+    "pydantic>=2,<3",
+    "pydantic-settings>=2.16.3",
+    "structlog>=26.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "django-stubs>=6.1.2",
+    "hypothesis>=6.170.17",
+    "import-linter>=2.17",
+    "pre-commit>=4.7.0",
+    "pyrefly>=1.5.0",
+    "pytest>=9.2.0",
+    "pytest-bdd>=9.0.1",
+    "pytest-django>=4.14.0",
+    "python-doctor>=2026.5.11",
+    "ruff>=0.17.6",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "."]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "S", "DJ", "N", "RUF", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pyrefly]
+project-includes = ["src", "config", "tests", "scripts", "manage.py"]
+search-path = ["src", "."]
+python-version = "3.13"
+
+[tool.importlinter]
+root_packages = ["drlibre"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Domain and shared kernel stay pure Python"
+type = "forbidden"
+source_modules = ["drlibre.*.domain", "drlibre.shared_kernel"]
+forbidden_modules = [
+    "django",
+    "ninja",
+    "celery",
+    "drlibre.*.application",
+    "drlibre.*.infrastructure",
+    "drlibre.interfaces",
+    "drlibre.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+name = "Application depends on ports, not frameworks or adapters"
+type = "forbidden"
+source_modules = ["drlibre.*.application"]
+forbidden_modules = [
+    "django",
+    "ninja",
+    "celery",
+    "drlibre.*.infrastructure",
+    "drlibre.interfaces",
+    "drlibre.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+name = "Interfaces reach use cases only through bootstrap"
+type = "forbidden"
+source_modules = ["drlibre.interfaces"]
+forbidden_modules = [
+    "drlibre.*.infrastructure",
+    "drlibre.*.domain",
+    "drlibre.*.application.use_cases",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Each context layers infrastructure over application over domain"
+type = "layers"
+containers = ["drlibre.health", "drlibre.notifications"]
+layers = ["infrastructure", "application", "(domain)"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+markers = ["integration: needs the compose PostgreSQL, Redis or Mailpit services"]
+addopts = "--strict-markers"
+
+[tool.python-doctor]
+profile = "web"
+# Pyrefly is configured above but not detected by Python Doctor.
+suppress = ["structure/no-type-checker"]

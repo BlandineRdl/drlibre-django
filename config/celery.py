@@ -1,0 +1,22 @@
+import os
+from logging.config import dictConfig
+from typing import Any
+
+from celery import Celery
+from celery.signals import setup_logging
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+
+app = Celery("drlibre")
+app.config_from_object("django.conf:settings", namespace="CELERY")
+app.conf.beat_schedule = {
+    "heartbeat": {"task": "drlibre.heartbeat", "schedule": 60.0},
+}
+app.autodiscover_tasks(["drlibre.interfaces.jobs"])
+
+
+@setup_logging.connect
+def use_django_logging(**_: Any) -> None:
+    from django.conf import settings
+
+    dictConfig(settings.LOGGING)
