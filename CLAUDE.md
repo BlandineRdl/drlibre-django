@@ -52,6 +52,21 @@
 - Read only task-relevant context and linked memory files; complete required reads.
 
 <!-- aidd_project_memory:start -->
+
+@aidd_docs/memory/architecture.md
+@aidd_docs/memory/codebase-map.md
+@aidd_docs/memory/coding-assertions.md
+@aidd_docs/memory/ecosystem.md
+@aidd_docs/memory/project-brief.md
+@aidd_docs/memory/testing.md
+@aidd_docs/memory/vcs.md
+
+<!-- read on demand, not auto-loaded -->
+- aidd_docs/memory/external/drlibre-specs.md
+
+<!-- folders other plugins own, read on demand -->
+- aidd_docs/backlog/
+
 <!-- aidd_project_memory:end -->
 
 - Load `aidd_docs/memory/external/*` only when asked.
