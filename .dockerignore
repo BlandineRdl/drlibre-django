@@ -1,0 +1,11 @@
+.git
+.venv
+.env
+.tokenade
+aidd_docs
+tests
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.python-doctor
+staticfiles
