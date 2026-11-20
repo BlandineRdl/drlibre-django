@@ -1,6 +1,6 @@
 ---
 objective: "Un praticien gère ses plages hebdomadaires et ses absences, et `GET /slots` renvoie, depuis la table `slot` tenue à jour dans la même transaction, les créneaux libres justes de §5.1, l'admin voyant résumé et calendrier en lecture seule."
-status: implemented
+status: reviewed
 ---
 
 # Plan: E2 - Les praticiens publient leurs disponibilités et les créneaux libres en découlent
