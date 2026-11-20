@@ -191,6 +191,9 @@ class InMemoryReferenceQueries(ReferenceQueries):
     def department_appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
         return self.stores[4].where(department_id=department_id)
 
+    def department_rooms(self, department_id: Id) -> tuple[Room, ...]:
+        return self.stores[3].where(department_id=department_id)
+
 
 class InMemoryClinicianProfiles(ClinicianProfiles):
     def __init__(self) -> None:

@@ -118,8 +118,8 @@ from drlibre.scheduling.application.ports.inbound import (
     SaveAvailabilityRule,
 )
 from drlibre.scheduling.application.ports.outbound import (
-    ActiveAppointments,
     AvailabilityRules,
+    ClinicianAppointments,
     SchedulingDirectory,
     SlotQueries,
     SlotStore,
@@ -138,7 +138,7 @@ from drlibre.scheduling.application.use_cases.save_availability_rule import (
 )
 from drlibre.scheduling.infrastructure.directory import OrganisationSchedulingDirectory
 from drlibre.scheduling.infrastructure.no_appointments_yet import (
-    NoAppointmentsYet as NoActiveAppointmentsYet,
+    NoAppointmentsYet as NoClinicianAppointmentsYet,
 )
 from drlibre.scheduling.infrastructure.queries import DjangoAvailabilityQueries
 from drlibre.scheduling.infrastructure.repositories import (
@@ -183,7 +183,7 @@ class Adapters:
     scheduling_directory: SchedulingDirectory
     availability_rules: AvailabilityRules
     time_offs: TimeOffs
-    active_appointments: ActiveAppointments
+    clinician_appointments: ClinicianAppointments
     slot_store: SlotStore
     slot_queries: SlotQueries
     availability_queries: AvailabilityQueries
@@ -235,7 +235,7 @@ def wire(a: Adapters) -> Container:
         directory=directory,
         rules=a.availability_rules,
         time_offs=a.time_offs,
-        appointments=a.active_appointments,
+        appointments=a.clinician_appointments,
         store=a.slot_store,
     )
     slots = a.slot_refresh or SchedulingSlotRefresh(refresh=refresh)
@@ -260,7 +260,15 @@ def wire(a: Adapters) -> Container:
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
         ),
-        save_hospital=SaveHospitalUseCase(clock=clock, uow=uow, audit=audit, hospitals=a.hospitals),
+        save_hospital=SaveHospitalUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            hospitals=a.hospitals,
+            departments=a.departments,
+            profiles=a.profiles,
+            slots=slots,
+        ),
         delete_hospital=DeleteHospitalUseCase(
             clock=clock, uow=uow, audit=audit, hospitals=a.hospitals, departments=a.departments
         ),
@@ -271,7 +279,13 @@ def wire(a: Adapters) -> Container:
             clock=clock, uow=uow, audit=audit, specialties=a.specialties, profiles=a.profiles
         ),
         save_department=SaveDepartmentUseCase(
-            clock=clock, uow=uow, audit=audit, departments=a.departments, hospitals=a.hospitals
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            departments=a.departments,
+            hospitals=a.hospitals,
+            profiles=a.profiles,
+            slots=slots,
         ),
         delete_department=DeleteDepartmentUseCase(
             clock=clock,
@@ -442,7 +456,7 @@ def real_adapters() -> Adapters:
         ),
         availability_rules=DjangoAvailabilityRules(),
         time_offs=DjangoTimeOffs(),
-        active_appointments=NoActiveAppointmentsYet(),
+        clinician_appointments=NoClinicianAppointmentsYet(),
         slot_store=DjangoSlotStore(),
         slot_queries=DjangoSlotQueries(),
         availability_queries=availability_queries,

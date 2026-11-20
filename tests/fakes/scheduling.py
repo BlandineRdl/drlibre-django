@@ -3,10 +3,10 @@ from datetime import datetime
 
 from drlibre.scheduling.application.ports.inbound import AvailabilityQueries, RoomUsage
 from drlibre.scheduling.application.ports.outbound import (
-    ActiveAppointments,
     AppointmentType,
     AvailabilityRules,
     Clinician,
+    ClinicianAppointments,
     Room,
     SchedulingDirectory,
     SlotQueries,
@@ -14,18 +14,18 @@ from drlibre.scheduling.application.ports.outbound import (
     StoredSlot,
     TimeOffs,
 )
+from drlibre.scheduling.domain.appointment import Appointment
 from drlibre.scheduling.domain.availability_rule import AvailabilityRule
 from drlibre.scheduling.domain.slot import Period, Slot
 from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
 
-INACTIVE_STATUSES = frozenset({"CANCELLED", "NO_SHOW"})
-
 
 class InMemoryAvailabilityRules(AvailabilityRules):
     def __init__(self) -> None:
         self.rows: dict[Id, AvailabilityRule] = {}
+        self.locked: list[Id] = []
 
     def get(self, rule_id: Id) -> AvailabilityRule | None:
         return self.rows.get(rule_id)
@@ -35,6 +35,9 @@ class InMemoryAvailabilityRules(AvailabilityRules):
 
     def delete(self, rule_id: Id) -> None:
         self.rows.pop(rule_id, None)
+
+    def lock_clinician(self, clinician_id: Id) -> None:
+        self.locked.append(clinician_id)
 
     def clinicians(self) -> tuple[Id, ...]:
         return tuple(dict.fromkeys(r.clinician_id for r in self.rows.values()))
@@ -46,6 +49,7 @@ class InMemoryAvailabilityRules(AvailabilityRules):
 class InMemoryTimeOffs(TimeOffs):
     def __init__(self) -> None:
         self.rows: dict[Id, TimeOff] = {}
+        self.locked: list[Id] = []
 
     def get(self, time_off_id: Id) -> TimeOff | None:
         return self.rows.get(time_off_id)
@@ -56,22 +60,21 @@ class InMemoryTimeOffs(TimeOffs):
     def delete(self, time_off_id: Id) -> None:
         self.rows.pop(time_off_id, None)
 
+    def lock_clinician(self, clinician_id: Id) -> None:
+        self.locked.append(clinician_id)
+
     def for_clinician(self, clinician_id: Id) -> tuple[TimeOff, ...]:
         return tuple(t for t in self.rows.values() if t.clinician_id == clinician_id)
 
 
-class InMemoryActiveAppointments(ActiveAppointments):
-    """Holds appointments as (clinician, period, status) rows."""
+class InMemoryClinicianAppointments(ClinicianAppointments):
+    """Holds appointments as (clinician, appointment) rows."""
 
     def __init__(self) -> None:
-        self.rows: list[tuple[Id, Period, str]] = []
+        self.rows: list[tuple[Id, Appointment]] = []
 
-    def for_clinician(self, clinician_id: Id, *, within: Period) -> tuple[Period, ...]:
-        return tuple(
-            p
-            for c, p, status in self.rows
-            if c == clinician_id and status not in INACTIVE_STATUSES and p.overlaps(within)
-        )
+    def for_clinician(self, clinician_id: Id, *, within: Period) -> tuple[Appointment, ...]:
+        return tuple(a for c, a in self.rows if c == clinician_id and a.period.overlaps(within))
 
 
 class InMemorySlotStore(SlotStore, SlotQueries):

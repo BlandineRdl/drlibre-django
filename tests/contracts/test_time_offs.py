@@ -67,3 +67,13 @@ def test_a_clinician_lists_only_own_time_off_by_start(setup: Setup) -> None:
         setup.time_offs.save(each)
 
     assert setup.queries.time_offs_of(setup.clinician) == (sooner, later)
+
+
+def test_locking_a_clinician_keeps_their_time_off_writable(setup: Setup) -> None:
+    """Story absences : deux absences identiques ne s'enregistrent pas en parallèle."""
+    setup.time_offs.lock_clinician(setup.clinician)
+    setup.time_offs.lock_clinician(Id())
+    saved = time_off(setup.clinician, at(1, 8), at(1, 9))
+    setup.time_offs.save(saved)
+
+    assert setup.time_offs.for_clinician(setup.clinician) == (saved,)

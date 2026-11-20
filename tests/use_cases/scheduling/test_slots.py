@@ -3,11 +3,14 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.test import Client
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from drlibre.bootstrap.container import Container
 from drlibre.scheduling.application.ports.outbound import AppointmentType, Clinician
 from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
+from drlibre.scheduling.domain.appointment import AppointmentStatus
 from drlibre.scheduling.domain.slot import Slot
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
@@ -29,6 +32,7 @@ class Outcome:
         self.people: dict[str, Id] = {}
         self.slots: tuple[Slot, ...] = ()
         self.error: DomainError | None = None
+        self.answer: tuple[int, str] = (0, "")
 
     @property
     def tz(self) -> ZoneInfo:
@@ -52,7 +56,7 @@ def refresh(world: FakeWorld, clinician_id: Id) -> None:
         directory=world.scheduling_directory,
         rules=world.availability_rules,
         time_offs=world.time_offs,
-        appointments=world.active_appointments,
+        appointments=world.clinician_appointments,
         store=world.slots,
     ).execute(clinician_id=clinician_id)
 
@@ -102,7 +106,9 @@ def clinician_elsewhere(world: FakeWorld, outcome: Outcome, name: str) -> None:
     )
 )
 def appointment_type(world: FakeWorld, outcome: Outcome, duration: int, buffer: int) -> None:
-    kind = AppointmentType(outcome.type, outcome.department, duration, buffer, active=True)
+    kind = AppointmentType(
+        outcome.type, outcome.department, duration, buffer, True, outcome.time_zone
+    )
     world.scheduling_directory.types[kind.id] = kind
 
 
@@ -237,7 +243,7 @@ def has_appointment(
     world: FakeWorld, outcome: Outcome, name: str, status: str, start: str, end: str
 ) -> None:
     clinician_id = outcome.person(name)
-    world.active_appointments.rows.append(
+    world.clinician_appointments.rows.append(
         appointment(clinician_id, outcome.at(start), outcome.at(end), status=status)
     )
     refresh(world, clinician_id)
@@ -246,8 +252,9 @@ def has_appointment(
 @when(parsers.parse('the appointment of "{name}" becomes "{status}"'))
 def appointment_becomes(world: FakeWorld, outcome: Outcome, name: str, status: str) -> None:
     clinician_id = outcome.person(name)
-    rows = world.active_appointments.rows
-    rows[:] = [(c, p, status if c == clinician_id else s) for c, p, s in rows]
+    rows = world.clinician_appointments.rows
+    new = AppointmentStatus(status)
+    rows[:] = [(c, dataclasses.replace(a, status=new) if c == clinician_id else a) for c, a in rows]
     refresh(world, clinician_id)
 
 
@@ -260,6 +267,18 @@ def a_day_passes(world: FakeWorld) -> None:
 @when(parsers.parse('the slots of "{name}" are asked from "{start}" to "{end}"'))
 def slots_of(world: FakeWorld, outcome: Outcome, name: str, start: str, end: str) -> None:
     ask(world, outcome, outcome.person(name), start, end)
+
+
+@when(parsers.parse('the slots of "{name}" are asked through the API without a session'))
+def slots_without_session(fake_container: Container, outcome: Outcome, name: str) -> None:
+    query = {
+        "type": str(outcome.type),
+        "clinician": str(outcome.person(name)),
+        "start": "2026-11-23T00:00:00+01:00",
+        "end": "2026-11-24T00:00:00+01:00",
+    }
+    response = Client().get("/api/v1/slots", query)
+    outcome.answer = (response.status_code, response.json()["code"])
 
 
 @when(parsers.parse('the department\'s slots are asked from "{start}" to "{end}"'))
@@ -314,3 +333,8 @@ def slots_run_on(outcome: Outcome, days: str) -> None:
 def refused(outcome: Outcome, code: str) -> None:
     assert outcome.error is not None
     assert outcome.error.code == code
+
+
+@then(parsers.parse('the API answers {status:d} "{code}"'))
+def api_answers(outcome: Outcome, status: int, code: str) -> None:
+    assert outcome.answer == (status, code)

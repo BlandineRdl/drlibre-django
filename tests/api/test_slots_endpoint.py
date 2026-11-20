@@ -32,9 +32,11 @@ def test_without_a_session_slots_answer_unauthenticated(client: Client) -> None:
 
 def test_a_range_over_31_days_is_refused_as_invalid(admin_client: Client) -> None:
     """§5.1 : une requête de créneaux couvre 31 jours au plus."""
+    kind = build.appointment_type(stored_department().id)
+    DjangoAppointmentTypes().save(kind)
     start = datetime(2026, 12, 1, tzinfo=UTC)
 
-    response = admin_client.get(slots_url(Id(), start, start + timedelta(days=32)))
+    response = admin_client.get(slots_url(kind.id, start, start + timedelta(days=32)))
 
     assert response.status_code == 400
     assert response.json()["code"] == "invalid_input"

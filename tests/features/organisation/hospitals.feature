@@ -58,3 +58,15 @@ Feature: L'admin gère les hôpitaux
     When the admin saves a hospital "NORD" named "Hôpital Nord"
     Then the save fails
     And no hospital "NORD" is stored
+
+  Scenario Outline: Règle §4 : la disponibilité est en heure locale de l'hôpital, donc changer son fuseau recalcule les créneaux de ses praticiens dans la même écriture (<case>)
+    Given a hospital "NORD" exists
+    And a department "CARD" exists in hospital "NORD"
+    And a clinician profile in department "CARD"
+    When the admin edits the hospital "NORD" setting time zone "<zone>"
+    Then the slots of that profile are <refreshed>
+
+ Examples:
+  | case | zone | refreshed |
+  | fuseau changé | America/New_York | refreshed |
+  | fuseau inchangé | Europe/Paris | left as they are |

@@ -40,7 +40,7 @@ def fake() -> Known:
     department, user = Id(), Id()
     active = Clinician(Id(), department, "Europe/Paris", active=True)
     inactive = Clinician(Id(), department, "Europe/Paris", active=False)
-    kind = AppointmentType(Id(), department, 30, 0, active=True)
+    kind = AppointmentType(Id(), department, 30, 0, active=True, time_zone="Europe/Paris")
     room = Room(Id(), department, active=True)
     directory.clinicians = {active.id: active, inactive.id: inactive}
     directory.profile_of_user[user] = active.id
@@ -67,7 +67,7 @@ def real() -> Known:
         user.id,
         Clinician(active.id, department.id, "Europe/Paris", active=True),
         Clinician(inactive.id, department.id, "Europe/Paris", active=False),
-        AppointmentType(kind.id, department.id, 30, 0, active=True),
+        AppointmentType(kind.id, department.id, 30, 0, active=True, time_zone="Europe/Paris"),
         Room(room.id, department.id, active=True),
     )
 

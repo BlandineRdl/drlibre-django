@@ -70,6 +70,24 @@ def test_a_bad_or_missing_week_falls_back_to_this_week_starting_monday() -> None
     assert week_start(None, today=today) == date(2026, 11, 16)
 
 
+def test_a_week_at_the_calendar_limits_falls_back_to_this_week() -> None:
+    """§4 : une valeur d'adresse inutilisable donne la valeur par défaut."""
+    today = date(2026, 11, 20)
+
+    for raw in ("0001-01-01", "9999-12-31"):
+        monday = week_start(raw, today=today)
+        view = week_view(
+            clinician="Dr A",
+            time_zone="Europe/Paris",
+            monday=monday,
+            rules=(),
+            time_offs=(),
+            base_url="/console/clinicians/x/week",
+        )
+        assert monday == date(2026, 11, 16)
+        assert view.next_url.endswith("?week=2026-11-23")
+
+
 def test_week_grid_labels_availability_and_time_off_in_text_from_7_to_19() -> None:
     """Story calendrier : heures dans le fuseau de l'hôpital ; cellules libellées en texte."""
     rules = (rule(CLINICIAN, weekday=1, start=time(9), end=time(10)),)

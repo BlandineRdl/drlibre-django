@@ -93,7 +93,7 @@ def clinicians(world: FakeWorld, outcome: Outcome, first: str, second: str) -> N
 
 @given(parsers.parse("an active appointment type of {minutes:d} minutes in that department"))
 def appointment_type(world: FakeWorld, outcome: Outcome, minutes: int) -> None:
-    kind = AppointmentType(Id(), outcome.department, minutes, 0, active=True)
+    kind = AppointmentType(Id(), outcome.department, minutes, 0, True, outcome.tz.key)
     world.scheduling_directory.types[kind.id] = kind
 
 
@@ -243,7 +243,7 @@ def has_appointment(
 ) -> None:
     clinician = outcome.people[name].profile_id
     row = appointment(clinician, outcome.local(start), outcome.local(end), status=status)
-    world.active_appointments.rows.append(row)
+    world.clinician_appointments.rows.append(row)
 
 
 @given("the audit log is unavailable")
@@ -336,7 +336,7 @@ def time_off_instant(world: FakeWorld, outcome: Outcome, name: str, instant: str
 @then(parsers.parse('the appointment of "{name}" is still "{status}"'))
 def appointment_kept(world: FakeWorld, outcome: Outcome, name: str, status: str) -> None:
     clinician = outcome.people[name].profile_id
-    assert [s for c, _, s in world.active_appointments.rows if c == clinician] == [status]
+    assert [a.status for c, a in world.clinician_appointments.rows if c == clinician] == [status]
     assert outcome.error is None
 
 

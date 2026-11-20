@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
@@ -9,6 +9,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from drlibre.bootstrap.container import Container
 from drlibre.identity.domain.user import Email, Role, User
 from drlibre.organisation.application.ports.outbound import Clinician
+from drlibre.organisation.domain.clinician_profile import ClinicianProfile
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
@@ -617,3 +618,39 @@ def asks_confirmation_only(outcome: Outcome) -> None:
 @then(parsers.parse('"{name}" has no profile'))
 def has_no_profile(world: FakeWorld, outcome: Outcome, name: str) -> None:
     assert world.profiles.for_user(outcome.people[name]) is None
+
+
+@given(parsers.parse('a clinician profile in department "{dept}"'))
+def profile_in(world: FakeWorld, outcome: Outcome, dept: str) -> None:
+    fields = {
+        "department_id": str(find(world, "department", dept).id),
+        "specialty_id": str(Id()),
+        "title": "Dr X",
+    }
+    profile = ClinicianProfile.attach(fields, user_id=Id(), at=datetime(2026, 11, 1, tzinfo=UTC))
+    world.profiles.save(profile)
+    outcome.people["profile"] = profile.id
+
+
+@when(parsers.parse('the admin edits the hospital "{code}" setting time zone "{zone}"'))
+def edits_time_zone(world: FakeWorld, outcome: Outcome, code: str, zone: str) -> None:
+    hospital = find(world, "hospital", code)
+    fields = {**defaults(world, "hospital", code), "time_zone": zone}
+    save(world, outcome, "hospital", fields, hospital.id)
+
+
+@when(parsers.parse('the admin edits the department "{code}" setting hospital "{hospital}"'))
+def edits_department_hospital(world: FakeWorld, outcome: Outcome, code: str, hospital: str) -> None:
+    department = find(world, "department", code)
+    fields = {
+        **defaults(world, "department", code),
+        "hospital_id": str(find(world, "hospital", hospital).id),
+    }
+    save(world, outcome, "department", fields, department.id)
+
+
+@then(parsers.re(r"the slots of that profile are (?P<state>refreshed|left as they are)$"))
+def profile_refreshed(world: FakeWorld, outcome: Outcome, state: str) -> None:
+    assert outcome.error is None
+    refreshed = outcome.people["profile"] in world.slot_refresh.refreshed
+    assert refreshed is (state == "refreshed")

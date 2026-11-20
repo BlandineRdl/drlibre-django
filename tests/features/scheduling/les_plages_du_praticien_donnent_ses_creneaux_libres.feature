@@ -13,6 +13,10 @@ Feature: Les plages du praticien donnent ses créneaux libres
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-11-24 00:00"
     Then the slots start at "09:00, 09:30"
 
+  Scenario: GET /slots prend un type, un praticien et une période ; sans session, il répond unauthenticated (sans session)
+    When the slots of "A" are asked through the API without a session
+    Then the API answers 401 "unauthenticated"
+
   Scenario: Pour chaque jour local de la période, chaque plage valable ce jour-là propose un début à son heure de début puis à chaque pas, tant que le début plus la durée du type ne dépasse pas sa fin ; chaque créneau dure la durée du type
     Given "A" has a rule on weekday 1 from "09:00" to "12:00" every 15 minutes
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-11-24 00:00"
@@ -49,6 +53,12 @@ Feature: Les plages du praticien donnent ses créneaux libres
   Scenario: Une période de plus de 31 jours est refusée en invalid_input (31 jours acceptés)
     Given "A" has a rule on weekday 1 from "09:00" to "10:00" every 30 minutes
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-12-24 00:00"
+    Then 10 slots are returned
+
+  Scenario: Une période de plus de 31 jours est refusée en invalid_input (31 jours locaux à travers le retour à l'heure d'hiver)
+    Given today is "2026-10-01"
+    And "A" has a rule on weekday 1 from "09:00" to "10:00" every 30 minutes
+    When the slots of "A" are asked from "2026-10-05 00:00" to "2026-11-05 00:00"
     Then 10 slots are returned
 
   Scenario Outline: La semaine du changement d'heure, une plage 09:00–12:00 donne toujours un premier créneau à 09:00 heure locale de l'hôpital (<case>)

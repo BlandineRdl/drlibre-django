@@ -108,3 +108,13 @@ def test_the_daily_job_finds_each_clinician_with_rules_once(setup: Setup) -> Non
 
     assert found.count(setup.clinician) == 1
     assert setup.other not in found
+
+
+def test_locking_a_clinician_keeps_their_rules_writable(setup: Setup) -> None:
+    """Story plages : deux plages qui se chevauchent ne s'enregistrent pas en parallèle."""
+    setup.rules.lock_clinician(setup.clinician)
+    setup.rules.lock_clinician(Id())
+    saved = rule(setup.clinician, weekday=1)
+    setup.rules.save(saved)
+
+    assert setup.rules.for_clinician(setup.clinician) == (saved,)

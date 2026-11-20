@@ -32,26 +32,40 @@ class OrganisationSchedulingDirectory(SchedulingDirectory):
 
     def appointment_type(self, appointment_type_id: Id) -> AppointmentType | None:
         kind = self._queries.appointment_type(appointment_type_id)
-        return _type(kind) if kind else None
+        time_zone = self._time_zone(kind.department_id) if kind else None
+        return _type(kind, time_zone) if kind and time_zone else None
 
     def appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
-        return tuple(map(_type, self._queries.department_appointment_types(department_id)))
+        time_zone = self._time_zone(department_id)
+        if time_zone is None:
+            return ()
+        kinds = self._queries.department_appointment_types(department_id)
+        return tuple(_type(kind, time_zone) for kind in kinds)
 
     def room(self, room_id: Id) -> Room | None:
         room = self._queries.room(room_id)
         return Room(room.id, room.department_id, room.active) if room else None
 
     def _clinician(self, profile: ClinicianProfile) -> Clinician | None:
-        department = self._queries.department(profile.department_id)
-        hospital = self._queries.hospital(department.hospital_id) if department else None
-        if hospital is None:
+        time_zone = self._time_zone(profile.department_id)
+        if time_zone is None:
             return None
         member = self._lookup.staff_member(profile.user_id)
         active = member is not None and member.active and member.role is Role.CLINICIAN
-        return Clinician(profile.id, profile.department_id, hospital.time_zone, active)
+        return Clinician(profile.id, profile.department_id, time_zone, active)
+
+    def _time_zone(self, department_id: Id) -> str | None:
+        department = self._queries.department(department_id)
+        hospital = self._queries.hospital(department.hospital_id) if department else None
+        return hospital.time_zone if hospital else None
 
 
-def _type(kind: OrganisationType) -> AppointmentType:
+def _type(kind: OrganisationType, time_zone: str) -> AppointmentType:
     return AppointmentType(
-        kind.id, kind.department_id, kind.duration_minutes, kind.buffer_minutes, kind.active
+        kind.id,
+        kind.department_id,
+        kind.duration_minutes,
+        kind.buffer_minutes,
+        kind.active,
+        time_zone,
     )

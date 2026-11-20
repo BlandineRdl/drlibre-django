@@ -49,3 +49,15 @@ Feature: L'admin gère les départements d'un hôpital
   Scenario: Chaque écriture laisse une entrée d'audit sans donnée personnelle
     When the admin saves a department "CARD" in hospital "NORD"
     Then the audit holds "department.created" for "CARD"
+
+  Scenario Outline: Règle §4 : la disponibilité est en heure locale de l'hôpital, donc rattacher un département à un autre hôpital recalcule les créneaux de ses praticiens dans la même écriture (<case>)
+    Given a hospital "SUD" exists
+    And a department "CARD" exists in hospital "NORD"
+    And a clinician profile in department "CARD"
+    When the admin edits the department "CARD" setting hospital "<hospital>"
+    Then the slots of that profile are <refreshed>
+
+ Examples:
+  | case | hospital | refreshed |
+  | autre hôpital | SUD | refreshed |
+  | même hôpital | NORD | left as they are |

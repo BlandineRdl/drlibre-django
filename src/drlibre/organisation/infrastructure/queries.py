@@ -127,6 +127,10 @@ class DjangoReferenceQueries(ReferenceQueries):
         rows = AppointmentTypeRecord.objects.filter(department_id=department_id.value)
         return tuple(from_row(AppointmentType, r) for r in rows.order_by("name", "code"))
 
+    def department_rooms(self, department_id: Id) -> tuple[Room, ...]:
+        rows = RoomRecord.objects.filter(department_id=department_id.value)
+        return tuple(from_row(Room, r) for r in rows.order_by("name", "code"))
+
     def profiled_user_ids(self) -> frozenset[Id]:
         return frozenset(
             Id(pk) for pk in ClinicianProfileRecord.objects.values_list("user_id", flat=True)

@@ -2,13 +2,14 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Protocol
 
-from drlibre.scheduling.domain.availability_rule import AvailabilityRule
+from drlibre.scheduling.domain.availability_rule import WEEKDAYS, AvailabilityRule
 from drlibre.scheduling.domain.slot import Slot
 from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
 
 __all__ = [
+    "WEEKDAYS",
     "AvailabilityQueries",
     "AvailabilityRule",
     "DeleteAvailabilityRule",

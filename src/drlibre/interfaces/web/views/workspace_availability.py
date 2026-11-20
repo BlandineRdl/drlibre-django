@@ -53,12 +53,8 @@ def _owned[T: (AvailabilityRule, TimeOff)](found: T | None, me: Me) -> T:
 
 
 def _rooms(me: Me) -> tuple[Choice, ...]:
-    q = container().reference_queries
-    return tuple(
-        Choice(str(o.id), o.label)
-        for o in q.room_options()
-        if (room := q.room(o.id)) and room.department_id == me.department_id
-    )
+    rooms = container().reference_queries.department_rooms(me.department_id)
+    return tuple(Choice(str(room.id), room.label) for room in rooms if room.active)
 
 
 def _page(
@@ -106,9 +102,9 @@ def _posted(request: HttpRequest, specs: tuple[FieldSpec, ...]) -> dict[str, str
 @require_role(Role.CLINICIAN)
 def list_rules(request: HttpRequest) -> HttpResponse:
     me = _me(request)
-    q = container().reference_queries
     rules = container().availability_queries.rules_of(me.profile_id)
-    rooms = {r.room_id: room.label for r in rules if r.room_id and (room := q.room(r.room_id))}
+    department_rooms = container().reference_queries.department_rooms(me.department_id)
+    rooms = {room.id: room.label for room in department_rooms}
     view = rules_view(
         rules, time_zone=me.time_zone, room_labels=rooms, done=request.GET.get("done")
     )

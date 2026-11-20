@@ -38,8 +38,6 @@ class RecordTimeOffUseCase(RecordTimeOff):
         time_off = TimeOff.from_form(
             fields, id=Id(), clinician_id=clinician.id, time_zone=ZoneInfo(clinician.time_zone)
         )
-        if any(time_off.same_period_as(t) for t in self._time_offs.for_clinician(clinician.id)):
-            raise invalid_field("start", "Une absence couvre déjà exactement cette période.")
         # The reason is free text, so it never reaches the audit metadata.
         self._writes.commit(
             actor=actor,
@@ -47,6 +45,14 @@ class RecordTimeOffUseCase(RecordTimeOff):
             action="created",
             entity_id=time_off.id,
             metadata={},
-            write=lambda: self._time_offs.save(time_off),
+            write=lambda: self._save(time_off),
         )
         return time_off.id
+
+    def _save(self, time_off: TimeOff) -> None:
+        self._time_offs.lock_clinician(time_off.clinician_id)
+        if any(
+            time_off.same_period_as(t) for t in self._time_offs.for_clinician(time_off.clinician_id)
+        ):
+            raise invalid_field("start", "Une absence couvre déjà exactement cette période.")
+        self._time_offs.save(time_off)

@@ -3,8 +3,8 @@ from zoneinfo import ZoneInfo
 
 from drlibre.scheduling.application.ports.inbound import RefreshSlots
 from drlibre.scheduling.application.ports.outbound import (
-    ActiveAppointments,
     AvailabilityRules,
+    ClinicianAppointments,
     SchedulingDirectory,
     SlotStore,
     StoredSlot,
@@ -26,7 +26,7 @@ class RefreshSlotsUseCase(RefreshSlots):
         directory: SchedulingDirectory,
         rules: AvailabilityRules,
         time_offs: TimeOffs,
-        appointments: ActiveAppointments,
+        appointments: ClinicianAppointments,
         store: SlotStore,
     ) -> None:
         self._clock = clock
@@ -45,8 +45,12 @@ class RefreshSlotsUseCase(RefreshSlots):
         window = _horizon(self._clock.now(), tz)
         types = self._directory.appointment_types(clinician.department_id)
         lead = timedelta(minutes=max((t.buffer_minutes for t in types), default=0))
-        busy = self._appointments.for_clinician(
-            clinician_id, within=Period(window.start - lead, window.end)
+        busy = tuple(
+            a.period
+            for a in self._appointments.for_clinician(
+                clinician_id, within=Period(window.start - lead, window.end)
+            )
+            if a.active
         )
         rules = self._rules.for_clinician(clinician_id)
         time_off = self._time_offs.for_clinician(clinician_id)

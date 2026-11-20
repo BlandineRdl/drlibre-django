@@ -52,7 +52,6 @@ class SaveAvailabilityRuleUseCase(SaveAvailabilityRule):
             valid_from=before.valid_from if before else today,
             valid_to=before.valid_to if before else None,
         )
-        self._check(after, clinician)
         metadata: dict[str, object] = {"weekday": after.weekday}
         if before:
             metadata["changed"] = changed_fields(before, after)
@@ -62,15 +61,17 @@ class SaveAvailabilityRuleUseCase(SaveAvailabilityRule):
             action="updated" if before else "created",
             entity_id=after.id,
             metadata=metadata,
-            write=lambda: self._rules.save(after),
+            write=lambda: self._save(after, clinician),
         )
         return after.id
 
-    def _check(self, rule: AvailabilityRule, clinician: Clinician) -> None:
+    def _save(self, rule: AvailabilityRule, clinician: Clinician) -> None:
         if rule.room_id is not None:
             room = self._directory.room(rule.room_id)
             if room is None or not room.active or room.department_id != clinician.department_id:
                 raise invalid_field("room_id", "Choisissez une salle active de votre département.")
+        self._rules.lock_clinician(clinician.id)
         for other in self._rules.for_clinician(clinician.id):
             if rule.clashes_with(other):
                 raise invalid_field("start", f"Cette plage chevauche la plage {other.label}.")
+        self._rules.save(rule)

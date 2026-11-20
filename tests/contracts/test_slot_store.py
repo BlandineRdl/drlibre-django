@@ -21,8 +21,8 @@ from tests.builders_scheduling import rule, stored_department, stored_profile
 from tests.fakes.clock import FixedClock
 from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
-    InMemoryActiveAppointments,
     InMemoryAvailabilityRules,
+    InMemoryClinicianAppointments,
     InMemorySlotStore,
     InMemoryTimeOffs,
 )
@@ -76,7 +76,7 @@ class Refresh:
             )
         for kind, minutes in zip(setup.types, (30, 60), strict=True):
             self.directory.types[kind] = AppointmentType(
-                kind, setup.department, minutes, 0, active=True
+                kind, setup.department, minutes, 0, active=True, time_zone="Europe/Paris"
             )
 
     def __call__(self, clinician: Id) -> None:
@@ -85,7 +85,7 @@ class Refresh:
             directory=self.directory,
             rules=self.rules,
             time_offs=InMemoryTimeOffs(),
-            appointments=InMemoryActiveAppointments(),
+            appointments=InMemoryClinicianAppointments(),
             store=self.store,
         ).execute(clinician_id=clinician)
 

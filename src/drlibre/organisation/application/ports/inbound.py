@@ -186,3 +186,7 @@ class ReferenceQueries(Protocol):
     def department_appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
         """Every appointment type of the department, active or not, by name."""
         ...
+
+    def department_rooms(self, department_id: Id) -> tuple[Room, ...]:
+        """Every room of the department, active or not, by name."""
+        ...

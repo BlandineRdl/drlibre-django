@@ -9,6 +9,7 @@ from drlibre.organisation.infrastructure.repositories import (
     DjangoHospitals,
     DjangoSpecialties,
 )
+from drlibre.scheduling.domain.appointment import Appointment, AppointmentStatus
 from drlibre.scheduling.domain.availability_rule import AvailabilityRule
 from drlibre.scheduling.domain.slot import Period
 from drlibre.scheduling.domain.time_off import TimeOff
@@ -47,8 +48,8 @@ def time_off(clinician_id: Id, start: datetime, end: datetime) -> TimeOff:
 
 def appointment(
     clinician_id: Id, start: datetime, end: datetime, *, status: str = "BOOKED"
-) -> tuple[Id, Period, str]:
-    return clinician_id, Period(start, end), status
+) -> tuple[Id, Appointment]:
+    return clinician_id, Appointment(Period(start, end), AppointmentStatus(status))
 
 
 def stored_department() -> Department:

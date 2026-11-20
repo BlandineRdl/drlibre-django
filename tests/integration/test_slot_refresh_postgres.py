@@ -8,7 +8,11 @@ from drlibre.audit.application.ports.outbound import AuditEntry
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.bootstrap.container import Container, real_adapters, wire
 from drlibre.organisation.domain.department import Department
-from drlibre.organisation.infrastructure.repositories import DjangoAppointmentTypes
+from drlibre.organisation.infrastructure.repositories import (
+    DjangoAppointmentTypes,
+    DjangoDepartments,
+    DjangoHospitals,
+)
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.domain.slot import Period, Slot
 from drlibre.scheduling.infrastructure.django.models import AvailabilityRuleModel, SlotModel
@@ -151,3 +155,60 @@ def test_a_deleted_clinician_profile_leaves_no_slot() -> None:
     app.delete_clinician_profile.execute(actor=None, profile_id=profile.id)
 
     assert not SlotModel.objects.filter(clinician_id=profile.id.value).exists()
+
+
+def first_local_start(kind: Id, profile: Id, zone: str) -> time:
+    tz = ZoneInfo(zone)
+    monday = datetime(2026, 11, 23, tzinfo=tz)
+    (slot, *_) = read(kind, profile, monday, monday + timedelta(days=1))
+    return slot.start.astimezone(tz).time()
+
+
+def ruled_profile(department: Department) -> tuple[Id, Id]:
+    kind = stored_type(department)
+    profile = stored_profile(department)
+    DjangoAvailabilityRules().save(rule(profile.id, weekday=1, start=time(9), end=time(10)))
+    refresh_slots(FixedClock(NOW)).execute(clinician_id=profile.id)
+    assert first_local_start(kind, profile.id, "Europe/Paris") == time(9)
+    return kind, profile.id
+
+
+def test_changing_a_hospitals_time_zone_moves_its_clinicians_slots_in_the_same_response() -> None:
+    """Règle §4 : la disponibilité est en heure locale de l'hôpital, son fuseau changé compris."""
+    app: Container = wire(dataclasses.replace(real_adapters(), clock=FixedClock(NOW)))
+    department = stored_department()
+    kind, profile = ruled_profile(department)
+    hospital = DjangoHospitals().get(department.hospital_id)
+    assert hospital is not None
+    fields = {
+        "name": hospital.name,
+        "code": hospital.code,
+        "street": hospital.street,
+        "postal_code": hospital.postal_code,
+        "city": hospital.city,
+        "country": hospital.country,
+        "phone": hospital.phone,
+        "time_zone": "America/New_York",
+        "active": "on",
+    }
+
+    app.save_hospital.execute(actor=None, record_id=hospital.id, fields=fields)
+
+    assert first_local_start(kind, profile, "America/New_York") == time(9)
+
+
+def test_moving_a_department_to_another_hospital_moves_its_clinicians_slots() -> None:
+    """Règle §4 : la disponibilité suit le fuseau du nouvel hôpital du département."""
+    app: Container = wire(dataclasses.replace(real_adapters(), clock=FixedClock(NOW)))
+    department = stored_department()
+    kind, profile = ruled_profile(department)
+    elsewhere = dataclasses.replace(build.hospital(), time_zone="America/New_York")
+    DjangoHospitals().save(elsewhere)
+    fields = {"name": department.name, "code": department.code, "hospital_id": str(elsewhere.id)}
+
+    app.save_department.execute(actor=None, record_id=department.id, fields=fields)
+
+    moved = DjangoDepartments().get(department.id)
+    assert moved is not None
+    assert moved.hospital_id == elsewhere.id
+    assert first_local_start(kind, profile, "America/New_York") == time(9)

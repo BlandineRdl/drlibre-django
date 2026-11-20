@@ -21,9 +21,9 @@ from tests.fakes.organisation import (
 from tests.fakes.password_hasher import InMemoryPasswordHasher
 from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
-    InMemoryActiveAppointments,
     InMemoryAvailabilityQueries,
     InMemoryAvailabilityRules,
+    InMemoryClinicianAppointments,
     InMemorySlotStore,
     InMemoryTimeOffs,
 )
@@ -65,7 +65,7 @@ class FakeWorld:
         self.scheduling_directory = FixedSchedulingDirectory()
         self.availability_rules = InMemoryAvailabilityRules()
         self.time_offs = InMemoryTimeOffs()
-        self.active_appointments = InMemoryActiveAppointments()
+        self.clinician_appointments = InMemoryClinicianAppointments()
         self.slots = InMemorySlotStore()
         self.slot_refresh = InMemorySlotRefresh()
         self.availability_queries = InMemoryAvailabilityQueries(
@@ -124,7 +124,7 @@ class FakeWorld:
             scheduling_directory=self.scheduling_directory,
             availability_rules=self.availability_rules,
             time_offs=self.time_offs,
-            active_appointments=self.active_appointments,
+            clinician_appointments=self.clinician_appointments,
             slot_store=self.slots,
             slot_queries=self.slots,
             availability_queries=self.availability_queries,

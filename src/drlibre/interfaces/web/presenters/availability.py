@@ -4,13 +4,12 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from drlibre.interfaces.web.presenters.forms import Choice, FieldSpec
-from drlibre.scheduling.application.ports.inbound import AvailabilityRule, TimeOff
+from drlibre.scheduling.application.ports.inbound import WEEKDAYS, AvailabilityRule, TimeOff
 from drlibre.shared_kernel.ids import Id
 
 RULES_URL = "/workspace/availability/"
 TIME_OFF_URL = "/workspace/time-off/"
 # Weekdays numbered 0 Sunday to 6 Saturday (spec 3.1), shown Monday first.
-WEEKDAYS = ("Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi")
 WEEK_ORDER = (1, 2, 3, 4, 5, 6, 0)
 WEEKDAY_CHOICES = tuple(Choice(str(day), WEEKDAYS[day]) for day in WEEK_ORDER)
 GRID_START = time(7)
@@ -189,11 +188,17 @@ class WeekView:
     next_url: str
 
 
+WEEK_MARGIN = timedelta(days=14)
+
+
 def week_start(raw: str | None, *, today: date) -> date:
     """Monday of the week holding ?week=YYYY-MM-DD; a missing or bad value means this week."""
     try:
         day = date.fromisoformat(raw or "")
     except ValueError:
+        day = today
+    # The grid and its previous and next links need two weeks on either side.
+    if not date.min + WEEK_MARGIN <= day <= date.max - WEEK_MARGIN:
         day = today
     return day - timedelta(days=day.weekday())
 

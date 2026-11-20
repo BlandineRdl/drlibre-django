@@ -1,3 +1,4 @@
+from drlibre.organisation.infrastructure.django.models import ClinicianProfileRecord
 from drlibre.scheduling.application.ports.outbound import AvailabilityRules, TimeOffs
 from drlibre.scheduling.domain.availability_rule import AvailabilityRule
 from drlibre.scheduling.domain.time_off import TimeOff
@@ -29,6 +30,12 @@ def as_time_off(row: TimeOffModel) -> TimeOff:
     )
 
 
+def lock_profile(clinician_id: Id) -> None:
+    # The profile row serialises one clinician's overlap checks until the transaction ends.
+    rows = ClinicianProfileRecord.objects.select_for_update().filter(pk=clinician_id.value)
+    list(rows.values_list("pk", flat=True))
+
+
 class DjangoAvailabilityRules(AvailabilityRules):
     def get(self, rule_id: Id) -> AvailabilityRule | None:
         row = AvailabilityRuleModel.objects.filter(id=rule_id.value).first()
@@ -51,6 +58,9 @@ class DjangoAvailabilityRules(AvailabilityRules):
 
     def delete(self, rule_id: Id) -> None:
         AvailabilityRuleModel.objects.filter(id=rule_id.value).delete()
+
+    def lock_clinician(self, clinician_id: Id) -> None:
+        lock_profile(clinician_id)
 
     def clinicians(self) -> tuple[Id, ...]:
         ids = AvailabilityRuleModel.objects.values_list("clinician_id", flat=True).distinct()
@@ -79,6 +89,9 @@ class DjangoTimeOffs(TimeOffs):
 
     def delete(self, time_off_id: Id) -> None:
         TimeOffModel.objects.filter(id=time_off_id.value).delete()
+
+    def lock_clinician(self, clinician_id: Id) -> None:
+        lock_profile(clinician_id)
 
     def for_clinician(self, clinician_id: Id) -> tuple[TimeOff, ...]:
         rows = TimeOffModel.objects.filter(clinician_id=clinician_id.value)
