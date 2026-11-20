@@ -10,4 +10,4 @@ paths:
 - Web views catch only the refusals their page re-renders: `invalid_input` on a form, `has_dependents` and `forbidden` on a form or delete confirmation; `DomainErrorPagesMiddleware` turns every other code into its error page.
 - Keep `details` to ids, field names and resource lists; never personal data.
 
-<!-- aidd_rule_output:path=.claude/rules/06-design-patterns/6-domain-errors.md sha256=1531dbf403cd5456a5a20b5eac01efa07fda007d2de3d108695baa44bd0f9aac -->
+<!-- aidd_rule_output:path=.claude/rules/06-design-patterns/6-domain-errors.md sha256=d37e45fe772f15dba22e74f287397df037ffe8f97d82708034591915c7075db7 -->
