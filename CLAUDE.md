@@ -64,9 +64,6 @@
 <!-- read on demand, not auto-loaded -->
 - aidd_docs/memory/external/drlibre-specs.md
 
-<!-- folders other plugins own, read on demand -->
-- aidd_docs/backlog/
-
 <!-- aidd_project_memory:end -->
 
 - Load `aidd_docs/memory/external/*` only when asked.
