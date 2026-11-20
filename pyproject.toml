@@ -20,6 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "django-stubs>=6.1.2",
+    "django-upgrade>=1.33.0",
     "hypothesis>=6.170.17",
     "import-linter>=2.17",
     "pre-commit>=4.7.0",

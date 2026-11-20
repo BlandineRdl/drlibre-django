@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     default_time_zone: str = "Europe/Paris"
     allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
     log_level: str = "INFO"
+    # True once served behind TLS; localhost stays plain HTTP.
+    https_only: bool = False
 
 
 env = Settings()
@@ -49,6 +51,14 @@ X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+SECURE_SSL_REDIRECT = env.https_only
+SESSION_COOKIE_SECURE = env.https_only
+CSRF_COOKIE_SECURE = env.https_only
+SECURE_HSTS_SECONDS = 31_536_000 if env.https_only else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.https_only
+# HSTS preload list submission is a domain owner's opt-in, not a code default.
+SILENCED_SYSTEM_CHECKS = ["security.W021"]
 
 configure_structlog()
 LOGGING = logging_config(env.log_level)
@@ -94,5 +104,3 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

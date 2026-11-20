@@ -10,5 +10,6 @@
 - `config/`: settings from `.env` via pydantic-settings, urls, Celery app and beat schedule, correlation id middleware, structlog JSON logging.
 - `tests/`: `features/` Gherkin, `use_cases/` pytest-bdd on fakes, `contracts/` fake vs real, `integration/` against compose services, `fakes/` in-memory adapters.
 - `docker/`, `docker-compose.yml`: image, entrypoint (migrate, seed, gunicorn) and the six-service stack.
+- `.github/workflows/ci.yml`: CI, pre-commit gates and pytest against PostgreSQL, Redis and Mailpit services.
 - `scripts/seed.py`: idempotent seed, run with `python -m scripts.seed`.
 - `static/vendor/`: vendored HTMX 2.0.11.
