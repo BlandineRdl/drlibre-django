@@ -3,6 +3,7 @@ from drlibre.identity.application.ports.inbound import DeleteUser
 from drlibre.identity.application.ports.outbound import (
     AuditActors,
     Sessions,
+    StaffProfiles,
     UpcomingAppointments,
     Users,
 )
@@ -26,6 +27,7 @@ class DeleteUserUseCase(DeleteUser):
         sessions: Sessions,
         appointments: UpcomingAppointments,
         actors: AuditActors,
+        profiles: StaffProfiles,
     ) -> None:
         self._clock = clock
         self._uow = uow
@@ -34,6 +36,7 @@ class DeleteUserUseCase(DeleteUser):
         self._sessions = sessions
         self._appointments = appointments
         self._actors = actors
+        self._profiles = profiles
 
     def execute(self, *, actor: Id | None, user_id: Id) -> None:
         user = self._users.get(user_id)
@@ -44,15 +47,11 @@ class DeleteUserUseCase(DeleteUser):
                 ErrorCode.FORBIDDEN,
                 f"Vous ne pouvez pas supprimer votre compte. {DEACTIVATE_INSTEAD}",
             )
-        audited = (
-            (Dependent("audit_entry", user.id, "Entrées du journal d'audit"),)
-            if self._actors.has_acted(user.id)
-            else ()
-        )
-        Dependents.of(self._appointments.any_for_user(user.id), audited).refuse_if_any(
-            f"Ce compte est encore référencé. {DEACTIVATE_INSTEAD}"
-        )
         with self._uow:
+            # Checked inside the unit, so the refusal and the delete see the same rows.
+            self._dependents(user.id).refuse_if_any(
+                f"Ce compte est encore référencé. {DEACTIVATE_INSTEAD}"
+            )
             self._sessions.delete_for_user(user.id)
             self._users.delete(user.id)
             self._audit.record(
@@ -65,3 +64,14 @@ class DeleteUserUseCase(DeleteUser):
                     metadata={"role": user.role},
                 )
             )
+
+    def _dependents(self, user_id: Id) -> Dependents:
+        audited = (
+            (Dependent("audit_entry", user_id, "Entrées du journal d'audit"),)
+            if self._actors.has_acted(user_id)
+            else ()
+        )
+        profile = self._profiles.profile_of(user_id)
+        return Dependents.of(
+            self._appointments.any_for_user(user_id), audited, (profile,) if profile else ()
+        )

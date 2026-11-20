@@ -51,13 +51,13 @@ Feature: Le personnel se connecte par mot de passe et arrive dans son espace
     Then the session expires 7 days from now
     And the session was renewed
 
-  Scenario: La session ne repart pas tant qu'il en reste plus de la moitié
+  Scenario: La session repart pour une durée pleine quand il en reste moins de la moitié (pas avant)
     Given "clinician@example.org" signed in
     When 2 days pass
     And the session is used
     Then the session expires 5 days from now
 
-  Scenario: La session dure 12 h pour un admin, puis ne permet plus d'entrer
+  Scenario: La session dure 12 h pour un admin (au-delà, elle ne vaut plus)
     Given "admin@example.org" signed in
     When 13 hours pass
     And the session is used

@@ -23,6 +23,7 @@ from drlibre.identity.application.ports.outbound import (
     FailedSignIns,
     PasswordHasher,
     Sessions,
+    StaffProfiles,
     TokenGenerator,
     UpcomingAppointments,
     Users,
@@ -40,6 +41,7 @@ from drlibre.identity.infrastructure.failed_sign_ins import RedisFailedSignIns
 from drlibre.identity.infrastructure.password_hasher import DjangoPasswordHasher
 from drlibre.identity.infrastructure.queries import DjangoUserQueries
 from drlibre.identity.infrastructure.repositories import DjangoSessions, DjangoUsers
+from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import NoAppointmentsYet
 from drlibre.notifications.application.ports.outbound import Mailer
@@ -47,6 +49,7 @@ from drlibre.notifications.infrastructure.smtp_mailer import SmtpMailer
 from drlibre.organisation.application.ports.inbound import (
     AttachClinicianProfile,
     DeleteAppointmentType,
+    DeleteClinicianProfile,
     DeleteDepartment,
     DeleteHospital,
     DeleteRoom,
@@ -74,6 +77,9 @@ from drlibre.organisation.application.use_cases.attach_clinician_profile import 
 )
 from drlibre.organisation.application.use_cases.delete_appointment_type import (
     DeleteAppointmentTypeUseCase,
+)
+from drlibre.organisation.application.use_cases.delete_clinician_profile import (
+    DeleteClinicianProfileUseCase,
 )
 from drlibre.organisation.application.use_cases.delete_department import DeleteDepartmentUseCase
 from drlibre.organisation.application.use_cases.delete_hospital import DeleteHospitalUseCase
@@ -132,6 +138,7 @@ class Adapters:
     staff_lookup: StaffLookup
     profiles: ClinicianProfiles
     staff: StaffDirectory
+    staff_profiles: StaffProfiles
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +166,7 @@ class Container:
     staff_lookup: StaffLookup
     attach_clinician_profile: AttachClinicianProfile
     edit_clinician_profile: EditClinicianProfile
+    delete_clinician_profile: DeleteClinicianProfile
 
 
 def wire(a: Adapters) -> Container:
@@ -244,6 +252,7 @@ def wire(a: Adapters) -> Container:
             sessions=a.sessions,
             hasher=a.hasher,
             appointments=a.appointments,
+            profiles=a.staff_profiles,
         ),
         delete_user=DeleteUserUseCase(
             clock=clock,
@@ -253,6 +262,7 @@ def wire(a: Adapters) -> Container:
             sessions=a.sessions,
             appointments=a.appointments,
             actors=a.actors,
+            profiles=a.staff_profiles,
         ),
         user_queries=a.user_queries,
         staff_lookup=a.staff_lookup,
@@ -275,11 +285,15 @@ def wire(a: Adapters) -> Container:
             specialties=a.specialties,
             rooms=a.rooms,
         ),
+        delete_clinician_profile=DeleteClinicianProfileUseCase(
+            clock=clock, uow=uow, audit=audit, profiles=a.profiles, schedule=a.schedule
+        ),
     )
 
 
 def real_adapters() -> Adapters:
     user_queries = DjangoUserQueries()
+    reference_queries = DjangoReferenceQueries()
     return Adapters(
         clock=SystemClock(),
         database=DjangoDatabaseProbe(),
@@ -297,13 +311,14 @@ def real_adapters() -> Adapters:
         rooms=DjangoRooms(),
         appointment_types=DjangoAppointmentTypes(),
         schedule=NoScheduleYet(),
-        reference_queries=DjangoReferenceQueries(),
+        reference_queries=reference_queries,
         appointments=NoAppointmentsYet(),
         actors=AuditLogActors(DjangoAuditQueries()),
         user_queries=user_queries,
         staff_lookup=user_queries,
         profiles=DjangoClinicianProfiles(),
         staff=IdentityStaffDirectory(lookup=user_queries),
+        staff_profiles=OrganisationStaffProfiles(reference_queries),
     )
 
 

@@ -20,6 +20,7 @@ from tests.fakes.organisation import (
 from tests.fakes.password_hasher import InMemoryPasswordHasher
 from tests.fakes.sessions import InMemorySessions
 from tests.fakes.staff_directory import InMemoryStaffDirectory
+from tests.fakes.staff_profiles import InMemoryStaffProfiles
 from tests.fakes.tokens import InMemoryTokenGenerator
 from tests.fakes.unit_of_work import InMemoryUnitOfWork
 from tests.fakes.upcoming_appointments import InMemoryUpcomingAppointments
@@ -51,6 +52,7 @@ class FakeWorld:
         self.actors = InMemoryAuditActors(self.audit)
         self.user_queries = InMemoryUserQueries(self.users)
         self.staff = InMemoryStaffDirectory()
+        self.staff_profiles = InMemoryStaffProfiles()
         self.uow = InMemoryUnitOfWork(
             self.audit,
             self.users,
@@ -96,4 +98,5 @@ class FakeWorld:
             staff_lookup=self.user_queries,
             profiles=self.profiles,
             staff=self.staff,
+            staff_profiles=self.staff_profiles,
         )

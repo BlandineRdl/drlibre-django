@@ -101,14 +101,20 @@ class DjangoReferenceQueries(ReferenceQueries):
             for pk, name, code, department in rows
         )
 
-    def clinician_profiles(self, request: PageRequest) -> Page[ClinicianProfile]:
+    def clinician_profiles(
+        self, request: PageRequest, *, named: frozenset[Id] = frozenset()
+    ) -> Page[ClinicianProfile]:
         rows = ClinicianProfileRecord.objects.order_by("title")
         if request.search:
-            rows = rows.filter(title__icontains=request.search)
+            ids = [i.value for i in named]
+            rows = rows.filter(Q(title__icontains=request.search) | Q(user_id__in=ids))
         window = rows[request.offset : request.offset + PAGE_SIZE]
-        return Page(
-            tuple(from_row(ClinicianProfile, r) for r in window), rows.count(), request.number
-        )
+        items = tuple(from_row(ClinicianProfile, r) for r in window)
+        return Page(items, rows.count(), request.number)
+
+    def clinician_profile_of(self, user_id: Id) -> ClinicianProfile | None:
+        row = ClinicianProfileRecord.objects.filter(user_id=user_id.value).first()
+        return from_row(ClinicianProfile, row) if row else None
 
     def clinician_profile(self, profile_id: Id) -> ClinicianProfile | None:
         return _one(ClinicianProfileRecord, ClinicianProfile, profile_id)

@@ -3,6 +3,7 @@ from drlibre.identity.application.ports.inbound import SaveUser
 from drlibre.identity.application.ports.outbound import (
     PasswordHasher,
     Sessions,
+    StaffProfiles,
     UpcomingAppointments,
     Users,
 )
@@ -26,6 +27,7 @@ class SaveUserUseCase(SaveUser):
         sessions: Sessions,
         hasher: PasswordHasher,
         appointments: UpcomingAppointments,
+        profiles: StaffProfiles,
     ) -> None:
         self._clock = clock
         self._uow = uow
@@ -34,6 +36,7 @@ class SaveUserUseCase(SaveUser):
         self._sessions = sessions
         self._hasher = hasher
         self._appointments = appointments
+        self._profiles = profiles
 
     def execute(
         self,
@@ -92,6 +95,9 @@ class SaveUserUseCase(SaveUser):
             raise invalid_field("active", "Vous ne pouvez pas désactiver votre propre compte.")
         if actor == before.id and details.role is not before.role:
             raise invalid_field("role", "Vous ne pouvez pas changer votre propre rôle.")
+        leaves_clinician = before.role is Role.CLINICIAN and details.role is not Role.CLINICIAN
+        if leaves_clinician and self._profiles.profile_of(before.id) is not None:
+            raise invalid_field("role", "Ce praticien a un profil praticien : il reste praticien.")
         if before.active and not details.active and before.role is Role.CLINICIAN:
             upcoming = self._appointments.active_upcoming_for_clinician(
                 before.id, after=self._clock.now()

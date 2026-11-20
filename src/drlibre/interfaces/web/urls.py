@@ -23,6 +23,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("console/clinicians/", console_clinicians.list_clinicians),
     path("console/clinicians/new", console_clinicians.attach_profile),
     path("console/clinicians/<uuid:record_id>/edit", console_clinicians.edit_profile),
+    path("console/clinicians/<uuid:record_id>/delete", console_clinicians.delete_profile),
     path("console/<slug:slug>/", console_reference.list_records),
     path("console/<slug:slug>/new", console_reference.create_record),
     path("console/<slug:slug>/<uuid:record_id>/edit", console_reference.edit_record),

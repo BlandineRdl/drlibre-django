@@ -281,3 +281,8 @@ def session_closed(world: FakeWorld, outcome: Outcome, email: str) -> None:
 @then(parsers.parse('no user "{email}" exists'))
 def no_user(world: FakeWorld, email: str) -> None:
     assert world.users.by_email(Email(email)) is None
+
+
+@given(parsers.parse('"{email}" has a clinician profile'))
+def has_clinician_profile(world: FakeWorld, email: str) -> None:
+    world.staff_profiles.profiles[user_of(world, email).id] = Dependent("clinician", Id(), "Dr Ana")

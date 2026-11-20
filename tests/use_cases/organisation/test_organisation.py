@@ -255,7 +255,7 @@ def audited(world: FakeWorld, action: str, code: str) -> None:
 def audited_changes(world: FakeWorld, action: str, code: str, fields: str) -> None:
     [entry] = world.audit.entries
     assert entry.action == action
-    assert entry.entity_id == find(world, "hospital", code).id
+    assert entry.entity_id == find(world, action.split(".")[0], code).id
     assert dict(entry.metadata)["changed"] == tuple(fields.split(","))
 
 
@@ -413,7 +413,8 @@ def asks_confirmation(world: FakeWorld, outcome: Outcome, kind: str, code: str) 
 
 
 @when("the admin confirms the deletion")
-def confirms_deletion(outcome: Outcome, console: Client) -> None:
+def confirms_deletion(world: FakeWorld, outcome: Outcome, console: Client) -> None:
+    outcome.mark = len(world.audit.entries)
     assert console.post(outcome.path).status_code == 302
 
 
@@ -552,3 +553,66 @@ def audited_ids(world: FakeWorld, outcome: Outcome, action: str) -> None:
     for _, value in entry.metadata:
         values = value if isinstance(value, tuple) else (value,)
         assert all(parse_id(str(v)) is not None or str(v).isidentifier() for v in values)
+
+
+def as_text(record: Any) -> dict[str, str]:
+    """A stored record as the raw form text an edit starts from."""
+    text: dict[str, str] = {}
+    for name in record.__dataclass_fields__:
+        value = getattr(record, name)
+        if isinstance(value, bool):
+            text[name] = "on" if value else ""
+        elif isinstance(value, tuple):
+            text[name] = ", ".join(value)
+        else:
+            text[name] = "" if value is None else str(value)
+    return text
+
+
+@when(parsers.re(rf'the admin edits the {KIND} "(?P<code>[^"]+)" setting name "(?P<name>[^"]+)"'))
+def edits_name(world: FakeWorld, outcome: Outcome, kind: str, code: str, name: str) -> None:
+    record = find(world, kind_of(kind), code)
+    save(world, outcome, kind_of(kind), {**as_text(record), "name": name}, record.id)
+    assert outcome.error is None
+
+
+@then(parsers.re(rf'the {KIND} "(?P<code>[^"]+)" is named "(?P<name>[^"]+)"'))
+def is_named(world: FakeWorld, kind: str, code: str, name: str) -> None:
+    assert find(world, kind_of(kind), code).name == name
+
+
+@given(parsers.parse('the profile of "{name}" has an appointment'))
+def profile_has_appointment(world: FakeWorld, outcome: Outcome, name: str) -> None:
+    profile = world.profiles.for_user(outcome.people[name])
+    assert profile is not None
+    world.schedule.by_clinician_profile[profile.id] = (
+        Dependent("appointment", Id(), "RDV 2026-12-02"),
+    )
+
+
+@when(parsers.parse('the admin deletes the profile of "{name}"'))
+def deletes_profile(world: FakeWorld, outcome: Outcome, name: str) -> None:
+    profile = world.profiles.for_user(outcome.people[name])
+    assert profile is not None
+    try:
+        world.app.delete_clinician_profile.execute(actor=ADMIN, profile_id=profile.id)
+    except DomainError as error:
+        outcome.error = error
+
+
+@when(parsers.parse('the admin opens the deletion of the profile of "{name}"'))
+def opens_profile_deletion(world: FakeWorld, outcome: Outcome, console: Client, name: str) -> None:
+    profile = world.profiles.for_user(outcome.people[name])
+    assert profile is not None
+    outcome.path = f"/console/clinicians/{profile.id}/delete"
+    outcome.body = console.get(outcome.path).content.decode()
+
+
+@then("the deletion asks for confirmation")
+def asks_confirmation_only(outcome: Outcome) -> None:
+    assert "Cette action est définitive." in outcome.body
+
+
+@then(parsers.parse('"{name}" has no profile'))
+def has_no_profile(world: FakeWorld, outcome: Outcome, name: str) -> None:
+    assert world.profiles.for_user(outcome.people[name]) is None

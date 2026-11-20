@@ -15,18 +15,18 @@ Feature: L'admin rattache un profil praticien
     When the admin attaches a profile to "Ana Bel" in department "CARD" with specialty "CARDIO" and default room "R101"
     Then the profile of "Ana Bel" is in department "CARD" with specialty "CARDIO", default room "R101" and weight 1
 
-  Scenario Outline: Le profil porte une salle par défaut active de ce département et un poids d'au moins 1 (<field> <case>)
+  Scenario Outline: Le profil porte un département, une spécialité, un titre, une bio, une salle par défaut (salle active de ce département) et un poids d'au moins 1 (refus : <case>)
     Given a room "R201" exists in department "PEDIA"
     And an inactive room "R102" exists in department "CARD"
     When the admin attaches a profile to "Ana Bel" with <field> "<value>"
     Then the save is refused as invalid on "<field>"
 
     Examples:
-      | field           | case                   | value |
-      | default_room_id | d'un autre département | R201  |
-      | default_room_id | inactive               | R102  |
-      | weight          | nul                    | 0     |
-      | specialty_id    | absente                | nope  |
+      | case                             | field           | value |
+      | salle par défaut d'un autre département | default_room_id | R201  |
+      | salle par défaut inactive        | default_room_id | R102  |
+      | poids nul                        | weight          | 0     |
+      | spécialité inconnue              | specialty_id    | nope  |
 
   Scenario Outline: Le profil se rattache à un utilisateur praticien actif qui n'en a pas (<case>)
     Given <situation>
@@ -67,3 +67,18 @@ Feature: L'admin rattache un profil praticien
     When the admin edits the profile of "Ana Bel" setting weight "3"
     Then the audit holds "clinician_profile.updated" holding only ids
     And the profile of "Ana Bel" has weight 3
+
+  Scenario: Règle §10 : un profil praticien ne peut pas être supprimé tant qu'il a des rendez-vous
+    Given "Ana Bel" has a profile in department "CARD" with specialty "CARDIO" and default room "R101"
+    And the profile of "Ana Bel" has an appointment
+    When the admin deletes the profile of "Ana Bel"
+    Then the delete is refused listing appointment "RDV 2026-12-02"
+
+  Scenario: Règle §10 : un profil praticien sans rendez-vous est supprimé après confirmation
+    Given "Ana Bel" has a profile in department "CARD" with specialty "CARDIO" and default room "R101"
+    And the admin is signed in on the console
+    When the admin opens the deletion of the profile of "Ana Bel"
+    Then the deletion asks for confirmation
+    When the admin confirms the deletion
+    Then "Ana Bel" has no profile
+    And the audit holds "clinician_profile.deleted" holding only ids

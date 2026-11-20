@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from enum import StrEnum
 
 import pytest
 
@@ -19,12 +20,17 @@ def entry_with(metadata: dict[str, object]) -> AuditEntry:
     )
 
 
+class Status(StrEnum):
+    BOOKED = "BOOKED"
+
+
 def test_ids_counts_statuses_domains_and_field_names_are_kept() -> None:
+    """Spec §4: audit metadata holds ids, counts, status values and changed field names."""
     entry = entry_with(
         {
             "room": Id(),
             "count": 3,
-            "status": "BOOKED",
+            "status": Status.BOOKED,
             "email_domain": "example.org",
             "changed": ("full_name", "role"),
         }
@@ -36,9 +42,18 @@ def test_ids_counts_statuses_domains_and_field_names_are_kept() -> None:
 
 @pytest.mark.parametrize(
     "value",
-    ["ana@example.org", "Douleur thoracique depuis hier", ("ok", "ana@example.org"), 1.5, None],
-    ids=["email", "free-text", "email-in-names", "float", "none"],
+    [
+        "ana@example.org",
+        "Ana",
+        "Douleur thoracique",
+        ("ok", "ana@example.org"),
+        ("Ana",),
+        1.5,
+        None,
+    ],
+    ids=["email", "first-name", "free-text", "email-in-names", "name-in-names", "float", "none"],
 )
 def test_personal_or_free_values_are_refused(value: object) -> None:
+    """Spec §4: metadata never holds names, emails or free text."""
     with pytest.raises(UnsafeMetadataError):
         entry_with({"value": value})

@@ -3,7 +3,7 @@
 - `aidd_docs/INSTALL.md` holds the target folder structure: one package per bounded context, each split into domain, application and infrastructure.
 - `aidd_docs/memory/external/drlibre-specs.md` is the functional specification the code implements.
 - `src/drlibre/shared_kernel/`: `Id`, `Clock` port, `Result`, `ErrorCode` (spec 4), `DomainError`, `UnitOfWork` port, `Page`/`PageRequest` (20 rows), `FieldErrors` and `Dependents` (`has_dependents` lists).
-- `src/drlibre/audit/`: write side of the audit log; `AuditEntry` refuses personal metadata, `DjangoAuditLog` (append-only), `DjangoUnitOfWork` (`transaction.atomic`).
+- `src/drlibre/audit/`: write side of the audit log; `AuditEntry` refuses personal metadata, `DjangoAuditLog` (append-only), `DjangoUnitOfWork` (`transaction.atomic`); `AuditQueries` inbound port tells identity who acted.
 - `src/drlibre/identity/`: users, password sign-in, sessions (token hash), lockout (Redis), password change, user management, `authorize_owned` guard; `StaffLookup` inbound port for other contexts.
 - `src/drlibre/organisation/`: hospitals, specialties, departments, rooms, appointment types, clinician profiles; `DjangoReferenceQueries` reads; `NoScheduleYet` null adapter until scheduling exists.
 - `src/drlibre/health/`: health check context; `DatabaseProbe` port, PostgreSQL adapter, `SystemClock`.

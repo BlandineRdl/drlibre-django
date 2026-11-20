@@ -12,13 +12,13 @@ Feature: Un compte est verrouillé après des échecs répétés
     Then sign-in is refused with "Trop de tentatives pour cette adresse. Réessayez dans 15 minutes."
     And no session is opened
 
-  Scenario: La connexion est refusée jusqu'à la fin de la fenêtre, puis rouvre
+  Scenario: Après 10 échecs en 15 minutes sur une adresse, la connexion de cette adresse est refusée jusqu'à la fin de la fenêtre
     Given "admin@example.org" failed to sign in 10 times in 10 minutes
     When 15 minutes pass
     And "admin@example.org" signs in with "admin-password-1"
     Then a ADMIN session lasting 12 hours is opened
 
-  Scenario: Moins de 10 échecs en 15 minutes ne verrouillent pas l'adresse
+  Scenario: Après 10 échecs en 15 minutes sur une adresse, la connexion de cette adresse est refusée (9 échecs ne suffisent pas)
     Given "admin@example.org" failed to sign in 9 times in 5 minutes
     When "admin@example.org" signs in with "admin-password-1"
     Then a ADMIN session lasting 12 hours is opened

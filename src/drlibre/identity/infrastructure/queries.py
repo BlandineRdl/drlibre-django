@@ -40,3 +40,7 @@ class DjangoUserQueries(UserQueries, StaffLookup):
             "full_name"
         )
         return tuple(_member(r) for r in rows)
+
+    def named_like(self, text: str) -> frozenset[Id]:
+        ids = UserRecord.objects.filter(full_name__icontains=text).values_list("id", flat=True)
+        return frozenset(Id(pk) for pk in ids)

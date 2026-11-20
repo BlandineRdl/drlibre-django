@@ -103,8 +103,9 @@ TYPES = (
         "colour": "#8E24AA",
     },
 )
+ADMIN_EMAIL = "admin@drlibre.localhost"
 USERS = (
-    ("ADMIN", "Alice Admin", "admin@drlibre.localhost"),
+    ("ADMIN", "Alice Admin", ADMIN_EMAIL),
     ("CLINICIAN", "Dr Claire Martin", "clinicien@drlibre.localhost"),
     ("PATIENT", "Paul Patient", "patient@drlibre.localhost"),
 )
@@ -116,27 +117,42 @@ def _by_code(page: Callable[[PageRequest], Page[Any]], code: str) -> Id | None:
 
 
 def _upsert(
-    save: SaveRecord, page: Callable[[PageRequest], Page[Any]], fields: dict[str, str]
+    save: SaveRecord,
+    page: Callable[[PageRequest], Page[Any]],
+    fields: dict[str, str],
+    *,
+    actor: Id | None,
 ) -> Id:
     """Get or create on the unique code, so a second run adds nothing."""
     found = _by_code(page, fields["code"])
-    return found or save.execute(actor=None, record_id=None, fields={**fields, "active": "on"})
+    return found or save.execute(actor=actor, record_id=None, fields={**fields, "active": "on"})
+
+
+def _demo_admin(app: Container) -> Id | None:
+    """The demo admin is the actor of every seeded write once it exists (spec §3.1)."""
+    return _user_id(app, ADMIN_EMAIL)
 
 
 def seed_referential(app: Container) -> None:
     q = app.reference_queries
-    hospitals = {h["code"]: _upsert(app.save_hospital, q.hospitals, h) for h in HOSPITALS}
+    actor = _demo_admin(app)
+    hospitals = {
+        h["code"]: _upsert(app.save_hospital, q.hospitals, h, actor=actor) for h in HOSPITALS
+    }
     for specialty in SPECIALTIES:
-        _upsert(app.save_specialty, q.specialties, specialty)
+        _upsert(app.save_specialty, q.specialties, specialty, actor=actor)
     departments = {
         d["code"]: _upsert(
-            app.save_department, q.departments, {**d, "hospital_id": str(hospitals[d["hospital"]])}
+            app.save_department,
+            q.departments,
+            {**d, "hospital_id": str(hospitals[d["hospital"]])},
+            actor=actor,
         )
         for d in DEPARTMENTS
     }
     for room in ROOMS:
         fields = {**room, "department_id": str(departments[room["department"]])}
-        _upsert(app.save_room, q.rooms, fields)
+        _upsert(app.save_room, q.rooms, fields, actor=actor)
     for kind in TYPES:
         fields = {
             **kind,
@@ -144,7 +160,7 @@ def seed_referential(app: Container) -> None:
             "needs_room": "on",
             "bookable_online": "on",
         }
-        _upsert(app.save_appointment_type, q.appointment_types, fields)
+        _upsert(app.save_appointment_type, q.appointment_types, fields, actor=actor)
 
 
 def _user_id(app: Container, email: str) -> Id | None:
@@ -156,8 +172,9 @@ def seed_users(app: Container) -> None:
     for role, name, email in USERS:
         if _user_id(app, email) is not None:
             continue
+        # The first account, the demo admin, has no one before it to act.
         user_id = app.save_user.execute(
-            actor=None,
+            actor=_demo_admin(app),
             user_id=None,
             full_name=name,
             email=email,
@@ -182,11 +199,13 @@ def seed_clinician_profile(app: Container) -> None:
         "title": "Dr Claire Martin",
         "bio": "Cardiologue, consultations adultes.",
     }
-    app.attach_clinician_profile.execute(actor=None, user_id=str(clinician), fields=fields)
+    app.attach_clinician_profile.execute(
+        actor=_demo_admin(app), user_id=str(clinician), fields=fields
+    )
 
 
 # Each seeder gets or creates its rows, so the whole seed can run again safely.
-SEEDERS: list[Callable[[Container], None]] = [seed_referential, seed_users, seed_clinician_profile]
+SEEDERS: list[Callable[[Container], None]] = [seed_users, seed_referential, seed_clinician_profile]
 
 
 def main() -> None:

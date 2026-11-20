@@ -16,6 +16,7 @@ __all__ = [
     "AttachClinicianProfile",
     "ClinicianProfile",
     "DeleteAppointmentType",
+    "DeleteClinicianProfile",
     "DeleteDepartment",
     "DeleteHospital",
     "DeleteRecord",
@@ -91,6 +92,12 @@ class EditClinicianProfile(Protocol):
         ...
 
 
+class DeleteClinicianProfile(Protocol):
+    def execute(self, *, actor: Id | None, profile_id: Id) -> None:
+        """Delete a profile; not_found, or has_dependents while it has appointments."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class Option:
     id: Id
@@ -154,8 +161,14 @@ class ReferenceQueries(Protocol):
         """Every active room as an option labelled with its department, by name."""
         ...
 
-    def clinician_profiles(self, request: PageRequest) -> Page[ClinicianProfile]:
-        """Profiles matching the search on title, 20 per page, by title."""
+    def clinician_profiles(
+        self, request: PageRequest, *, named: frozenset[Id] = frozenset()
+    ) -> Page[ClinicianProfile]:
+        """Profiles whose title matches the search or whose user is in `named`, 20 per page."""
+        ...
+
+    def clinician_profile_of(self, user_id: Id) -> ClinicianProfile | None:
+        """The profile of the clinician user, or None."""
         ...
 
     def clinician_profile(self, profile_id: Id) -> ClinicianProfile | None:

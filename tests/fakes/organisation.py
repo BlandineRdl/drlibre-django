@@ -83,12 +83,16 @@ class InMemoryScheduleDependents(ScheduleDependents):
     def __init__(self) -> None:
         self.by_room: dict[Id, tuple[Dependent, ...]] = {}
         self.by_appointment_type: dict[Id, tuple[Dependent, ...]] = {}
+        self.by_clinician_profile: dict[Id, tuple[Dependent, ...]] = {}
 
     def for_room(self, room_id: Id) -> tuple[Dependent, ...]:
         return self.by_room.get(room_id, ())
 
     def for_appointment_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
         return self.by_appointment_type.get(appointment_type_id, ())
+
+    def for_clinician_profile(self, profile_id: Id) -> tuple[Dependent, ...]:
+        return self.by_clinician_profile.get(profile_id, ())
 
 
 def _page[T: Named](records: InMemoryRecords[T], request: PageRequest) -> Page[T]:
@@ -161,13 +165,21 @@ class InMemoryReferenceQueries(ReferenceQueries):
         rooms = self.stores[3]
         return tuple(Option(r.id, r.label) for r in rooms.where() if r.active)
 
-    def clinician_profiles(self, request: PageRequest) -> Page[ClinicianProfile]:
-        found = [p for p in self.profiles.matching() if request.search.lower() in p.title.lower()]
+    def clinician_profiles(
+        self, request: PageRequest, *, named: frozenset[Id] = frozenset()
+    ) -> Page[ClinicianProfile]:
+        needle = request.search.lower()
+        found = [
+            p for p in self.profiles.matching() if needle in p.title.lower() or p.user_id in named
+        ]
         window = tuple(found[request.offset : request.offset + PAGE_SIZE])
         return Page(window, len(found), request.number)
 
     def clinician_profile(self, profile_id: Id) -> ClinicianProfile | None:
         return self.profiles.get(profile_id)
+
+    def clinician_profile_of(self, user_id: Id) -> ClinicianProfile | None:
+        return self.profiles.for_user(user_id)
 
     def profiled_user_ids(self) -> frozenset[Id]:
         return frozenset(p.user_id for p in self.profiles.rows.values())
@@ -185,6 +197,9 @@ class InMemoryClinicianProfiles(ClinicianProfiles):
 
     def save(self, profile: ClinicianProfile) -> None:
         self.rows[profile.id] = profile
+
+    def delete(self, profile_id: Id) -> None:
+        self.rows.pop(profile_id, None)
 
     def matching(
         self,

@@ -3,23 +3,29 @@ Feature: L'admin gère les spécialités
   Je veux gérer une liste de spécialités (nom, code unique, actif)
   Afin que les praticiens soient classés sur des valeurs communes, cherchables et filtrables
 
-  Scenario: Création d'une spécialité
+  Scenario: Création, liste avec recherche et pagination par 20, modification et suppression avec confirmation (création)
     When the admin saves a specialty "CARDIO" named "Cardiologie"
     Then the specialty "CARDIO" is listed
 
-  Scenario: Création : le code est unique, quelle que soit sa casse
+  Scenario: Création, liste avec recherche et pagination par 20, modification et suppression avec confirmation (création : code unique, quelle que soit sa casse)
     Given a specialty "CARDIO" exists
     When the admin saves a specialty "NEW" with code "cardio"
     Then the save is refused as invalid on "code"
 
-  Scenario: Liste avec recherche et pagination par 20
+  Scenario: Création, liste avec recherche et pagination par 20, modification et suppression avec confirmation (liste et recherche)
     Given 21 specialty records exist, 2 of them named with "Pédiatrie"
     When the admin lists the specialty records on page 1
     Then the page shows 20 rows out of 21
     When the admin lists the specialty records searching "pédiatrie"
     Then the page shows 2 rows out of 2
 
-  Scenario: Modification et suppression avec confirmation
+  Scenario: Création, liste avec recherche et pagination par 20, modification et suppression avec confirmation (modification)
+    Given a specialty "CARDIO" exists
+    When the admin edits the specialty "CARDIO" setting name "Cardiologie interventionnelle"
+    Then the specialty "CARDIO" is named "Cardiologie interventionnelle"
+    And the audit holds "specialty.updated" for "CARDIO" changing "name"
+
+  Scenario: Création, liste avec recherche et pagination par 20, modification et suppression avec confirmation (suppression avec confirmation)
     Given a specialty "CARDIO" exists
     And the admin is signed in on the console
     When the admin opens the deletion of the specialty "CARDIO"

@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from django.conf import settings
 from django.test import Client
@@ -110,3 +112,68 @@ def test_a_clinician_cannot_manage_accounts(client: Client) -> None:
 
     assert client.get("/console/users/").status_code == 403
     assert client.get("/console/clinicians/new").status_code == 403
+
+
+def attached_clinician(admin_client: Client) -> tuple[Any, Any]:
+    hospital = build.hospital()
+    DjangoHospitals().save(hospital)
+    department = build.department(hospital.id)
+    DjangoDepartments().save(department)
+    specialty = build.specialty()
+    DjangoSpecialties().save(specialty)
+    clinician = stored_user(Role.CLINICIAN)
+    admin_client.post(
+        "/console/clinicians/new",
+        {
+            "user_id": str(clinician.id),
+            "department_id": str(department.id),
+            "specialty_id": str(specialty.id),
+            "title": "Dr Profil",
+        },
+    )
+    return clinician, ClinicianProfileRecord.objects.get(user_id=clinician.id.value)
+
+
+def test_a_clinician_with_a_profile_is_neither_deleted_nor_moved_to_another_role(
+    admin_client: Client,
+) -> None:
+    """Règle §3.2 : un praticien rattaché garde son compte et son rôle tant que son profil vit."""
+    clinician, _ = attached_clinician(admin_client)
+
+    delete = admin_client.post(f"/console/users/{clinician.id}/delete")
+    role = admin_client.post(
+        f"/console/users/{clinician.id}/edit",
+        {
+            "full_name": clinician.full_name,
+            "email": clinician.email.value,
+            "role": "PATIENT",
+            "active": "on",
+        },
+    )
+
+    assert delete.status_code == 409
+    assert "Praticien : Dr Profil" in delete.content.decode()
+    assert role.status_code == 400
+    assert UserRecord.objects.get(id=clinician.id.value).role == "CLINICIAN"
+
+
+def test_a_profile_without_appointments_is_deleted_after_confirmation(admin_client: Client) -> None:
+    """Règle §10 : un profil praticien sans rendez-vous est supprimé après confirmation."""
+    _, profile = attached_clinician(admin_client)
+
+    confirm = admin_client.get(f"/console/clinicians/{profile.id}/delete")
+    deleted = admin_client.post(f"/console/clinicians/{profile.id}/delete")
+
+    assert "Cette action est définitive." in confirm.content.decode()
+    assert deleted["Location"] == "/console/clinicians/?done=deleted"
+    assert not ClinicianProfileRecord.objects.filter(id=profile.id).exists()
+
+
+def test_the_clinician_list_is_searched_by_the_clinician_name(admin_client: Client) -> None:
+    """Profil praticien : la liste des praticiens se cherche par nom ou titre."""
+    clinician, _ = attached_clinician(admin_client)
+    UserRecord.objects.filter(id=clinician.id.value).update(full_name="Zoé Quentin")
+
+    found = admin_client.get("/console/clinicians/?search=quentin").content.decode()
+
+    assert "Dr Profil" in found

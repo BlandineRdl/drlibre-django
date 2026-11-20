@@ -7,31 +7,31 @@ Feature: L'admin gère les hôpitaux
     When the admin saves a hospital "NORD" named "Hôpital Nord"
     Then the hospital "NORD" is listed with time zone "Europe/Paris"
 
-  Scenario Outline: Un hôpital porte les champs du §3.1 : une valeur invalide est refusée sur son champ (<field>)
+  Scenario Outline: Un hôpital porte les champs du §3.1 (valeur refusée : <case>)
     Given a hospital "TAKEN" exists
     When the admin saves a hospital "NEW" with <field> "<value>"
     Then the save is refused as invalid on "<field>"
     And nothing is audited
 
     Examples:
-      | field     | value        |
-      | code      | taken        |
-      | code      | no spaces!   |
-      | time_zone | Mars/Olympus |
-      | latitude  | 95           |
-      | longitude | east         |
-      | name      |              |
+      | case                    | field     | value        |
+      | code déjà pris          | code      | taken        |
+      | code avec des espaces   | code      | no spaces!   |
+      | fuseau horaire inconnu  | time_zone | Mars/Olympus |
+      | latitude hors limites   | latitude  | 95           |
+      | longitude non numérique | longitude | east         |
+      | nom vide                | name      |              |
 
-  Scenario: Un hôpital porte les champs du §3.1 : modifier un hôpital absent est introuvable
+  Scenario: Règle §4 : un enregistrement absent donne not_found
     When the admin edits an unknown hospital
     Then the save is refused as "not_found"
 
-  Scenario: La liste montre 20 lignes par page, avec le total
+  Scenario: La liste montre 20 lignes par page, avec le total et une recherche (pagination)
     Given 25 hospital records exist, 3 of them named with "Nord"
     When the admin lists the hospital records on page 2
     Then the page shows 5 rows out of 25
 
-  Scenario: La liste se cherche par nom ou par code
+  Scenario: La liste montre 20 lignes par page, avec le total et une recherche (recherche par nom ou code)
     Given 25 hospital records exist, 3 of them named with "Nord"
     When the admin lists the hospital records searching "nord"
     Then the page shows 3 rows out of 3
@@ -53,7 +53,7 @@ Feature: L'admin gère les hôpitaux
     When the admin edits the hospital "NORD" setting name "Hôpital du Nord" and city "Lille"
     Then the audit holds "hospital.updated" for "NORD" changing "name,city"
 
-  Scenario: Chaque écriture laisse une entrée d'audit : sans audit, rien n'est écrit
+  Scenario: Chaque écriture laisse une entrée d'audit sans donnée personnelle (sans audit, rien n'est écrit)
     Given the audit log is down
     When the admin saves a hospital "NORD" named "Hôpital Nord"
     Then the save fails

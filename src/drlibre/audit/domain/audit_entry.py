@@ -8,8 +8,9 @@ from drlibre.shared_kernel.ids import Id
 
 type MetadataValue = str | int | bool | tuple[str, ...]
 
-# Codes, status values, field names and email domains; rules out emails and free text.
-_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.\-]{0,99}")
+# Free text is allowed only under these keys; elsewhere a plain string could be a name.
+_TEXT_KEYS = {"email_domain": re.compile(r"[a-z0-9-]+(\.[a-z0-9-]+)+")}
+_FIELD_NAME = re.compile(r"[a-z_][a-z0-9_]{0,63}")
 
 
 class UnsafeMetadataError(ValueError):
@@ -17,18 +18,20 @@ class UnsafeMetadataError(ValueError):
 
 
 def _clean(key: str, value: object) -> MetadataValue:
+    """Keep ids, counts, enum statuses, field-name tuples and allow-listed text only."""
     if isinstance(value, Id):
         return str(value)
     if isinstance(value, StrEnum):
         return value.value
     if isinstance(value, bool | int):
         return value
-    if isinstance(value, str) and _TOKEN.fullmatch(value):
+    pattern = _TEXT_KEYS.get(key)
+    if isinstance(value, str) and pattern is not None and pattern.fullmatch(value):
         return value
-    if isinstance(value, tuple) and all(isinstance(v, str | Id) for v in value):
-        items = tuple(str(v) for v in value)
-        if all(_TOKEN.fullmatch(v) for v in items):
-            return items
+    if isinstance(value, tuple) and all(
+        isinstance(v, Id) or (isinstance(v, str) and _FIELD_NAME.fullmatch(v)) for v in value
+    ):
+        return tuple(str(v) for v in value)
     raise UnsafeMetadataError(f"audit metadata {key!r} must be an id, a count, a status or names")
 
 

@@ -39,8 +39,8 @@
 - Django stores session keys raw; the session store must keep only a hash.
 - Own session cookie `drlibre_session` (HttpOnly, SameSite=Lax, Secure with `HTTPS_ONLY`); `django.contrib.sessions` and `django.contrib.auth` stay uninstalled, Django's hashers work without them.
 - `SameOriginMiddleware` refuses unsafe methods from another origin, API included; CSRF stays on for web forms.
-- Dependents not modelled yet (appointments, availability rules, waitlist) are read through null adapters (`NoScheduleYet`, `NoAppointmentsYet`) that later Epics replace.
-- Web views catch `invalid_input` and `has_dependents` to re-render their form; other refusals become error pages through `DomainErrorPagesMiddleware`.
+- Dependents not modelled yet (appointments, availability rules, waitlist) are read through null adapters (`NoScheduleYet`, `NoAppointmentsYet`) that later Epics replace; dependents are checked inside the unit of work of the delete.
+- Web views catch `invalid_input`, `has_dependents` and `forbidden` to re-render their form or delete confirmation; other refusals become error pages through `DomainErrorPagesMiddleware` (rule 6-domain-errors).
 - Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 
 ## Flow

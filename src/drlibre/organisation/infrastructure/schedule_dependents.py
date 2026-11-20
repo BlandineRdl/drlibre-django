@@ -11,3 +11,6 @@ class NoScheduleYet(ScheduleDependents):
 
     def for_appointment_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
         return ()
+
+    def for_clinician_profile(self, profile_id: Id) -> tuple[Dependent, ...]:
+        return ()

@@ -64,6 +64,10 @@ class ScheduleDependents(Protocol):
         """Return appointments and waitlist entries of the appointment type."""
         ...
 
+    def for_clinician_profile(self, profile_id: Id) -> tuple[Dependent, ...]:
+        """Return the appointments of the clinician holding the profile."""
+        ...
+
 
 class ClinicianProfiles(Protocol):
     def get(self, profile_id: Id) -> ClinicianProfile | None:
@@ -76,6 +80,10 @@ class ClinicianProfiles(Protocol):
 
     def save(self, profile: ClinicianProfile) -> None:
         """Insert or replace the profile by id."""
+        ...
+
+    def delete(self, profile_id: Id) -> None:
+        """Remove the profile; callers check its dependents first."""
         ...
 
     def matching(

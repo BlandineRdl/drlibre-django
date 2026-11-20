@@ -41,3 +41,7 @@ class InMemoryUserQueries(UserQueries, StaffLookup):
 
     def active_clinicians(self) -> tuple[StaffMember, ...]:
         return tuple(_member(u) for u in self._sorted() if u.role is Role.CLINICIAN and u.active)
+
+    def named_like(self, text: str) -> frozenset[Id]:
+        rows = self.users_store.rows.values()
+        return frozenset(u.id for u in rows if text.lower() in u.full_name.lower())

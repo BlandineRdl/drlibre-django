@@ -1,4 +1,5 @@
 import re
+from typing import Any
 
 import pytest
 from django.conf import settings
@@ -166,3 +167,64 @@ def test_clinician_cannot_open_the_console_screens(client: Client) -> None:
 
     assert client.get("/console/hospitals/").status_code == 403
     assert client.post("/console/hospitals/new", hospital_fields(code("H"))).status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("slug", "model", "build_fields"),
+    [
+        ("specialties", SpecialtyRecord, lambda refs: {"code": code("S")}),
+        (
+            "departments",
+            DepartmentRecord,
+            lambda refs: {"code": code("D"), "hospital_id": refs["hospital"]},
+        ),
+        (
+            "rooms",
+            RoomRecord,
+            lambda refs: {
+                "code": code("R"),
+                "department_id": refs["department"],
+                "floor": "1",
+                "capacity": "2",
+            },
+        ),
+        (
+            "appointment-types",
+            AppointmentTypeRecord,
+            lambda refs: {
+                "code": code("T"),
+                "department_id": refs["department"],
+                "duration_minutes": "30",
+                "buffer_minutes": "0",
+                "colour": "#336699",
+            },
+        ),
+    ],
+    ids=["specialty", "department", "room", "appointment-type"],
+)
+def test_admin_edits_each_referential_record_and_the_audit_names_the_change(
+    admin_client: Client, slug: str, model: Any, build_fields: Any
+) -> None:
+    """Création, liste avec recherche et pagination par 20, modification (§10 console)."""
+    h, d = code("H"), code("D")
+    admin_client.post("/console/hospitals/new", hospital_fields(h))
+    hospital = HospitalRecord.objects.get(code=h)
+    admin_client.post(
+        "/console/departments/new", {"hospital_id": str(hospital.id), "name": "Base", "code": d}
+    )
+    refs = {
+        "hospital": str(hospital.id),
+        "department": str(DepartmentRecord.objects.get(code=d).id),
+    }
+    fields = {"name": "Avant", "active": "on", **build_fields(refs)}
+    admin_client.post(f"/console/{slug}/new", fields)
+    record = model.objects.get(code=fields["code"])
+
+    form = admin_client.get(f"/console/{slug}/{record.id}/edit")
+    edited = admin_client.post(f"/console/{slug}/{record.id}/edit", {**fields, "name": "Après"})
+
+    assert 'value="Avant"' in form.content.decode()
+    assert edited["Location"] == f"/console/{slug}/?done=updated"
+    assert model.objects.get(id=record.id).name == "Après"
+    entry = AuditEntryRecord.objects.get(entity_id=record.id, action__endswith=".updated")
+    assert entry.metadata == {"changed": ["name"]}

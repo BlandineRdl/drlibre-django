@@ -93,3 +93,9 @@ class AuditActors(Protocol):
     def has_acted(self, user_id: Id) -> bool:
         """True when the user is the actor of at least one audit entry."""
         ...
+
+
+class StaffProfiles(Protocol):
+    def profile_of(self, user_id: Id) -> Dependent | None:
+        """The clinician profile attached to the user, as a dependent, or None."""
+        ...

@@ -113,3 +113,7 @@ class StaffLookup(Protocol):
     def active_clinicians(self) -> tuple[StaffMember, ...]:
         """Every active clinician user, by name."""
         ...
+
+    def named_like(self, text: str) -> frozenset[Id]:
+        """Users whose full name contains the text, ignoring case."""
+        ...

@@ -36,11 +36,11 @@ Feature: Chaque rôle n'accède qu'à son espace
     When "clinician@example.org" opens a record owned by "other@example.org"
     Then access is refused as "forbidden"
 
-  Scenario: Un enregistrement appartenant à l'utilisateur lui est rendu
+  Scenario: Un enregistrement existant mais appartenant à un autre donne forbidden (son propriétaire y accède)
     When "clinician@example.org" opens a record owned by "clinician@example.org"
     Then the record is returned
 
-  Scenario: Un admin, global, atteint les enregistrements de tous
+  Scenario: Un enregistrement existant mais appartenant à un autre donne forbidden (sauf pour l'admin, global)
     When "admin@example.org" opens a record owned by "other@example.org"
     Then the record is returned
 

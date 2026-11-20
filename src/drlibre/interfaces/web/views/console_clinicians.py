@@ -12,6 +12,7 @@ from drlibre.interfaces.web.presenters.console import console_nav
 from drlibre.interfaces.web.presenters.forms import Choice, build_form
 from drlibre.interfaces.web.presenters.reference import (
     Column,
+    confirm_view,
     labels_by_id,
     list_view,
     record_values,
@@ -98,19 +99,20 @@ def list_clinicians(request: HttpRequest) -> HttpResponse:
     page_request = PageRequest.from_query(
         page=request.GET.get("page"), search=request.GET.get("search")
     )
+    search = page_request.search
+    named = container().staff_lookup.named_like(search) if search else frozenset()
     view = list_view(
         title="Praticiens",
         base_url=BASE,
         columns=columns,
-        page=q.clinician_profiles(page_request),
+        page=q.clinician_profiles(page_request, named=named),
         request=page_request,
         label=lambda p: p.title,
         done=request.GET.get("done"),
-        deletable=False,
     )
     context = {
         "view": view,
-        "search_label": "Rechercher par titre",
+        "search_label": "Rechercher par nom ou titre",
         "section_nav": console_nav(request.path),
     }
     return render(request, "console/list.html", context)
@@ -151,3 +153,25 @@ def edit_profile(request: HttpRequest, record_id: uuid.UUID) -> HttpResponse:
             raise
         return _form(request, title=title, values=values, attaching=False, error=error)
     return redirect(f"{BASE}?done=updated")
+
+
+@require_http_methods(["GET", "POST"])
+@require_role(Role.ADMIN)
+def delete_profile(request: HttpRequest, record_id: uuid.UUID) -> HttpResponse:
+    profile = _profile(record_id)
+    error: DomainError | None = None
+    if request.method == "POST":
+        try:
+            container().delete_clinician_profile.execute(
+                actor=current_identity(request).user_id, profile_id=profile.id
+            )
+        except DomainError as refused:
+            if refused.code is not ErrorCode.HAS_DEPENDENTS:
+                raise
+            error = refused
+        else:
+            return redirect(f"{BASE}?done=deleted")
+    confirm = confirm_view(label=profile.title, action=request.path, cancel_url=BASE, error=error)
+    context = {"confirm": confirm, "section_nav": console_nav(request.path)}
+    status = error.code.http_status if error else 200
+    return render(request, "console/confirm_delete.html", context, status=status)

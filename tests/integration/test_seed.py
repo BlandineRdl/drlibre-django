@@ -1,6 +1,7 @@
 import pytest
 from django.apps import apps
 
+from drlibre.audit.infrastructure.django.models import AuditEntryRecord
 from drlibre.identity.infrastructure.django.models import UserRecord
 from scripts import seed
 
@@ -31,3 +32,6 @@ def test_the_demo_seed_can_run_again_without_duplicating_rows() -> None:
         )
     )
     assert roles == {"ADMIN", "CLINICIAN", "PATIENT"}
+    admin = UserRecord.objects.get(email="admin@drlibre.localhost")
+    seeded = AuditEntryRecord.objects.filter(entity_type="hospital", action="hospital.created")
+    assert set(seeded.values_list("actor_id", flat=True)) == {admin.id}
