@@ -53,6 +53,51 @@ python-version = "3.13"
 
 [tool.importlinter]
 root_packages = ["drlibre"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Domain and shared kernel stay pure Python"
+type = "forbidden"
+source_modules = ["drlibre.*.domain", "drlibre.shared_kernel"]
+forbidden_modules = [
+    "django",
+    "ninja",
+    "celery",
+    "drlibre.*.application",
+    "drlibre.*.infrastructure",
+    "drlibre.interfaces",
+    "drlibre.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+name = "Application depends on ports, not frameworks or adapters"
+type = "forbidden"
+source_modules = ["drlibre.*.application"]
+forbidden_modules = [
+    "django",
+    "ninja",
+    "celery",
+    "drlibre.*.infrastructure",
+    "drlibre.interfaces",
+    "drlibre.bootstrap",
+]
+
+[[tool.importlinter.contracts]]
+name = "Interfaces reach use cases only through bootstrap"
+type = "forbidden"
+source_modules = ["drlibre.interfaces"]
+forbidden_modules = [
+    "drlibre.*.infrastructure",
+    "drlibre.*.domain",
+    "drlibre.*.application.use_cases",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Each context layers infrastructure over application over domain"
+type = "layers"
+containers = ["drlibre.health", "drlibre.notifications"]
+layers = ["infrastructure", "application", "(domain)"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
