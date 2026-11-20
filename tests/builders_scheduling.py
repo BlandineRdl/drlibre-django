@@ -1,4 +1,5 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from drlibre.organisation.domain.clinician_profile import ClinicianProfile
 from drlibre.organisation.domain.department import Department
@@ -12,6 +13,7 @@ from drlibre.scheduling.domain.availability_rule import AvailabilityRule
 from drlibre.scheduling.domain.slot import Period
 from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.system_clock import SystemClock
 from tests import builders_organisation as build
 
 
@@ -70,3 +72,10 @@ def stored_profile(department: Department, *, user_id: Id | None = None) -> Clin
     profile = ClinicianProfile.attach(fields, user_id=user_id or Id(), at=build.AT)
     DjangoClinicianProfiles().save(profile)
     return profile
+
+
+def next_monday(time_zone: str = "Europe/Paris") -> datetime:
+    """Midnight of next Monday in the hospital's time zone, always after today."""
+    tz = ZoneInfo(time_zone)
+    today = SystemClock().now().astimezone(tz).date()
+    return datetime.combine(today + timedelta(days=7 - today.weekday()), time(), tzinfo=tz)

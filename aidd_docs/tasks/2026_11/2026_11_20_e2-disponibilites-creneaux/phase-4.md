@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: `GET /slots`, écrans praticien, résumé et calendrier admin

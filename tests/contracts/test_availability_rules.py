@@ -60,10 +60,12 @@ def test_a_rule_is_stored_edited_and_deleted(setup: Setup) -> None:
     setup.rules.save(moved)
 
     assert setup.rules.get(saved.id) == moved
+    assert setup.queries.rule(saved.id) == moved
     assert setup.rules.for_clinician(setup.clinician) == (moved,)
     setup.rules.delete(saved.id)
     setup.rules.delete(Id())
     assert setup.rules.get(saved.id) is None
+    assert setup.queries.rule(saved.id) is None
 
 
 def test_a_clinician_lists_only_own_rules_by_weekday_then_start(setup: Setup) -> None:

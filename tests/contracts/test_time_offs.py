@@ -51,10 +51,12 @@ def test_a_time_off_is_stored_and_deleted(setup: Setup) -> None:
     setup.time_offs.save(saved)
 
     assert setup.time_offs.get(saved.id) == saved
+    assert setup.queries.time_off(saved.id) == saved
     assert setup.time_offs.for_clinician(setup.clinician) == (saved,)
     setup.time_offs.delete(saved.id)
     setup.time_offs.delete(Id())
     assert setup.time_offs.get(saved.id) is None
+    assert setup.queries.time_off(saved.id) is None
 
 
 def test_a_clinician_lists_only_own_time_off_by_start(setup: Setup) -> None:

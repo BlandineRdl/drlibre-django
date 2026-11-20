@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Mes absences{% endblock %}
+{% block content %}
+<div class="actions">
+  <h1>Mes absences</h1>
+  <a href="/workspace/time-off/new" role="button">Ajouter une absence</a>
+</div>
+<p>Fuseau : {{ view.time_zone }}. Début et fin sont saisis et affichés en heure locale de votre hôpital.</p>
+{% if view.status %}<p role="status">{{ view.status }}</p>{% endif %}
+{% if view.rows %}
+<div class="overflow-auto">
+  <table>
+    <caption>Mes absences, heure locale ({{ view.time_zone }})</caption>
+    <thead><tr><th scope="col">Début</th><th scope="col">Fin</th><th scope="col">Motif</th><th scope="col">Actions</th></tr></thead>
+    <tbody>
+    {% for row in view.rows %}
+      <tr>
+        <td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.reason }}</td>
+        <td class="actions"><a href="{{ row.delete_url }}" aria-label="Supprimer l'absence {{ row.label }}">Supprimer</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>Aucune absence pour l'instant.</p>
+{% endif %}
+{% endblock %}

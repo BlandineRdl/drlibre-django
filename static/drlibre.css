@@ -8,3 +8,6 @@
 .section-nav ul { flex-wrap: wrap; }
 .error-summary { border-left: 0.25rem solid var(--pico-del-color); padding-left: 1rem; margin-bottom: 1rem; }
 caption { text-align: left; }
+.week-grid td { font-size: 0.8rem; white-space: nowrap; }
+.week-grid td.available { border-left: 0.25rem solid var(--pico-ins-color); }
+.week-grid td.time-off { border-left: 0.25rem dashed var(--pico-del-color); font-style: italic; }

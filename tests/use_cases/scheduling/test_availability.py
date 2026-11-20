@@ -4,9 +4,10 @@ from datetime import UTC, date, datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.test import Client
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from drlibre.bootstrap.container import wire
+from drlibre.bootstrap.container import Container, wire
 from drlibre.organisation.infrastructure.schedule_dependents import SchedulingScheduleDependents
 from drlibre.scheduling.application.ports.outbound import (
     AppointmentType,
@@ -18,6 +19,7 @@ from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from tests import builders_organisation as build
 from tests.builders_scheduling import appointment
+from tests.builders_web import fake_clinician, signed_in
 from tests.fakes.audit_log import AuditLogUnavailableError
 from tests.fakes.world import FakeWorld
 
@@ -41,6 +43,9 @@ class Outcome:
         self.rooms: dict[str, Id] = {}
         self.slots_before: list[StoredSlot] = []
         self.error: DomainError | None = None
+        self.clients: dict[str, Client] = {}
+        self.path = ""
+        self.body = ""
 
     def local(self, raw: str) -> datetime:
         return datetime.fromisoformat(raw).replace(tzinfo=self.tz)
@@ -388,3 +393,62 @@ def audit_changed(world: FakeWorld, action: str, names: str) -> None:
 def audit_silent(world: FakeWorld, text: str) -> None:
     assert world.audit.entries
     assert all(text not in repr(e) for e in world.audit.entries)
+
+
+def web(world: FakeWorld, outcome: Outcome, name: str) -> Client:
+    """The clinician's workspace over the fake wiring, signed in on first use."""
+    if name not in outcome.clients:
+        person = outcome.people[name]
+        user = fake_clinician(
+            world,
+            user_id=person.user_id,
+            profile_id=person.profile_id,
+            department_id=outcome.department,
+            time_zone=outcome.tz.key,
+            name=name,
+        )
+        outcome.clients[name] = signed_in(world, user)
+    return outcome.clients[name]
+
+
+@when(parsers.parse('"{name}" opens the page "{path}"'))
+def opens_page(
+    world: FakeWorld, outcome: Outcome, fake_container: Container, name: str, path: str
+) -> None:
+    response = web(world, outcome, name).get(path)
+    assert response.status_code == 200
+    outcome.body = response.content.decode()
+
+
+@when(parsers.re(r'"(?P<name>[^"]+)" opens the deletion of that (?P<kind>rule|time off)$'))
+def opens_deletion(
+    world: FakeWorld, outcome: Outcome, fake_container: Container, name: str, kind: str
+) -> None:
+    clinician = outcome.people[name].profile_id
+    if kind == "rule":
+        (found,) = world.availability_queries.rules_of(clinician)
+        outcome.path = f"/workspace/availability/{found.id}/delete"
+    else:
+        (off,) = world.availability_queries.time_offs_of(clinician)
+        outcome.path = f"/workspace/time-off/{off.id}/delete"
+    outcome.body = web(world, outcome, name).get(outcome.path).content.decode()
+
+
+@when(parsers.parse('"{name}" confirms the deletion'))
+def confirms_deletion(world: FakeWorld, outcome: Outcome, name: str) -> None:
+    assert web(world, outcome, name).post(outcome.path).status_code == 302
+
+
+@then("the page asks for confirmation")
+def asks_confirmation(outcome: Outcome) -> None:
+    assert "Cette action est définitive." in outcome.body
+
+
+@then(parsers.parse('the page names the time zone "{time_zone}"'))
+def names_time_zone(outcome: Outcome, time_zone: str) -> None:
+    assert f"Fuseau : {time_zone}" in outcome.body or f"({time_zone})" in outcome.body
+
+
+@then(parsers.parse('the page shows "{text}"'))
+def page_shows(outcome: Outcome, text: str) -> None:
+    assert text in outcome.body

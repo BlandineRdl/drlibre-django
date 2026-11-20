@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ week.title }}{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<h1>{{ week.title }}</h1>
+<p>{{ week.week_label }} · Fuseau : {{ week.time_zone }} · Lecture seule</p>
+<nav aria-label="Semaines" class="pagination">
+  <a href="{{ week.previous_url }}">‹ Semaine précédente</a>
+  <a href="{{ week.this_url }}">Cette semaine</a>
+  <a href="{{ week.next_url }}">Semaine suivante ›</a>
+</nav>
+<div class="overflow-auto week-grid" role="region" aria-labelledby="week-caption" tabindex="0">
+  <table>
+    <caption id="week-caption">{{ week.week_label }}, heure locale ({{ week.time_zone }}) : « {{ available }} » pour une plage, « {{ time_off }} » pour une absence</caption>
+    <thead><tr><th scope="col">Heure</th>{% for day in week.days %}<th scope="col"><abbr title="{{ day.long }}">{{ day.short }}</abbr></th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in week.rows %}
+      <tr><th scope="row">{{ row.time }}</th>{% for cell in row.cells %}<td{% if cell.kind %} class="{{ cell.kind }}"{% endif %}>{{ cell.text }}</td>{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p><a href="/console/clinicians/">Retour aux praticiens</a></p>
+{% endblock %}

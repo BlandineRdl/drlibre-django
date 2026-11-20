@@ -32,6 +32,16 @@ Feature: Le praticien gère ses plages hebdomadaires
     When "Dr A" saves a rule on weekday "2" from "09:00" to "10:00" every "30" minutes
     Then the stored slots of "Dr A" on "2026-11-24" start at "09:00, 09:30" local time
 
+  Scenario: Les heures sont saisies et affichées en heure locale de l'hôpital du praticien, et la page nomme ce fuseau (la page nomme ce fuseau)
+    Given "Dr A" saved a rule on weekday "1" from "09:00" to "12:00" every "15" minutes
+    When "Dr A" opens the page "/workspace/availability/"
+    Then the page names the time zone "Europe/Paris"
+    And the page shows "09:00-12:00"
+
+  Scenario: Les heures sont saisies et affichées en heure locale de l'hôpital du praticien, et la page nomme ce fuseau (le formulaire nomme ce fuseau)
+    When "Dr A" opens the page "/workspace/availability/new"
+    Then the page names the time zone "Europe/Paris"
+
   Scenario: La salle, si elle est donnée, est une salle active du département du praticien (salle acceptée)
     Given an active room "R1" in that department
     When "Dr A" saves a rule on weekday "1" from "09:00" to "12:00" every "15" minutes in room "R1"
@@ -74,6 +84,14 @@ Feature: Le praticien gère ses plages hebdomadaires
     And today is "2026-12-03"
     When "Dr A" edits that rule to weekday "1" from "10:00" to "12:00" every "15" minutes
     Then the rule of "Dr A" is valid from "2026-11-20" with no end date
+
+  Scenario: La suppression demande une confirmation
+    Given "Dr A" saved a rule on weekday "1" from "09:00" to "12:00" every "15" minutes
+    When "Dr A" opens the deletion of that rule
+    Then the page asks for confirmation
+    And "Dr A" has the rules "Lundi 09:00-12:00"
+    When "Dr A" confirms the deletion
+    Then "Dr A" has no rule
 
   Scenario: Le praticien ne voit et ne modifie que ses propres plages (liste)
     Given "Dr A" saved a rule on weekday "1" from "09:00" to "12:00" every "15" minutes

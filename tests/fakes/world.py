@@ -126,6 +126,7 @@ class FakeWorld:
             time_offs=self.time_offs,
             active_appointments=self.active_appointments,
             slot_store=self.slots,
+            slot_queries=self.slots,
             availability_queries=self.availability_queries,
             slot_refresh=self.slot_refresh,
         )

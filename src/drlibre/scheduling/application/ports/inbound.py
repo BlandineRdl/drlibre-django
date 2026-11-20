@@ -69,6 +69,14 @@ class DeleteTimeOff(Protocol):
 
 
 class AvailabilityQueries(Protocol):
+    def rule(self, rule_id: Id) -> AvailabilityRule | None:
+        """The rule whoever owns it, or None when unknown."""
+        ...
+
+    def time_off(self, time_off_id: Id) -> TimeOff | None:
+        """The time off whoever owns it, or None when unknown."""
+        ...
+
     def rules_of(self, clinician_id: Id) -> tuple[AvailabilityRule, ...]:
         """The clinician's rules by weekday then start; empty when there are none."""
         ...

@@ -39,6 +39,16 @@ Feature: Le praticien déclare ses absences
     Then the time off of "Dr A" starts at "2026-12-01T08:00:00+00:00"
     And the stored slots of "Dr A" on "2026-12-01" start at "10:00, 11:00" local time
 
+  Scenario: Début et fin sont saisis et affichés en heure locale de l'hôpital du praticien, et la page nomme ce fuseau (la page nomme ce fuseau)
+    Given "Dr A" recorded a time off from "2026-12-01T09:00" to "2026-12-01T10:00"
+    When "Dr A" opens the page "/workspace/time-off/"
+    Then the page names the time zone "Europe/Paris"
+    And the page shows "01/12/2026 09:00"
+
+  Scenario: Début et fin sont saisis et affichés en heure locale de l'hôpital du praticien, et la page nomme ce fuseau (le formulaire nomme ce fuseau)
+    When "Dr A" opens the page "/workspace/time-off/new"
+    Then the page names the time zone "Europe/Paris"
+
   Scenario: Une période identique à une absence déjà enregistrée est refusée
     Given "Dr A" recorded a time off from "2026-12-01T09:00" to "2026-12-01T12:00"
     When "Dr A" records a time off from "2026-12-01T09:00" to "2026-12-01T12:00"
@@ -49,6 +59,14 @@ Feature: Le praticien déclare ses absences
     Given "Dr A" recorded a time off from "2026-12-01T09:00" to "2026-12-01T12:00"
     When "Dr A" records a time off from "2026-12-01T10:00" to "2026-12-01T12:00"
     Then "Dr A" has the time off "2026-12-01T09:00 → 2026-12-01T12:00, 2026-12-01T10:00 → 2026-12-01T12:00"
+
+  Scenario: La suppression demande une confirmation
+    Given "Dr A" recorded a time off from "2026-12-01T09:00" to "2026-12-01T10:00"
+    When "Dr A" opens the deletion of that time off
+    Then the page asks for confirmation
+    And "Dr A" has the time off "2026-12-01T09:00 → 2026-12-01T10:00"
+    When "Dr A" confirms the deletion
+    Then "Dr A" has no time off
 
   Scenario: Une absence n'annule pas les RDV déjà pris pendant sa période
     Given "Dr A" has a "BOOKED" appointment from "2026-12-01T09:00" to "2026-12-01T09:30"

@@ -22,11 +22,19 @@ class Column:
 
 
 @dataclass(frozen=True, slots=True)
+class LinkView:
+    url: str
+    label: str
+    aria_label: str
+
+
+@dataclass(frozen=True, slots=True)
 class RowView:
     label: str
     cells: tuple[str, ...]
     edit_url: str
     delete_url: str
+    links: tuple[LinkView, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +97,7 @@ def list_view(
     label: Callable[[Any], str],
     done: str | None = None,
     deletable: bool = True,
+    links: Callable[[Any], tuple[LinkView, ...]] = lambda _: (),
 ) -> ListView:
     def url(number: int) -> str:
         query = {"page": number, **({"search": request.search} if request.search else {})}
@@ -100,6 +109,7 @@ def list_view(
             cells=tuple(column.cell(record) for column in columns),
             edit_url=f"{base_url}{record.id}/edit",
             delete_url=f"{base_url}{record.id}/delete" if deletable else "",
+            links=links(record),
         )
         for record in page.items
     )

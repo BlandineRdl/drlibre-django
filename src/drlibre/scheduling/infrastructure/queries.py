@@ -15,6 +15,14 @@ _WEEKLY = ("weekday", "start", "end")
 
 
 class DjangoAvailabilityQueries(AvailabilityQueries, RoomUsage):
+    def rule(self, rule_id: Id) -> AvailabilityRule | None:
+        row = AvailabilityRuleModel.objects.filter(id=rule_id.value).first()
+        return as_rule(row) if row else None
+
+    def time_off(self, time_off_id: Id) -> TimeOff | None:
+        row = TimeOffModel.objects.filter(id=time_off_id.value).first()
+        return as_time_off(row) if row else None
+
     def rules_of(self, clinician_id: Id) -> tuple[AvailabilityRule, ...]:
         rows = AvailabilityRuleModel.objects.filter(clinician_id=clinician_id.value)
         return tuple(as_rule(row) for row in rows.order_by(*_WEEKLY))

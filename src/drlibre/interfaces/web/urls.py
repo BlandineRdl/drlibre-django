@@ -6,6 +6,7 @@ from drlibre.interfaces.web.views import (
     console_clinicians,
     console_reference,
     console_users,
+    workspace_availability,
 )
 
 urlpatterns: list[URLPattern | URLResolver] = [
@@ -24,6 +25,14 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("console/clinicians/new", console_clinicians.attach_profile),
     path("console/clinicians/<uuid:record_id>/edit", console_clinicians.edit_profile),
     path("console/clinicians/<uuid:record_id>/delete", console_clinicians.delete_profile),
+    path("console/clinicians/<uuid:record_id>/week", console_clinicians.clinician_week),
+    path("workspace/availability/", workspace_availability.list_rules),
+    path("workspace/availability/new", workspace_availability.create_rule),
+    path("workspace/availability/<uuid:record_id>/edit", workspace_availability.edit_rule),
+    path("workspace/availability/<uuid:record_id>/delete", workspace_availability.delete_rule),
+    path("workspace/time-off/", workspace_availability.list_time_off),
+    path("workspace/time-off/new", workspace_availability.create_time_off),
+    path("workspace/time-off/<uuid:record_id>/delete", workspace_availability.delete_time_off),
     path("console/<slug:slug>/", console_reference.list_records),
     path("console/<slug:slug>/new", console_reference.create_record),
     path("console/<slug:slug>/<uuid:record_id>/edit", console_reference.edit_record),

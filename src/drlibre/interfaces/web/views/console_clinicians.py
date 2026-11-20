@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Mapping
+from zoneinfo import ZoneInfo
 
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -8,16 +9,25 @@ from django.views.decorators.http import require_GET, require_http_methods
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.presenters.availability import (
+    AVAILABLE,
+    TIME_OFF,
+    week_start,
+    week_view,
+    weekly_summary,
+)
 from drlibre.interfaces.web.presenters.console import console_nav
 from drlibre.interfaces.web.presenters.forms import Choice, build_form
 from drlibre.interfaces.web.presenters.reference import (
     Column,
+    LinkView,
     confirm_view,
     labels_by_id,
     list_view,
     record_values,
 )
 from drlibre.interfaces.web.presenters.staff import CLINICIAN_FIELD, PROFILE_FIELDS
+from drlibre.interfaces.web.time_zones import hospital_time_zone
 from drlibre.organisation.application.ports.inbound import ClinicianProfile
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -89,26 +99,30 @@ def list_clinicians(request: HttpRequest) -> HttpResponse:
     names = _names()
     departments = labels_by_id(q.department_options())
     specialties = labels_by_id(q.specialty_options())
+    page_request = PageRequest.from_query(
+        page=request.GET.get("page"), search=request.GET.get("search")
+    )
+    search = page_request.search
+    named = container().staff_lookup.named_like(search) if search else frozenset()
+    page = q.clinician_profiles(page_request, named=named)
+    rules = container().availability_queries.weekly_summary(frozenset(p.id for p in page.items))
     columns = (
         Column("Praticien", lambda p: names.get(p.user_id, "Compte inactif")),
         Column("Titre", lambda p: p.title),
         Column("Département", lambda p: departments.get(p.department_id, "")),
         Column("Spécialité", lambda p: specialties.get(p.specialty_id, "")),
         Column("Poids", lambda p: str(p.weight)),
+        Column("Plages (heure locale de l'hôpital)", lambda p: weekly_summary(rules.get(p.id, ()))),
     )
-    page_request = PageRequest.from_query(
-        page=request.GET.get("page"), search=request.GET.get("search")
-    )
-    search = page_request.search
-    named = container().staff_lookup.named_like(search) if search else frozenset()
     view = list_view(
         title="Praticiens",
         base_url=BASE,
         columns=columns,
-        page=q.clinician_profiles(page_request, named=named),
+        page=page,
         request=page_request,
         label=lambda p: p.title,
         done=request.GET.get("done"),
+        links=lambda p: (LinkView(f"{BASE}{p.id}/week", "Semaine", f"Calendrier de {p.title}"),),
     )
     context = {
         "view": view,
@@ -175,3 +189,28 @@ def delete_profile(request: HttpRequest, record_id: uuid.UUID) -> HttpResponse:
     context = {"confirm": confirm, "section_nav": console_nav(request.path)}
     status = error.code.http_status if error else 200
     return render(request, "console/confirm_delete.html", context, status=status)
+
+
+@require_GET
+@require_role(Role.ADMIN)
+def clinician_week(request: HttpRequest, record_id: uuid.UUID) -> HttpResponse:
+    profile = _profile(record_id)
+    time_zone = hospital_time_zone(profile.department_id)
+    today = container().clock.now().astimezone(ZoneInfo(time_zone)).date()
+    q = container().availability_queries
+    week = week_view(
+        clinician=_names().get(profile.user_id, profile.title),
+        time_zone=time_zone,
+        monday=week_start(request.GET.get("week"), today=today),
+        rules=q.rules_of(profile.id),
+        time_offs=q.time_offs_of(profile.id),
+        base_url=request.path,
+    )
+    context = {
+        "week": week,
+        "available": AVAILABLE,
+        "time_off": TIME_OFF,
+        "time_zone": time_zone,
+        "section_nav": console_nav(request.path),
+    }
+    return render(request, "console/clinician_week.html", context)

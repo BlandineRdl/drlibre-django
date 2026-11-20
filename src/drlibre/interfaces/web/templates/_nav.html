@@ -1,5 +1,10 @@
 {% if shell.signed_in %}
 <ul>
+  {% if shell.is_clinician %}
+  <li><a href="/workspace/">Mon espace</a></li>
+  <li><a href="/workspace/availability/">Mes plages</a></li>
+  <li><a href="/workspace/time-off/">Mes absences</a></li>
+  {% endif %}
   {% if shell.can_change_password %}<li><a href="/account/password">Mot de passe</a></li>{% endif %}
   <li>
     <form method="post" action="/sign-out" class="inline-form">

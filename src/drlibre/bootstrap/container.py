@@ -113,6 +113,7 @@ from drlibre.scheduling.application.ports.inbound import (
     DeleteAvailabilityRule,
     DeleteTimeOff,
     ExtendSlotHorizon,
+    FindFreeSlots,
     RecordTimeOff,
     SaveAvailabilityRule,
 )
@@ -120,6 +121,7 @@ from drlibre.scheduling.application.ports.outbound import (
     ActiveAppointments,
     AvailabilityRules,
     SchedulingDirectory,
+    SlotQueries,
     SlotStore,
     TimeOffs,
 )
@@ -128,6 +130,7 @@ from drlibre.scheduling.application.use_cases.delete_availability_rule import (
 )
 from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
 from drlibre.scheduling.application.use_cases.extend_slot_horizon import ExtendSlotHorizonUseCase
+from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
 from drlibre.scheduling.application.use_cases.record_time_off import RecordTimeOffUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.application.use_cases.save_availability_rule import (
@@ -142,6 +145,7 @@ from drlibre.scheduling.infrastructure.repositories import (
     DjangoAvailabilityRules,
     DjangoTimeOffs,
 )
+from drlibre.scheduling.infrastructure.slot_queries import DjangoSlotQueries
 from drlibre.scheduling.infrastructure.slot_store import DjangoSlotStore
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.system_clock import SystemClock
@@ -181,6 +185,7 @@ class Adapters:
     time_offs: TimeOffs
     active_appointments: ActiveAppointments
     slot_store: SlotStore
+    slot_queries: SlotQueries
     availability_queries: AvailabilityQueries
     # None wires organisation to scheduling's own RefreshSlots.
     slot_refresh: SlotRefresh | None = None
@@ -188,6 +193,7 @@ class Adapters:
 
 @dataclass(frozen=True, slots=True)
 class Container:
+    clock: Clock
     check_health: CheckHealth
     mailer: Mailer
     sign_in: SignIn
@@ -218,6 +224,7 @@ class Container:
     delete_time_off: DeleteTimeOff
     availability_queries: AvailabilityQueries
     extend_slot_horizon: ExtendSlotHorizon
+    find_free_slots: FindFreeSlots
 
 
 def wire(a: Adapters) -> Container:
@@ -233,6 +240,7 @@ def wire(a: Adapters) -> Container:
     )
     slots = a.slot_refresh or SchedulingSlotRefresh(refresh=refresh)
     return Container(
+        clock=clock,
         check_health=CheckHealthUseCase(clock=clock, database=a.database),
         mailer=a.mailer,
         sign_in=SignInUseCase(
@@ -394,6 +402,9 @@ def wire(a: Adapters) -> Container:
         extend_slot_horizon=ExtendSlotHorizonUseCase(
             uow=uow, rules=a.availability_rules, refresh=refresh
         ),
+        find_free_slots=FindFreeSlotsUseCase(
+            clock=clock, directory=directory, queries=a.slot_queries
+        ),
     )
 
 
@@ -433,6 +444,7 @@ def real_adapters() -> Adapters:
         time_offs=DjangoTimeOffs(),
         active_appointments=NoActiveAppointmentsYet(),
         slot_store=DjangoSlotStore(),
+        slot_queries=DjangoSlotQueries(),
         availability_queries=availability_queries,
     )
 

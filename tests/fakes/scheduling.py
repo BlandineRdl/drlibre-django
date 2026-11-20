@@ -140,6 +140,12 @@ class InMemoryAvailabilityQueries(AvailabilityQueries, RoomUsage):
         self.rules = rules
         self.time_offs = time_offs
 
+    def rule(self, rule_id: Id) -> AvailabilityRule | None:
+        return self.rules.get(rule_id)
+
+    def time_off(self, time_off_id: Id) -> TimeOff | None:
+        return self.time_offs.get(time_off_id)
+
     def rules_of(self, clinician_id: Id) -> tuple[AvailabilityRule, ...]:
         return tuple(sorted(self.rules.for_clinician(clinician_id), key=_weekly))
 
