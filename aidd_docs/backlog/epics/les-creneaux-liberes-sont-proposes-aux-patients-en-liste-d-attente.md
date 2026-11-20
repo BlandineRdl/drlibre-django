@@ -1,6 +1,6 @@
 ---
 type: epic
-status: proposed
+status: ready
 source: aidd_docs/memory/external/drlibre-specs.md (§5.8, §8 Waitlist, §10 Waitlist, §11)
 goal: aidd_docs/memory/project-brief.md
 depends_on: aidd_docs/backlog/epics/le-patient-gere-ses-rendez-vous-et-reste-informe.md

@@ -1,6 +1,6 @@
 ---
 type: epic
-status: proposed
+status: ready
 source: aidd_docs/memory/external/drlibre-specs.md (§4, §10, §12)
 goal: aidd_docs/memory/project-brief.md
 ---

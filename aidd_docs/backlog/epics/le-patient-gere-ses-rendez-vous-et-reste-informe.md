@@ -1,6 +1,6 @@
 ---
 type: epic
-status: proposed
+status: ready
 source: aidd_docs/memory/external/drlibre-specs.md (§5.6, §5.7, §7.4, §7.6, §8, §11)
 goal: aidd_docs/memory/project-brief.md
 depends_on: aidd_docs/backlog/epics/un-visiteur-trouve-et-reserve-un-creneau-sans-compte.md
