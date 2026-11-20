@@ -15,6 +15,7 @@ from tests.fakes.organisation import (
     InMemoryReferenceQueries,
     InMemoryRooms,
     InMemoryScheduleDependents,
+    InMemorySlotRefresh,
     InMemorySpecialties,
 )
 from tests.fakes.password_hasher import InMemoryPasswordHasher
@@ -66,6 +67,7 @@ class FakeWorld:
         self.time_offs = InMemoryTimeOffs()
         self.active_appointments = InMemoryActiveAppointments()
         self.slots = InMemorySlotStore()
+        self.slot_refresh = InMemorySlotRefresh()
         self.availability_queries = InMemoryAvailabilityQueries(
             rules=self.availability_rules, time_offs=self.time_offs
         )
@@ -82,6 +84,7 @@ class FakeWorld:
             self.availability_rules,
             self.time_offs,
             self.slots,
+            self.slot_refresh,
         )
         self.app: Container = wire(self.adapters())
 
@@ -124,4 +127,5 @@ class FakeWorld:
             active_appointments=self.active_appointments,
             slot_store=self.slots,
             availability_queries=self.availability_queries,
+            slot_refresh=self.slot_refresh,
         )

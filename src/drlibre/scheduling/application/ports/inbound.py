@@ -13,6 +13,7 @@ __all__ = [
     "AvailabilityRule",
     "DeleteAvailabilityRule",
     "DeleteTimeOff",
+    "ExtendSlotHorizon",
     "FindFreeSlots",
     "RecordTimeOff",
     "RefreshSlots",
@@ -34,6 +35,12 @@ class FindFreeSlots(Protocol):
 class RefreshSlots(Protocol):
     def execute(self, *, clinician_id: Id) -> None:
         """Rebuild the clinician's stored slots from today to the horizon, in the caller's unit."""
+        ...
+
+
+class ExtendSlotHorizon(Protocol):
+    def execute(self) -> None:
+        """Rebuild every clinician's stored slots from today to the horizon, one unit each."""
         ...
 
 

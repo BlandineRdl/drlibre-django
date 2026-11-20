@@ -8,6 +8,7 @@ from drlibre.organisation.application.ports.outbound import (
     Hospitals,
     Rooms,
     ScheduleDependents,
+    SlotRefresh,
     Specialties,
 )
 from drlibre.organisation.domain.appointment_type import AppointmentType
@@ -225,3 +226,11 @@ class InMemoryClinicianProfiles(ClinicianProfiles):
             if all(getattr(p, k) == v for k, v in wanted.items() if v is not None)
         ]
         return tuple(sorted(found, key=lambda p: p.title))
+
+
+class InMemorySlotRefresh(SlotRefresh):
+    def __init__(self) -> None:
+        self.refreshed: list[Id] = []
+
+    def refresh(self, profile_ids: tuple[Id, ...]) -> None:
+        self.refreshed.extend(profile_ids)

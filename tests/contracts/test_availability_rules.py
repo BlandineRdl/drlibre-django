@@ -95,3 +95,14 @@ def test_a_room_lists_the_rules_that_use_it(setup: Setup) -> None:
         "Lundi 09:00-12:00",
     )
     assert setup.usage.rules_using(Id()) == ()
+
+
+def test_the_daily_job_finds_each_clinician_with_rules_once(setup: Setup) -> None:
+    """Story plages : cet horizon avance chaque jour sans intervention."""
+    setup.rules.save(rule(setup.clinician, weekday=1))
+    setup.rules.save(rule(setup.clinician, weekday=2))
+
+    found = setup.rules.clinicians()
+
+    assert found.count(setup.clinician) == 1
+    assert setup.other not in found

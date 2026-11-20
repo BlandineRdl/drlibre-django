@@ -52,6 +52,10 @@ class DjangoAvailabilityRules(AvailabilityRules):
     def delete(self, rule_id: Id) -> None:
         AvailabilityRuleModel.objects.filter(id=rule_id.value).delete()
 
+    def clinicians(self) -> tuple[Id, ...]:
+        ids = AvailabilityRuleModel.objects.values_list("clinician_id", flat=True).distinct()
+        return tuple(Id(value) for value in ids.order_by())
+
     def for_clinician(self, clinician_id: Id) -> tuple[AvailabilityRule, ...]:
         rows = AvailabilityRuleModel.objects.filter(clinician_id=clinician_id.value)
         return tuple(as_rule(row) for row in rows)

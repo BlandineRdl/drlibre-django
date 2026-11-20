@@ -3,6 +3,7 @@ from logging.config import dictConfig
 from typing import Any
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import setup_logging
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -11,6 +12,10 @@ app = Celery("drlibre")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 app.conf.beat_schedule = {
     "heartbeat": {"task": "drlibre.heartbeat", "schedule": 60.0},
+    "extend-slot-horizon": {
+        "task": "drlibre.extend_slot_horizon",
+        "schedule": crontab(hour=0, minute=15),
+    },
 }
 app.autodiscover_tasks(["drlibre.interfaces.jobs"])
 

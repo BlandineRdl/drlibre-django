@@ -21,6 +21,10 @@ class AvailabilityRules(Protocol):
         """Remove the rule; absent ids are ignored."""
         ...
 
+    def clinicians(self) -> tuple[Id, ...]:
+        """Return the ids of every clinician holding at least one rule."""
+        ...
+
     def for_clinician(self, clinician_id: Id) -> tuple[AvailabilityRule, ...]:
         """Return every rule of the clinician, whatever its validity dates."""
         ...

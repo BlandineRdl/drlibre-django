@@ -69,6 +69,7 @@ from drlibre.organisation.application.ports.outbound import (
     Hospitals,
     Rooms,
     ScheduleDependents,
+    SlotRefresh,
     Specialties,
     StaffDirectory,
 )
@@ -105,11 +106,13 @@ from drlibre.organisation.infrastructure.repositories import (
     DjangoSpecialties,
 )
 from drlibre.organisation.infrastructure.schedule_dependents import SchedulingScheduleDependents
+from drlibre.organisation.infrastructure.slot_refresh import SchedulingSlotRefresh
 from drlibre.organisation.infrastructure.staff_directory import IdentityStaffDirectory
 from drlibre.scheduling.application.ports.inbound import (
     AvailabilityQueries,
     DeleteAvailabilityRule,
     DeleteTimeOff,
+    ExtendSlotHorizon,
     RecordTimeOff,
     SaveAvailabilityRule,
 )
@@ -124,6 +127,7 @@ from drlibre.scheduling.application.use_cases.delete_availability_rule import (
     DeleteAvailabilityRuleUseCase,
 )
 from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
+from drlibre.scheduling.application.use_cases.extend_slot_horizon import ExtendSlotHorizonUseCase
 from drlibre.scheduling.application.use_cases.record_time_off import RecordTimeOffUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.application.use_cases.save_availability_rule import (
@@ -133,12 +137,12 @@ from drlibre.scheduling.infrastructure.directory import OrganisationSchedulingDi
 from drlibre.scheduling.infrastructure.no_appointments_yet import (
     NoAppointmentsYet as NoActiveAppointmentsYet,
 )
-from drlibre.scheduling.infrastructure.no_slot_table_yet import NoSlotTableYet
 from drlibre.scheduling.infrastructure.queries import DjangoAvailabilityQueries
 from drlibre.scheduling.infrastructure.repositories import (
     DjangoAvailabilityRules,
     DjangoTimeOffs,
 )
+from drlibre.scheduling.infrastructure.slot_store import DjangoSlotStore
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.system_clock import SystemClock
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
@@ -178,6 +182,8 @@ class Adapters:
     active_appointments: ActiveAppointments
     slot_store: SlotStore
     availability_queries: AvailabilityQueries
+    # None wires organisation to scheduling's own RefreshSlots.
+    slot_refresh: SlotRefresh | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +217,7 @@ class Container:
     record_time_off: RecordTimeOff
     delete_time_off: DeleteTimeOff
     availability_queries: AvailabilityQueries
+    extend_slot_horizon: ExtendSlotHorizon
 
 
 def wire(a: Adapters) -> Container:
@@ -224,6 +231,7 @@ def wire(a: Adapters) -> Container:
         appointments=a.active_appointments,
         store=a.slot_store,
     )
+    slots = a.slot_refresh or SchedulingSlotRefresh(refresh=refresh)
     return Container(
         check_health=CheckHealthUseCase(clock=clock, database=a.database),
         mailer=a.mailer,
@@ -288,6 +296,8 @@ def wire(a: Adapters) -> Container:
             audit=audit,
             appointment_types=a.appointment_types,
             departments=a.departments,
+            profiles=a.profiles,
+            slots=slots,
         ),
         delete_appointment_type=DeleteAppointmentTypeUseCase(
             clock=clock,
@@ -323,6 +333,7 @@ def wire(a: Adapters) -> Container:
             clock=clock,
             uow=uow,
             audit=audit,
+            slots=slots,
             profiles=a.profiles,
             staff=a.staff,
             departments=a.departments,
@@ -333,13 +344,19 @@ def wire(a: Adapters) -> Container:
             clock=clock,
             uow=uow,
             audit=audit,
+            slots=slots,
             profiles=a.profiles,
             departments=a.departments,
             specialties=a.specialties,
             rooms=a.rooms,
         ),
         delete_clinician_profile=DeleteClinicianProfileUseCase(
-            clock=clock, uow=uow, audit=audit, profiles=a.profiles, schedule=a.schedule
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            slots=slots,
+            profiles=a.profiles,
+            schedule=a.schedule,
         ),
         save_availability_rule=SaveAvailabilityRuleUseCase(
             clock=clock,
@@ -374,6 +391,9 @@ def wire(a: Adapters) -> Container:
             refresh=refresh,
         ),
         availability_queries=a.availability_queries,
+        extend_slot_horizon=ExtendSlotHorizonUseCase(
+            uow=uow, rules=a.availability_rules, refresh=refresh
+        ),
     )
 
 
@@ -412,7 +432,7 @@ def real_adapters() -> Adapters:
         availability_rules=DjangoAvailabilityRules(),
         time_offs=DjangoTimeOffs(),
         active_appointments=NoActiveAppointmentsYet(),
-        slot_store=NoSlotTableYet(),
+        slot_store=DjangoSlotStore(),
         availability_queries=availability_queries,
     )
 

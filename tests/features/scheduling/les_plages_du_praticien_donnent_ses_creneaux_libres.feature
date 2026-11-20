@@ -80,6 +80,12 @@ Feature: Les plages du praticien donnent ses créneaux libres
     When the slots of "A" are asked from "2027-02-17 00:00" to "2027-02-21 00:00"
     Then the slots run on "2027-02-17, 2027-02-18"
 
+ Scenario: Les créneaux sont connus jusqu'à 90 jours devant ; cet horizon avance chaque jour sans intervention (le lendemain)
+  Given "A" has a rule every day from "09:00" to "09:30" every 30 minutes
+  When a day passes and the daily job runs
+  And the slots of "A" are asked from "2027-02-17 00:00" to "2027-02-21 00:00"
+  Then the slots run on "2027-02-17, 2027-02-18, 2027-02-19"
+
   Scenario Outline: Règle §4 : un type ou un praticien inconnu ou inactif donne not_found (<case>)
     Given <situation>
     When the slots of "<clinician>" are asked from "2026-11-23 00:00" to "2026-11-24 00:00"

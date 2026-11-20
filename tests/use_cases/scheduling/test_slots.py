@@ -251,6 +251,12 @@ def appointment_becomes(world: FakeWorld, outcome: Outcome, name: str, status: s
     refresh(world, clinician_id)
 
 
+@when("a day passes and the daily job runs")
+def a_day_passes(world: FakeWorld) -> None:
+    world.clock.at += timedelta(days=1)
+    world.app.extend_slot_horizon.execute()
+
+
 @when(parsers.parse('the slots of "{name}" are asked from "{start}" to "{end}"'))
 def slots_of(world: FakeWorld, outcome: Outcome, name: str, start: str, end: str) -> None:
     ask(world, outcome, outcome.person(name), start, end)

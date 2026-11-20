@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Table `slot` PostgreSQL, rafraîchissement transactionnel, horizon quotidien

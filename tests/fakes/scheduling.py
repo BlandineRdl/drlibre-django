@@ -36,6 +36,9 @@ class InMemoryAvailabilityRules(AvailabilityRules):
     def delete(self, rule_id: Id) -> None:
         self.rows.pop(rule_id, None)
 
+    def clinicians(self) -> tuple[Id, ...]:
+        return tuple(dict.fromkeys(r.clinician_id for r in self.rows.values()))
+
     def for_clinician(self, clinician_id: Id) -> tuple[AvailabilityRule, ...]:
         return tuple(r for r in self.rows.values() if r.clinician_id == clinician_id)
 

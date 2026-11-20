@@ -50,6 +50,7 @@ class RecordWrites:
         record_id: Id | None,
         fields: Mapping[str, str],
         check: Callable[[T | None, T], None] = lambda before, after: None,
+        written: Callable[[T | None, T], None] = lambda before, after: None,
     ) -> Id:
         at = self._clock.now()
         before = self.existing(records, record_id) if record_id else None
@@ -64,6 +65,7 @@ class RecordWrites:
         check(before, after)
         with self._uow:
             records.save(after)
+            written(before, after)
             action = "updated" if before else "created"
             changed = changed_fields(before, after, ignore=("updated_at",)) if before else ()
             self._record(actor, action, after.id, {"changed": changed} if before else {}, at)

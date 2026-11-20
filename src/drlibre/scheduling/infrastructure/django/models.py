@@ -42,3 +42,35 @@ class TimeOffModel(models.Model):
 
     def __str__(self) -> str:
         return f"{self.start}-{self.end}"
+
+
+class SlotModel(models.Model):
+    # Rebuilt per clinician by RefreshSlots; indexed for the department and clinician reads.
+    clinician = models.ForeignKey(
+        "organisation.ClinicianProfileRecord",
+        on_delete=models.CASCADE,
+        db_index=False,
+        related_name="slots",
+    )
+    appointment_type = models.ForeignKey(
+        "organisation.AppointmentTypeRecord",
+        on_delete=models.CASCADE,
+        db_index=False,
+        related_name="slots",
+    )
+    start = models.DateTimeField()
+    end = models.DateTimeField()
+    clinician_id: uuid.UUID
+    appointment_type_id: uuid.UUID
+
+    class Meta:
+        db_table = "scheduling_slot"
+        indexes = (
+            models.Index(fields=("appointment_type", "start"), name="slot_type_start"),
+            models.Index(
+                fields=("clinician", "appointment_type", "start"), name="slot_clinician_type_start"
+            ),
+        )
+
+    def __str__(self) -> str:
+        return f"{self.start}-{self.end}"

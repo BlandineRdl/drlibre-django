@@ -6,6 +6,7 @@ from drlibre.organisation.application.ports.outbound import (
     ClinicianProfiles,
     Departments,
     Rooms,
+    SlotRefresh,
     Specialties,
 )
 from drlibre.organisation.application.use_cases.clinician_profile_rules import check_references
@@ -23,6 +24,7 @@ class EditClinicianProfileUseCase(EditClinicianProfile):
         clock: Clock,
         uow: UnitOfWork,
         audit: AuditLog,
+        slots: SlotRefresh,
         profiles: ClinicianProfiles,
         departments: Departments,
         specialties: Specialties,
@@ -31,6 +33,7 @@ class EditClinicianProfileUseCase(EditClinicianProfile):
         self._clock = clock
         self._uow = uow
         self._audit = audit
+        self._slots = slots
         self._profiles = profiles
         self._departments = departments
         self._specialties = specialties
@@ -47,6 +50,7 @@ class EditClinicianProfileUseCase(EditClinicianProfile):
         )
         with self._uow:
             self._profiles.save(after)
+            self._slots.refresh((after.id,))
             self._audit.record(
                 AuditEntry.from_event(
                     actor=actor,
