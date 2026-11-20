@@ -62,7 +62,7 @@ def test_department_options_name_their_hospital() -> None:
     assert f"Pédiatrie ({department.code}) · Hôpital Est" in labels
 
 
-def test_a_child_added_after_the_check_still_refuses_the_delete_with_its_label() -> None:
+def test_the_repository_itself_refuses_a_protected_delete_and_lists_the_child() -> None:
     """Un hôpital qui a des départements ne peut pas être supprimé, même ajoutés entre-temps."""
     hospital = build.hospital()
     DjangoHospitals().save(hospital)

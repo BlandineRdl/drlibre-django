@@ -23,8 +23,12 @@ Feature: L'admin gère les comptes utilisateurs
     When the admin creates the PATIENT "Ana Bis" with email "ANA@example.org" and password "temporary-pass-1"
     Then the write is refused as invalid on "email"
 
-  Scenario: Règle §10 : le compte est créé avec un mot de passe temporaire, de 10 à 72 caractères
+  Scenario: Règle §8 et §10 : le compte est créé avec un mot de passe temporaire, de 10 à 72 caractères (trop court)
     When the admin creates the PATIENT "Paul" with email "paul@example.org" and password "short"
+    Then the write is refused as invalid on "temporary_password"
+
+  Scenario: Règle §8 et §10 : le compte est créé avec un mot de passe temporaire, de 10 à 72 caractères (trop long)
+    When the admin creates the PATIENT "Paul" with email "paul@example.org" and password "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     Then the write is refused as invalid on "temporary_password"
 
   Scenario: Le nom, l'email, le rôle et l'état actif sont modifiables
