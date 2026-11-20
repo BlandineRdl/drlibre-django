@@ -1,7 +1,10 @@
 from pathlib import Path
 
+from django.utils.csp import CSP
 from pydantic import Field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from config.logging import configure_structlog, logging_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -17,6 +20,7 @@ class Settings(BaseSettings):
     email_port: int
     default_time_zone: str = "Europe/Paris"
     allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
+    log_level: str = "INFO"
 
 
 env = Settings()
@@ -32,9 +36,21 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "config.middleware.CorrelationIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+SECURE_CSP = {"default-src": [CSP.SELF], "frame-ancestors": [CSP.NONE]}
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+
+configure_structlog()
+LOGGING = logging_config(env.log_level)
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
