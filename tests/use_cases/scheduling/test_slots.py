@@ -14,7 +14,11 @@ from drlibre.shared_kernel.ids import Id
 from tests.builders_scheduling import appointment, rule, time_off
 from tests.fakes.world import FakeWorld
 
-scenarios("../../features/scheduling")
+scenarios(
+    "../../features/scheduling/les_plages_du_praticien_donnent_ses_creneaux_libres.feature",
+    "../../features/scheduling/les_absences_et_les_rdv_actifs_retirent_des_creneaux.feature",
+    "../../features/scheduling/les_creneaux_d_un_departement_reunissent_ceux_de_ses_praticiens.feature",
+)
 
 
 class Outcome:
@@ -148,17 +152,16 @@ def has_rule(
     valid_from: str | None,
 ) -> None:
     clinician_id = outcome.person(name)
-    validity = {"valid_from": date.fromisoformat(valid_from)} if valid_from else {}
-    world.availability_rules.save(
-        rule(
-            clinician_id,
-            weekday=int(weekday),
-            start=hhmm(start),
-            end=hhmm(end),
-            step_minutes=int(step),
-            **validity,
-        )
+    made = rule(
+        clinician_id,
+        weekday=int(weekday),
+        start=hhmm(start),
+        end=hhmm(end),
+        step_minutes=int(step),
     )
+    if valid_from:
+        made = dataclasses.replace(made, valid_from=date.fromisoformat(valid_from))
+    world.availability_rules.save(made)
     refresh(world, clinician_id)
 
 

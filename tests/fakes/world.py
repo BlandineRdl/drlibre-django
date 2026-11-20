@@ -21,6 +21,7 @@ from tests.fakes.password_hasher import InMemoryPasswordHasher
 from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
     InMemoryActiveAppointments,
+    InMemoryAvailabilityQueries,
     InMemoryAvailabilityRules,
     InMemorySlotStore,
     InMemoryTimeOffs,
@@ -65,6 +66,9 @@ class FakeWorld:
         self.time_offs = InMemoryTimeOffs()
         self.active_appointments = InMemoryActiveAppointments()
         self.slots = InMemorySlotStore()
+        self.availability_queries = InMemoryAvailabilityQueries(
+            rules=self.availability_rules, time_offs=self.time_offs
+        )
         self.uow = InMemoryUnitOfWork(
             self.audit,
             self.users,
@@ -114,4 +118,10 @@ class FakeWorld:
             profiles=self.profiles,
             staff=self.staff,
             staff_profiles=self.staff_profiles,
+            scheduling_directory=self.scheduling_directory,
+            availability_rules=self.availability_rules,
+            time_offs=self.time_offs,
+            active_appointments=self.active_appointments,
+            slot_store=self.slots,
+            availability_queries=self.availability_queries,
         )

@@ -119,6 +119,14 @@ class DjangoReferenceQueries(ReferenceQueries):
     def clinician_profile(self, profile_id: Id) -> ClinicianProfile | None:
         return _one(ClinicianProfileRecord, ClinicianProfile, profile_id)
 
+    def department_clinician_profiles(self, department_id: Id) -> tuple[ClinicianProfile, ...]:
+        rows = ClinicianProfileRecord.objects.filter(department_id=department_id.value)
+        return tuple(from_row(ClinicianProfile, r) for r in rows.order_by("title"))
+
+    def department_appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
+        rows = AppointmentTypeRecord.objects.filter(department_id=department_id.value)
+        return tuple(from_row(AppointmentType, r) for r in rows.order_by("name", "code"))
+
     def profiled_user_ids(self) -> frozenset[Id]:
         return frozenset(
             Id(pk) for pk in ClinicianProfileRecord.objects.values_list("user_id", flat=True)

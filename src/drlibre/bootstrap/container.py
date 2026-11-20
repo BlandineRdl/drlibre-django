@@ -104,8 +104,41 @@ from drlibre.organisation.infrastructure.repositories import (
     DjangoRooms,
     DjangoSpecialties,
 )
-from drlibre.organisation.infrastructure.schedule_dependents import NoScheduleYet
+from drlibre.organisation.infrastructure.schedule_dependents import SchedulingScheduleDependents
 from drlibre.organisation.infrastructure.staff_directory import IdentityStaffDirectory
+from drlibre.scheduling.application.ports.inbound import (
+    AvailabilityQueries,
+    DeleteAvailabilityRule,
+    DeleteTimeOff,
+    RecordTimeOff,
+    SaveAvailabilityRule,
+)
+from drlibre.scheduling.application.ports.outbound import (
+    ActiveAppointments,
+    AvailabilityRules,
+    SchedulingDirectory,
+    SlotStore,
+    TimeOffs,
+)
+from drlibre.scheduling.application.use_cases.delete_availability_rule import (
+    DeleteAvailabilityRuleUseCase,
+)
+from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
+from drlibre.scheduling.application.use_cases.record_time_off import RecordTimeOffUseCase
+from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
+from drlibre.scheduling.application.use_cases.save_availability_rule import (
+    SaveAvailabilityRuleUseCase,
+)
+from drlibre.scheduling.infrastructure.directory import OrganisationSchedulingDirectory
+from drlibre.scheduling.infrastructure.no_appointments_yet import (
+    NoAppointmentsYet as NoActiveAppointmentsYet,
+)
+from drlibre.scheduling.infrastructure.no_slot_table_yet import NoSlotTableYet
+from drlibre.scheduling.infrastructure.queries import DjangoAvailabilityQueries
+from drlibre.scheduling.infrastructure.repositories import (
+    DjangoAvailabilityRules,
+    DjangoTimeOffs,
+)
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.system_clock import SystemClock
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
@@ -139,6 +172,12 @@ class Adapters:
     profiles: ClinicianProfiles
     staff: StaffDirectory
     staff_profiles: StaffProfiles
+    scheduling_directory: SchedulingDirectory
+    availability_rules: AvailabilityRules
+    time_offs: TimeOffs
+    active_appointments: ActiveAppointments
+    slot_store: SlotStore
+    availability_queries: AvailabilityQueries
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,10 +206,24 @@ class Container:
     attach_clinician_profile: AttachClinicianProfile
     edit_clinician_profile: EditClinicianProfile
     delete_clinician_profile: DeleteClinicianProfile
+    save_availability_rule: SaveAvailabilityRule
+    delete_availability_rule: DeleteAvailabilityRule
+    record_time_off: RecordTimeOff
+    delete_time_off: DeleteTimeOff
+    availability_queries: AvailabilityQueries
 
 
 def wire(a: Adapters) -> Container:
     clock, uow, audit = a.clock, a.uow, a.audit
+    directory = a.scheduling_directory
+    refresh = RefreshSlotsUseCase(
+        clock=clock,
+        directory=directory,
+        rules=a.availability_rules,
+        time_offs=a.time_offs,
+        appointments=a.active_appointments,
+        store=a.slot_store,
+    )
     return Container(
         check_health=CheckHealthUseCase(clock=clock, database=a.database),
         mailer=a.mailer,
@@ -288,12 +341,46 @@ def wire(a: Adapters) -> Container:
         delete_clinician_profile=DeleteClinicianProfileUseCase(
             clock=clock, uow=uow, audit=audit, profiles=a.profiles, schedule=a.schedule
         ),
+        save_availability_rule=SaveAvailabilityRuleUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            directory=directory,
+            rules=a.availability_rules,
+            refresh=refresh,
+        ),
+        delete_availability_rule=DeleteAvailabilityRuleUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            directory=directory,
+            rules=a.availability_rules,
+            refresh=refresh,
+        ),
+        record_time_off=RecordTimeOffUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            directory=directory,
+            time_offs=a.time_offs,
+            refresh=refresh,
+        ),
+        delete_time_off=DeleteTimeOffUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            directory=directory,
+            time_offs=a.time_offs,
+            refresh=refresh,
+        ),
+        availability_queries=a.availability_queries,
     )
 
 
 def real_adapters() -> Adapters:
     user_queries = DjangoUserQueries()
     reference_queries = DjangoReferenceQueries()
+    availability_queries = DjangoAvailabilityQueries()
     return Adapters(
         clock=SystemClock(),
         database=DjangoDatabaseProbe(),
@@ -310,7 +397,7 @@ def real_adapters() -> Adapters:
         departments=DjangoDepartments(),
         rooms=DjangoRooms(),
         appointment_types=DjangoAppointmentTypes(),
-        schedule=NoScheduleYet(),
+        schedule=SchedulingScheduleDependents(usage=availability_queries),
         reference_queries=reference_queries,
         appointments=NoAppointmentsYet(),
         actors=AuditLogActors(DjangoAuditQueries()),
@@ -319,6 +406,14 @@ def real_adapters() -> Adapters:
         profiles=DjangoClinicianProfiles(),
         staff=IdentityStaffDirectory(lookup=user_queries),
         staff_profiles=OrganisationStaffProfiles(reference_queries),
+        scheduling_directory=OrganisationSchedulingDirectory(
+            queries=reference_queries, lookup=user_queries
+        ),
+        availability_rules=DjangoAvailabilityRules(),
+        time_offs=DjangoTimeOffs(),
+        active_appointments=NoActiveAppointmentsYet(),
+        slot_store=NoSlotTableYet(),
+        availability_queries=availability_queries,
     )
 
 

@@ -178,3 +178,11 @@ class ReferenceQueries(Protocol):
     def profiled_user_ids(self) -> frozenset[Id]:
         """Users who already have a clinician profile."""
         ...
+
+    def department_clinician_profiles(self, department_id: Id) -> tuple[ClinicianProfile, ...]:
+        """Every profile of the department, by title; empty for an unknown department."""
+        ...
+
+    def department_appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
+        """Every appointment type of the department, active or not, by name."""
+        ...

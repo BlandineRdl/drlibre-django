@@ -9,6 +9,10 @@ from drlibre.shared_kernel.ids import Id
 
 
 class AvailabilityRules(Protocol):
+    def get(self, rule_id: Id) -> AvailabilityRule | None:
+        """Return the rule, or None when unknown."""
+        ...
+
     def save(self, rule: AvailabilityRule) -> None:
         """Insert or replace the rule by id."""
         ...
@@ -23,6 +27,10 @@ class AvailabilityRules(Protocol):
 
 
 class TimeOffs(Protocol):
+    def get(self, time_off_id: Id) -> TimeOff | None:
+        """Return the time off, or None when unknown."""
+        ...
+
     def save(self, time_off: TimeOff) -> None:
         """Insert or replace the time off by id."""
         ...
@@ -85,9 +93,20 @@ class AppointmentType:
     active: bool
 
 
+@dataclass(frozen=True, slots=True)
+class Room:
+    id: Id
+    department_id: Id
+    active: bool
+
+
 class SchedulingDirectory(Protocol):
     def clinician(self, clinician_id: Id) -> Clinician | None:
         """Return the clinician profile with its hospital time zone, or None when unknown."""
+        ...
+
+    def clinician_of(self, user_id: Id) -> Clinician | None:
+        """Return the clinician profile of the user, or None when the user has none."""
         ...
 
     def active_clinicians(self, department_id: Id) -> tuple[Id, ...]:
@@ -100,4 +119,8 @@ class SchedulingDirectory(Protocol):
 
     def appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
         """Return every appointment type of the department, active or not."""
+        ...
+
+    def room(self, room_id: Id) -> Room | None:
+        """Return the room, active or not, or None when unknown."""
         ...

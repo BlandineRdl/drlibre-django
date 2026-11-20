@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "drlibre.audit.infrastructure.django",
     "drlibre.identity.infrastructure.django",
     "drlibre.organisation.infrastructure.django",
+    "drlibre.scheduling.infrastructure.django",
     "drlibre.interfaces.web",
 ]
 

@@ -184,6 +184,12 @@ class InMemoryReferenceQueries(ReferenceQueries):
     def profiled_user_ids(self) -> frozenset[Id]:
         return frozenset(p.user_id for p in self.profiles.rows.values())
 
+    def department_clinician_profiles(self, department_id: Id) -> tuple[ClinicianProfile, ...]:
+        return self.profiles.matching(department_id=department_id)
+
+    def department_appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
+        return self.stores[4].where(department_id=department_id)
+
 
 class InMemoryClinicianProfiles(ClinicianProfiles):
     def __init__(self) -> None:
