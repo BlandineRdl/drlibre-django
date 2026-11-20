@@ -20,6 +20,9 @@ Un admin connecté par mot de passe gère hôpitaux, spécialités, département
   - Utilisateurs : création avec mot de passe temporaire, modification, interdiction de se désactiver soi-même (10).
   - Rattachement du profil praticien : département, spécialité, titre, bio, salle par défaut, poids round robin (10).
   - Règles de la section 4 sur ces écrans : validation, audit dans la même transaction, codes d'erreur, correlation id, fuseau de l'hôpital.
+  - Changement de son propre mot de passe pour tout compte qui en a un (10 à 72 caractères), obligatoire à la première connexion après un mot de passe temporaire.
+  - Désactivation d'un praticien refusée tant qu'il a des RDV actifs à venir ; le refus les liste.
+  - API `POST /auth/login` et `POST /auth/logout` (§14).
 - Excludes:
   - Connexion par lien email et sessions de 24 h (Epic réservation sans compte).
   - Résumé des disponibilités et calendrier hebdomadaire du praticien (Epic disponibilités).
@@ -40,3 +43,5 @@ Un admin connecté par mot de passe gère hôpitaux, spécialités, département
 | Écriture du journal d'audit livrée ici, consultation dans l'Epic supervision | assumption | acceptée |
 | Seed de démo enrichie Epic par Epic ; ici référentiel + un compte par rôle | assumption | acceptée |
 | BDD + qualités §16 comme preuves de succès de chaque Epic | assumption | acceptée |
+| Changement de mot de passe pour le personnel, obligatoire après un mot de passe temporaire | decision | prise : décision du rapport de zones d'ombre (aidd_docs/backlog/epics-shadow-report.md) |
+| Praticien avec RDV actifs à venir non désactivable | decision | prise : décision du rapport de zones d'ombre (aidd_docs/backlog/epics-shadow-report.md) |

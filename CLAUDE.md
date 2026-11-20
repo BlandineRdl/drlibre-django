@@ -66,6 +66,7 @@
 
 <!-- folders other plugins own, read on demand -->
 - aidd_docs/backlog/
+- aidd_docs/rules/
 - aidd_docs/tasks/
 
 <!-- aidd_project_memory:end -->

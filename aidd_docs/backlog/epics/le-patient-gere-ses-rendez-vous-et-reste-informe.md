@@ -22,7 +22,9 @@ Un patient connecté, avec ou sans mot de passe, retrouve tous ses RDV, les dép
   - Notifications in-app : RDV réservé, déplacé, annulé, rappel ; créées dans la même transaction que l'événement ; heure seulement, sans nom, motif ni email ; liste avec « marquer comme lu » (§11, §8).
   - Email pour chaque notification patient, sans lien qui connecte (§7.6).
   - Job de rappel idempotent pour les RDV `BOOKED` des 24 prochaines heures, exécuté sur planning, avec une entrée d'audit portant le nombre de rappels (§5.7, §17).
-  - Profil : téléphone et date de naissance modifiables ; changement de mot de passe, masqué pour les patients sans mot de passe (§8).
+  - Profil : téléphone et date de naissance modifiables ; accès au changement de mot de passe livré par l'Epic 1, masqué pour les patients sans mot de passe (§8).
+  - La notification « RDV réservé » réutilise l'email de confirmation de l'Epic 3, sans second email ; tous les emails partent après la validation de la transaction.
+  - API `GET /appointments` limitée à ce que l'appelant peut voir, et API d'annulation et de déplacement pour le patient (§14).
 - Excludes:
   - Liste d'attente : inscription, offres, acceptation, notifications et emails associés (Epic liste d'attente).
   - Déclenchement manuel du job de rappel depuis les réglages (Epic supervision admin).
@@ -42,3 +44,4 @@ Un patient connecté, avec ou sans mot de passe, retrouve tous ses RDV, les dép
 | Réservation, session patient, envoi d'emails | dependency | `depends_on` Epic 3 |
 | Statut `CONFIRMED` retiré des statuts et des transitions (§5.6, §17) | decision | prise : supprimé |
 | Notification in-app « RDV réservé » ajoutée au placement livré par l'Epic 3 | assumption | acceptée |
+| Email unique à la réservation, endpoints patient de §14 | decision | prise : décision du rapport de zones d'ombre (aidd_docs/backlog/epics-shadow-report.md) |
