@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Moteur de créneaux et lecture des créneaux sur fakes

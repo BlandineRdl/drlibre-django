@@ -101,7 +101,7 @@ allow_indirect_imports = true
 [[tool.importlinter.contracts]]
 name = "Each context layers infrastructure over application over domain"
 type = "layers"
-containers = ["drlibre.audit", "drlibre.health", "drlibre.identity", "drlibre.notifications", "drlibre.organisation"]
+containers = ["drlibre.audit", "drlibre.health", "drlibre.identity", "drlibre.notifications", "drlibre.organisation", "drlibre.scheduling"]
 layers = ["infrastructure", "application", "(domain)"]
 
 [[tool.importlinter.contracts]]
@@ -115,6 +115,12 @@ name = "Organisation's core reaches identity only through its own ports"
 type = "forbidden"
 source_modules = ["drlibre.organisation.domain", "drlibre.organisation.application"]
 forbidden_modules = ["drlibre.identity"]
+
+[[tool.importlinter.contracts]]
+name = "Scheduling's core reaches identity and organisation only through its own ports"
+type = "forbidden"
+source_modules = ["drlibre.scheduling.domain", "drlibre.scheduling.application"]
+forbidden_modules = ["drlibre.identity", "drlibre.organisation"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"

@@ -18,6 +18,13 @@ from tests.fakes.organisation import (
     InMemorySpecialties,
 )
 from tests.fakes.password_hasher import InMemoryPasswordHasher
+from tests.fakes.scheduling import (
+    FixedSchedulingDirectory,
+    InMemoryActiveAppointments,
+    InMemoryAvailabilityRules,
+    InMemorySlotStore,
+    InMemoryTimeOffs,
+)
 from tests.fakes.sessions import InMemorySessions
 from tests.fakes.staff_directory import InMemoryStaffDirectory
 from tests.fakes.staff_profiles import InMemoryStaffProfiles
@@ -53,6 +60,11 @@ class FakeWorld:
         self.user_queries = InMemoryUserQueries(self.users)
         self.staff = InMemoryStaffDirectory()
         self.staff_profiles = InMemoryStaffProfiles()
+        self.scheduling_directory = FixedSchedulingDirectory()
+        self.availability_rules = InMemoryAvailabilityRules()
+        self.time_offs = InMemoryTimeOffs()
+        self.active_appointments = InMemoryActiveAppointments()
+        self.slots = InMemorySlotStore()
         self.uow = InMemoryUnitOfWork(
             self.audit,
             self.users,
@@ -63,6 +75,9 @@ class FakeWorld:
             self.rooms,
             self.appointment_types,
             self.profiles,
+            self.availability_rules,
+            self.time_offs,
+            self.slots,
         )
         self.app: Container = wire(self.adapters())
 
