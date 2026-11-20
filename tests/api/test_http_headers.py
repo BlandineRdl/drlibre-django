@@ -57,6 +57,7 @@ def test_responses_carry_security_headers(client: Client) -> None:
 
     assert "frame-ancestors 'none'" in response["Content-Security-Policy"]
     assert "default-src 'self'" in response["Content-Security-Policy"]
+    assert "img-src 'self' data:" in response["Content-Security-Policy"]
     assert response["X-Frame-Options"] == "DENY"
     assert response["X-Content-Type-Options"] == "nosniff"
     assert response["Referrer-Policy"] == "same-origin"

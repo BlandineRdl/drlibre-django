@@ -53,7 +53,12 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-SECURE_CSP = {"default-src": [CSP.SELF], "frame-ancestors": [CSP.NONE]}
+# Pico.css draws its search, select and checkbox icons as inline SVG data images.
+SECURE_CSP = {
+    "default-src": [CSP.SELF],
+    "img-src": [CSP.SELF, "data:"],
+    "frame-ancestors": [CSP.NONE],
+}
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
