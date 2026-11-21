@@ -1,3 +1,4 @@
+import colorsys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -164,12 +165,25 @@ class DayView:
     long: str
 
 
+# Palette classes `.hue-0` to `.hue-7` in drlibre.css, red to pink around the wheel.
+HUES = 8
+
+
 @dataclass(frozen=True, slots=True)
 class CellView:
     text: str
     kind: str
     colour: str = ""
     url: str = ""
+
+    @property
+    def hue_class(self) -> str:
+        """The palette class nearest the type colour: the CSP forbids inline styles."""
+        if len(self.colour) != 7:
+            return ""
+        red, green, blue = (int(self.colour[i : i + 2], 16) / 255 for i in (1, 3, 5))
+        hue, _, saturation = colorsys.rgb_to_hls(red, green, blue)
+        return "" if saturation < 0.15 else f"hue-{round(hue * HUES) % HUES}"
 
 
 @dataclass(frozen=True, slots=True)

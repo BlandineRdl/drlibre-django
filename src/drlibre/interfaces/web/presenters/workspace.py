@@ -32,6 +32,7 @@ from drlibre.interfaces.web.presenters.portal import (
     WeekStripView,
     refusal_text,
     rule_reasons,
+    status_key,
     week_strip,
 )
 from drlibre.interfaces.web.presenters.slots import day_label, local
@@ -158,6 +159,7 @@ class AgendaRowView:
     cancel_url: str
     page_url: str
     label: str
+    status_key: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +210,7 @@ def _row(entry: ClinicianEntry, zone: str) -> AgendaRowView:
         cancel_url=_cancel_url(entry),
         page_url=appointment_url(entry.appointment.id),
         label=label,
+        status_key=status_key(entry.appointment.status),
     )
 
 
@@ -274,6 +277,7 @@ def calendar_page(
 class FactView:
     label: str
     value: str
+    badge: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -316,7 +320,7 @@ def appointment_facts(file: AppointmentFile) -> tuple[FactView, ...]:
         FactView("Type", entry.appointment_type),
         FactView("Salle", entry.room or NONE),
         FactView("Motif", a.reason or NONE),
-        FactView("Statut", STATUS_LABELS[a.status]),
+        FactView("Statut", STATUS_LABELS[a.status], status_key(a.status)),
     ]
     if a.cancellation_reason:
         facts.append(FactView("Motif de l'annulation", a.cancellation_reason))

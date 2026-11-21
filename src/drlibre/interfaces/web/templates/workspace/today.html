@@ -18,10 +18,11 @@
   <h2 id="hour-{{ forloop.counter }}">{{ group.heading }}</h2>
   {% for row in group.rows %}
   <article class="agenda-row">
-    <p><strong>{{ row.time }}</strong> · {{ row.patient }} · {{ row.appointment_type }} · Salle : {{ row.room }} · Statut : {{ row.status }}</p>
+    <p class="agenda-time">{{ row.time }}</p>
+    <p class="agenda-who"><strong>{{ row.patient }}</strong> <span class="badge status-{{ row.status_key }}"><span class="visually-hidden">Statut : </span>{{ row.status }}</span><span class="agenda-meta">{{ row.appointment_type }} · Salle : {{ row.room }}</span></p>
     <div class="actions">
       {% include "workspace/_status_buttons.html" with buttons=row.buttons origin="day" %}
-      {% if row.cancel_url %}<a href="{{ row.cancel_url }}" aria-label="Annuler : {{ row.label }}">Annuler</a>{% endif %}
+      {% if row.cancel_url %}<a href="{{ row.cancel_url }}" class="danger-link" aria-label="Annuler : {{ row.label }}">Annuler</a>{% endif %}
       <a href="{{ row.page_url }}" aria-label="Ouvrir : {{ row.label }}">Ouvrir</a>
     </div>
   </article>

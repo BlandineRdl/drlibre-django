@@ -1,18 +1,14 @@
 <ul>
-  <li><a href="/">Rechercher</a></li>
+  <li><a href="/"{% if request.path == "/" %} aria-current="page"{% endif %}>Rechercher</a></li>
   {% if shell.signed_in %}
   {% if shell.is_clinician %}
   {% for link in shell.workspace_nav %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
+  {% elif shell.is_patient %}
+  {% for link in shell.patient_nav %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
   {% else %}
-  <li><a href="{{ shell.home_url }}">Mon espace</a></li>
+  <li><a href="{{ shell.home_url }}"{% if shell.home_current %} aria-current="page"{% endif %}>Mon espace</a></li>
   {% endif %}
-  {% if shell.is_patient %}
-  <li><a href="/portal/appointments">Mes RDV</a></li>
-  <li><a href="/portal/waitlist">Liste d'attente</a></li>
-  <li><a href="/portal/notifications">{{ shell.notifications_label }}</a></li>
-  <li><a href="/portal/profile">Profil</a></li>
-  {% endif %}
-  {% if shell.can_change_password %}<li><a href="/account/password">Mot de passe</a></li>{% endif %}
+  {% if shell.can_change_password %}<li><a href="/account/password"{% if request.path == "/account/password" %} aria-current="page"{% endif %}>Mot de passe</a></li>{% endif %}
   <li>
     <form method="post" action="/sign-out" class="inline-form">
       {% csrf_token %}
@@ -20,6 +16,6 @@
     </form>
   </li>
   {% else %}
-  <li><a href="/sign-in">Se connecter</a></li>
+  <li><a href="/sign-in" class="nav-cta">Se connecter</a></li>
   {% endif %}
 </ul>

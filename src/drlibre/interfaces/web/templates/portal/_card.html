@@ -1,6 +1,6 @@
 <article class="appointment-card">
   <header><{{ heading_level|default:"h3" }} class="card-when">{{ card.when }}</{{ heading_level|default:"h3" }}></header>
-  <p><strong>{{ card.status }}</strong></p>
+  <p>{% if card.status_key %}<span class="badge status-{{ card.status_key }}">{{ card.status }}</span>{% else %}<strong>{{ card.status }}</strong>{% endif %}</p>
   {% for line in card.lines %}<p class="result-line">{{ line }}</p>{% endfor %}
   {% if with_actions %}
   <footer class="actions">

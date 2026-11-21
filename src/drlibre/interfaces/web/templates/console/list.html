@@ -28,7 +28,7 @@
         <td class="actions">
           {% for link in row.links %}<a href="{{ link.url }}" aria-label="{{ link.aria_label }}">{{ link.label }}</a>{% endfor %}
           <a href="{{ row.edit_url }}" aria-label="Modifier {{ row.label }}">Modifier</a>
-          {% if row.delete_url %}<a href="{{ row.delete_url }}" aria-label="Supprimer {{ row.label }}">Supprimer</a>{% endif %}
+          {% if row.delete_url %}<a href="{{ row.delete_url }}" class="danger-link" aria-label="Supprimer {{ row.label }}">Supprimer</a>{% endif %}
         </td>
       </tr>
     {% endfor %}

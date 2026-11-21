@@ -16,7 +16,7 @@
     {% for row in view.rows %}
       <tr>
         <td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.reason }}</td>
-        <td class="actions"><a href="{{ row.delete_url }}" aria-label="Supprimer l'absence {{ row.label }}">Supprimer</a></td>
+        <td class="actions"><a href="{{ row.delete_url }}" class="danger-link" aria-label="Supprimer l'absence {{ row.label }}">Supprimer</a></td>
       </tr>
     {% endfor %}
     </tbody>

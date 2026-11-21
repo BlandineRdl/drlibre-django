@@ -162,6 +162,7 @@ def test_the_day_offers_only_the_actions_the_current_status_allows() -> None:
     assert rows[0].buttons[0].url == f"/workspace/appointments/{booked.appointment.id}/check-in"
     assert rows[0].buttons[0].aria_label == "Arrivé : 09:00-09:30 Ana Martin"
     assert rows[3].status == "Annulé"
+    assert [r.status_key for r in rows][-1] == "cancelled"
 
 
 def test_the_week_shows_appointments_named_by_their_type_in_its_colour() -> None:
@@ -173,6 +174,7 @@ def test_the_week_shows_appointments_named_by_their_type_in_its_colour() -> None
     monday = nine.cells[0]
     assert (len(view.rows), view.rows[0].time, view.rows[-1].time) == (24, "07:00", "18:30")
     assert (monday.kind, monday.text, monday.colour) == ("appointment", "Consultation", "#336699")
+    assert monday.hue_class == "hue-5"
     assert monday.url == f"/workspace/appointments/{booked.appointment.id}"
     assert view.time_zone == ZONE
     assert view.previous_url == "/workspace/calendar?week=2026-11-16"

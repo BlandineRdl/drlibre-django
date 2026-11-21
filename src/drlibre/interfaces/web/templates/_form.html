@@ -32,7 +32,7 @@
     {% if f.error %}<small id="error-{{ f.name }}" class="field-error">{{ f.error }}</small>{% endif %}
   {% endfor %}
   <div class="actions">
-    <button type="submit">{{ form.submit_label }}</button>
+    <button type="submit"{% if submit_class %} class="{{ submit_class }}"{% endif %}>{{ form.submit_label }}</button>
     {% if form.cancel_url %}<a href="{{ form.cancel_url }}">{{ form.cancel_label }}</a>{% endif %}
   </div>
 </form>

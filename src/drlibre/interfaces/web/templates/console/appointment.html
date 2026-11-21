@@ -12,7 +12,7 @@
 </div>
 {% endif %}
 <dl class="facts">
-  {% for fact in view.facts %}<dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd>{% endfor %}
+  {% for fact in view.facts %}<dt>{{ fact.label }}</dt><dd>{% if fact.badge %}<span class="badge status-{{ fact.badge }}">{{ fact.value }}</span>{% else %}{{ fact.value }}{% endif %}</dd>{% endfor %}
 </dl>
 {% if view.buttons or view.cancel_url %}
 <section aria-labelledby="actions-heading">

@@ -21,6 +21,7 @@ from drlibre.interfaces.web.presenters.portal import (
     WeekStripView,
     refusal_text,
     rule_reasons,
+    status_key,
     week_strip,
 )
 from drlibre.interfaces.web.presenters.slots import local
@@ -118,6 +119,7 @@ class AppointmentRowView:
     label: str
     cells: tuple[str, ...]
     open_url: str
+    status_key: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +133,7 @@ class AppointmentsListView:
     export_url: str
     book_url: str
     zone_note: str
+    status_column: int = HEADERS.index("Statut")
 
 
 def _choices(
@@ -159,6 +162,7 @@ def _row(row: AdminAppointmentRow) -> AppointmentRowView:
             row.room or NONE,
         ),
         open_url=appointment_url(a.id),
+        status_key=status_key(a.status),
     )
 
 

@@ -622,6 +622,10 @@ def seed_showcase(app: Container) -> None:
     if AppointmentRecord.objects.filter(patient_id__in=[p.id for p in patients]).exists():
         logger.info("seed_showcase_skipped")
         return
+    # Rules start today when saved; backdated so past weeks count as available time.
+    AvailabilityRuleModel.objects.filter(clinician__in=profiles).update(
+        valid_from=now.date() - timedelta(days=PAST_DAYS)
+    )
     taken: set[tuple[uuid.UUID, date]] = set()
     rows = _demo_patient_agenda(profiles, rng, now, taken)
     for profile in profiles.order_by("created_at"):
