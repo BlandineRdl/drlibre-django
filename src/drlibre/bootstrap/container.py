@@ -11,6 +11,7 @@ from drlibre.booking.application.ports.inbound import (
     CancelAppointment,
     CreateHold,
     ExpireHolds,
+    JoinWaitlist,
     ListPatientAppointments,
     OpenHolds,
     RequirePatient,
@@ -20,6 +21,7 @@ from drlibre.booking.application.ports.inbound import (
     VerifyHold,
     ViewAppointment,
     ViewHold,
+    WaitlistQueries,
 )
 from drlibre.booking.application.ports.outbound import (
     Appointments as BookingAppointments,
@@ -34,6 +36,7 @@ from drlibre.booking.application.ports.outbound import (
     Patients,
     RoundRobinLedger,
     ScheduleLocks,
+    Staff,
     VerificationCodes,
     Waitlist,
 )
@@ -42,6 +45,7 @@ from drlibre.booking.application.use_cases.book_appointment import BookAppointme
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.join_waitlist import JoinWaitlistUseCase
 from drlibre.booking.application.use_cases.list_patient_appointments import (
     ListPatientAppointmentsUseCase,
 )
@@ -64,6 +68,7 @@ from drlibre.booking.infrastructure.identity_patients import (
     IdentityPatientAccounts,
     IdentityPatientSessions,
 )
+from drlibre.booking.infrastructure.identity_staff import IdentityStaff
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.booking.infrastructure.patient_agenda import SqlPatientAgenda
 from drlibre.booking.infrastructure.patients import IdentityPatients
@@ -76,6 +81,7 @@ from drlibre.booking.infrastructure.repositories import (
 )
 from drlibre.booking.infrastructure.round_robin_ledger import OrganisationRoundRobinLedger
 from drlibre.booking.infrastructure.schedule_locks import DjangoScheduleLocks
+from drlibre.booking.infrastructure.waitlist_queries import SqlWaitlistQueries
 from drlibre.health.application.ports.inbound import CheckHealth
 from drlibre.health.application.ports.outbound import DatabaseProbe
 from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
@@ -315,6 +321,8 @@ class BookingAdapters:
     limiter: RateLimiter
     agenda: PatientAgenda
     waitlist: Waitlist
+    waitlist_queries: WaitlistQueries
+    staff: Staff
     network_hourly_limit: int = 20
 
 
@@ -417,6 +425,8 @@ class Container:
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
+    join_waitlist: JoinWaitlist
+    waitlist_queries: WaitlistQueries
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -663,6 +673,8 @@ def wire(a: Adapters) -> Container:
         cancel_appointment=booking.cancel_appointment,
         reschedule_appointment=booking.reschedule_appointment,
         send_reminders=booking.send_reminders,
+        join_waitlist=booking.join_waitlist,
+        waitlist_queries=booking.waitlist_queries,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -716,6 +728,8 @@ class _BookingUseCases:
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
+    join_waitlist: JoinWaitlist
+    waitlist_queries: WaitlistQueries
 
 
 def _wire_booking(
@@ -816,6 +830,16 @@ def _wire_booking(
             appointments=booking.appointments,
             notices=booking.notices,
         ),
+        join_waitlist=JoinWaitlistUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            placement=placement,
+            patients=booking.patients,
+            staff=booking.staff,
+            waitlist=booking.waitlist,
+        ),
+        waitlist_queries=booking.waitlist_queries,
     )
 
 
@@ -926,6 +950,8 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             limiter=RedisRateLimiter(prefix=settings.RATE_LIMIT_PREFIX),
             agenda=SqlPatientAgenda(),
             waitlist=DjangoWaitlist(),
+            waitlist_queries=SqlWaitlistQueries(),
+            staff=IdentityStaff(user_queries),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),

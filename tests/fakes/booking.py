@@ -2,7 +2,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from drlibre.booking.application.ports.inbound import AppointmentQueries, BookedPeriod
+from drlibre.booking.application.ports.inbound import (
+    AppointmentQueries,
+    BookedPeriod,
+    WaitlistOption,
+    WaitlistQueries,
+    WaitlistRow,
+)
 from drlibre.booking.application.ports.outbound import (
     AgendaEntry,
     AgendaFilter,
@@ -20,6 +26,7 @@ from drlibre.booking.application.ports.outbound import (
     RoundRobinLedger,
     ScheduleLocks,
     SlotRefresh,
+    Staff,
     Venue,
     VerificationCodes,
     Waitlist,
@@ -33,6 +40,7 @@ from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import PAGE_SIZE, Page, PageRequest
 from tests.fakes.users import InMemoryUsers
 
 
@@ -233,6 +241,22 @@ class InMemoryPatients(Patients):
     def email_of(self, patient_id: Id) -> str | None:
         user = self.users.rows.get(patient_id)
         return user.email.value if user is not None and user.role is Role.PATIENT else None
+
+    def active_patient_by_email(self, email: str) -> Id | None:
+        wanted = email.strip().lower()
+        found = (u for u in self.users.rows.values() if u.email.value == wanted)
+        return next((u.id for u in found if u.active and u.role is Role.PATIENT), None)
+
+
+class InMemoryStaff(Staff):
+    """Admins are the active ADMIN users of the in-memory users."""
+
+    def __init__(self, users: InMemoryUsers) -> None:
+        self.users = users
+
+    def is_admin(self, user_id: Id) -> bool:
+        user = self.users.rows.get(user_id)
+        return user is not None and user.active and user.role is Role.ADMIN
 
 
 class InMemoryRoundRobinLedger(RoundRobinLedger):
@@ -507,4 +531,76 @@ class InMemoryPatientAgenda(PatientAgenda):
             room=self.labels.get(appointment.room_id) if appointment.room_id else None,
             appointment_type=self.labels.get(appointment.appointment_type_id, ""),
             bookable_online=appointment.appointment_type_id not in self.offline_types,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistType:
+    """What the waitlist names about a type; `active` covers its hospital too."""
+
+    name: str = "Consultation"
+    hospital_name: str = "Hôpital Nord"
+    time_zone: str = "Europe/Paris"
+    bookable_online: bool = True
+    active: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistClinician:
+    name: str = "Dr Martin"
+    department: str = "Cardiologie"
+    active: bool = True
+
+
+class InMemoryWaitlistQueries(WaitlistQueries):
+    """Joins in-memory entries to users, `types` and `clinicians`."""
+
+    def __init__(self, waitlist: InMemoryWaitlist, users: InMemoryUsers) -> None:
+        self.waitlist = waitlist
+        self.users = users
+        self.types: dict[Id, WaitlistType] = {}
+        self.clinicians: dict[Id, WaitlistClinician] = {}
+
+    def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
+        mine = (e for e in self.waitlist.rows.values() if e.patient_id == patient_id)
+        newest = sorted(mine, key=lambda e: (e.created_at, e.id.value), reverse=True)
+        return tuple(self._row(e) for e in newest)
+
+    def page(self, status: str, request: PageRequest) -> Page[WaitlistRow]:
+        rows = sorted(self.waitlist.rows.values(), key=lambda e: (e.created_at, e.id.value))
+        if status in set(WaitlistStatus):
+            rows = [e for e in rows if e.status.value == status]
+        window = rows[request.offset : request.offset + PAGE_SIZE]
+        return Page(tuple(self._row(e) for e in window), len(rows), request.number)
+
+    def type_options(self, *, online_only: bool) -> tuple[WaitlistOption, ...]:
+        found = (
+            WaitlistOption(i, f"{t.name} · {t.hospital_name}")
+            for i, t in self.types.items()
+            if t.active and (t.bookable_online or not online_only)
+        )
+        return tuple(sorted(found, key=lambda o: (o.label, o.id.value)))
+
+    def clinician_options(self) -> tuple[WaitlistOption, ...]:
+        found = (
+            WaitlistOption(i, f"{c.name} · {c.department}")
+            for i, c in self.clinicians.items()
+            if c.active
+        )
+        return tuple(sorted(found, key=lambda o: (o.label, o.id.value)))
+
+    def _row(self, entry: WaitlistEntry) -> WaitlistRow:
+        kind = self.types.get(entry.appointment_type_id, WaitlistType())
+        patient = self.users.rows.get(entry.patient_id)
+        clinician = self.clinicians.get(entry.clinician_id) if entry.clinician_id else None
+        offered = entry.offered_appointment_id
+        appointment = self.waitlist.appointments.get(offered) if offered else None
+        return WaitlistRow(
+            entry=entry,
+            patient_name=patient.full_name if patient else "",
+            appointment_type=kind.name,
+            hospital_name=kind.hospital_name,
+            time_zone=kind.time_zone,
+            clinician_name=clinician.name if clinician else None,
+            offered_start=appointment.start if appointment else None,
         )

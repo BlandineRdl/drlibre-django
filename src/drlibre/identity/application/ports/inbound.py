@@ -109,6 +109,10 @@ class UserQueries(Protocol):
         """One user, active or not, or None."""
         ...
 
+    def user_by_email(self, email: str) -> User | None:
+        """The user of the email, trimmed and any case, active or not, or None."""
+        ...
+
 
 class StaffLookup(Protocol):
     def staff_member(self, user_id: Id) -> StaffMember | None:

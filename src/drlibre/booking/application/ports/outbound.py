@@ -177,6 +177,16 @@ class Patients(Protocol):
         """The patient's email, or None when the id is not a patient."""
         ...
 
+    def active_patient_by_email(self, email: str) -> Id | None:
+        """The active patient of the email, any case, or None."""
+        ...
+
+
+class Staff(Protocol):
+    def is_admin(self, user_id: Id) -> bool:
+        """Whether the id is an active admin."""
+        ...
+
 
 class BookingNotices(Protocol):
     def code_sent(self, *, email: str, code: str) -> None:

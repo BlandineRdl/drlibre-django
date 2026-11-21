@@ -31,6 +31,10 @@ class DjangoUserQueries(UserQueries, StaffLookup):
         record = UserRecord.objects.filter(id=user_id.value).first()
         return to_user(record) if record else None
 
+    def user_by_email(self, email: str) -> User | None:
+        record = UserRecord.objects.filter(email=email.strip().lower()).first()
+        return to_user(record) if record else None
+
     def staff_member(self, user_id: Id) -> StaffMember | None:
         record = UserRecord.objects.filter(id=user_id.value).first()
         return _member(record) if record else None

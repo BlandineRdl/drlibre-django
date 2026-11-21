@@ -35,6 +35,10 @@ class InMemoryUserQueries(UserQueries, StaffLookup):
     def user(self, user_id: Id) -> User | None:
         return self.users_store.get(user_id)
 
+    def user_by_email(self, email: str) -> User | None:
+        wanted = email.strip().lower()
+        return next((u for u in self.users_store.rows.values() if u.email.value == wanted), None)
+
     def staff_member(self, user_id: Id) -> StaffMember | None:
         user = self.users_store.get(user_id)
         return _member(user) if user else None

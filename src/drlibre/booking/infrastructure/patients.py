@@ -20,3 +20,9 @@ class IdentityPatients(Patients):
     def email_of(self, patient_id: Id) -> str | None:
         user = self._queries.user(patient_id)
         return user.email.value if user is not None and user.role is Role.PATIENT else None
+
+    def active_patient_by_email(self, email: str) -> Id | None:
+        user = self._queries.user_by_email(email)
+        if user is None or not user.active or user.role is not Role.PATIENT:
+            return None
+        return user.id

@@ -50,6 +50,8 @@ class Scene:
         self.mine: Appointment | None = None
         self.caller: Id | None = None
         self.page: Any = None
+        self.actor: Id | None = None
+        self.people: dict[str, Id] = {}
 
 
 def at(raw: str) -> datetime:
