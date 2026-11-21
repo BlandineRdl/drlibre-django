@@ -236,8 +236,8 @@ def _waitlist_page(
         action=WAITLIST_URL,
         submit_label="S'inscrire",
         specs=JOIN_FIELDS,
-        types=c.waitlist_queries.type_options(online_only=True),
-        clinicians=c.waitlist_queries.clinician_options(),
+        types=c.booking_option_queries.type_options(online_only=True),
+        clinicians=c.booking_option_queries.clinician_options(),
         values=values,
         error=form_error,
     )

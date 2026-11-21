@@ -6,6 +6,7 @@ from drlibre.booking.application.ports.inbound import (
     AppointmentQueries,
     AppointmentStatus,
     BookedPeriod,
+    RoomPeriod,
 )
 from drlibre.booking.infrastructure.django.models import AppointmentRecord, WaitlistEntryRecord
 from drlibre.booking.infrastructure.repositories import active_appointments
@@ -42,6 +43,15 @@ class DjangoBookingQueries(AppointmentQueries):
             BookedPeriod(Id(row.id), row.start, row.end, AppointmentStatus(row.status))
             for row in rows
         )
+
+    def room_periods(
+        self, room_ids: tuple[Id, ...], *, start: datetime, end: datetime
+    ) -> tuple[RoomPeriod, ...]:
+        rows = active_appointments().filter(
+            room_id__in=[r.value for r in room_ids], start__lt=end, end__gt=start
+        )
+        fields = rows.values_list("id", "room_id", "start", "end")
+        return tuple(RoomPeriod(Id(pk), Id(room), a, b) for pk, room, a, b in fields)
 
     def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
         return _dependents(

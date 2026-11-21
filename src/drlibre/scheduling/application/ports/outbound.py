@@ -101,6 +101,19 @@ class HeldPeriod:
     period: Period
 
 
+@dataclass(frozen=True, slots=True)
+class BusyRoom:
+    appointment_id: Id
+    room_id: Id
+    period: Period
+
+
+class RoomBookings(Protocol):
+    def busy(self, room_ids: tuple[Id, ...], *, within: Period) -> tuple[BusyRoom, ...]:
+        """Active appointments held in these rooms overlapping the range."""
+        ...
+
+
 class SlotHolds(Protocol):
     def open(
         self, clinician_ids: tuple[Id, ...], *, within: Period, at: datetime, ignoring: Id | None
@@ -125,6 +138,7 @@ class AppointmentType:
     buffer_minutes: int
     active: bool
     time_zone: str
+    needs_room: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,4 +171,8 @@ class SchedulingDirectory(Protocol):
 
     def room(self, room_id: Id) -> Room | None:
         """Return the room, active or not, or None when unknown."""
+        ...
+
+    def active_rooms(self, department_id: Id) -> tuple[Id, ...]:
+        """Return the ids of the department's active rooms."""
         ...

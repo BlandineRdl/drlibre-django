@@ -3,13 +3,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from drlibre.booking.infrastructure.django.models import BookingHoldRecord
+from drlibre.booking.infrastructure.django.models import AppointmentRecord, BookingHoldRecord
 from drlibre.identity.infrastructure.django.models import UserRecord
 from drlibre.organisation.infrastructure.django.models import (
     AppointmentTypeRecord,
     ClinicianProfileRecord,
     DepartmentRecord,
     HospitalRecord,
+    RoomRecord,
     SpecialtyRecord,
 )
 from drlibre.scheduling.infrastructure.django.models import SlotModel
@@ -30,6 +31,7 @@ class SearchWorld:
     types: dict[str, AppointmentTypeRecord] = field(default_factory=dict)
     specialties: dict[str, SpecialtyRecord] = field(default_factory=dict)
     clinicians: dict[str, ClinicianProfileRecord] = field(default_factory=dict)
+    rooms: dict[str, RoomRecord] = field(default_factory=dict)
 
     def hospital(
         self,
@@ -114,6 +116,37 @@ class SearchWorld:
         )
         self.clinicians[name] = record
         return record
+
+    def room(self, name: str, department: str) -> RoomRecord:
+        record = RoomRecord.objects.create(
+            department=self.departments[department],
+            name=name,
+            code=_code("R"),
+            floor="1",
+            capacity=1,
+            created_at=NOW,
+            updated_at=NOW,
+        )
+        self.rooms[name] = record
+        return record
+
+    def booked_in(self, name: str, room: str, start: str) -> None:
+        clinician = self.clinicians[name]
+        kind = min(
+            (t for t in self.types.values() if t.department_id == clinician.department_id),
+            key=lambda t: t.duration_minutes,
+        )
+        begin = self.local(clinician, start)
+        AppointmentRecord.objects.create(
+            patient_id=uuid.uuid4(),
+            clinician=clinician,
+            appointment_type=kind,
+            room=self.rooms[room],
+            start=begin,
+            end=begin + timedelta(minutes=kind.duration_minutes),
+            status="BOOKED",
+            source="ONLINE",
+        )
 
     def zone_of(self, clinician: ClinicianProfileRecord) -> ZoneInfo:
         return ZoneInfo(clinician.department.hospital.time_zone)

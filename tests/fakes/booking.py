@@ -7,8 +7,7 @@ from zoneinfo import ZoneInfo
 from drlibre.booking.application.ports.inbound import (
     AppointmentQueries,
     BookedPeriod,
-    BookingOptions,
-    WaitlistOption,
+    RoomPeriod,
     WaitlistQueries,
     WaitlistRow,
 )
@@ -464,6 +463,19 @@ class InMemoryAppointmentQueries(AppointmentQueries):
             if a.clinician_id == clinician_id and a.start < end and start < a.end
         )
 
+    def room_periods(
+        self, room_ids: tuple[Id, ...], *, start: datetime, end: datetime
+    ) -> tuple[RoomPeriod, ...]:
+        return tuple(
+            RoomPeriod(a.id, a.room_id, a.start, a.end)
+            for a in self.appointments.rows
+            if a.room_id is not None
+            and a.room_id in room_ids
+            and a.active
+            and a.start < end
+            and start < a.end
+        )
+
     def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
         return self._of(lambda a: a.appointment_type_id == appointment_type_id) + self._waiting(
             lambda e: e.appointment_type_id == appointment_type_id
@@ -563,29 +575,11 @@ class InMemoryPatientAgenda(PatientAgenda):
 
 @dataclass(frozen=True, slots=True)
 class WaitlistType:
-    """What the waitlist names about a type; `active` covers its hospital too."""
+    """What the waitlist names about a type."""
 
     name: str = "Consultation"
     hospital_name: str = "Hôpital Nord"
     time_zone: str = "Europe/Paris"
-    bookable_online: bool = True
-    active: bool = True
-    department_id: Id | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class WaitlistClinician:
-    name: str = "Dr Martin"
-    department: str = "Cardiologie"
-    active: bool = True
-    department_id: Id | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class WaitlistRoom:
-    department_id: Id
-    label: str
-    active: bool = True
 
 
 class InMemoryWaitlistQueries(WaitlistQueries):
@@ -595,8 +589,8 @@ class InMemoryWaitlistQueries(WaitlistQueries):
         self.waitlist = waitlist
         self.users = users
         self.types: dict[Id, WaitlistType] = {}
-        self.clinicians: dict[Id, WaitlistClinician] = {}
-        self.rooms: dict[Id, WaitlistRoom] = {}
+        # Clinician names by profile id.
+        self.clinicians: dict[Id, str] = {}
 
     def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
         mine = (e for e in self.waitlist.rows.values() if e.patient_id == patient_id)
@@ -610,39 +604,6 @@ class InMemoryWaitlistQueries(WaitlistQueries):
         window = rows[request.offset : request.offset + PAGE_SIZE]
         return Page(tuple(self._row(e) for e in window), len(rows), request.number)
 
-    def type_options(self, *, online_only: bool) -> tuple[WaitlistOption, ...]:
-        found = (
-            WaitlistOption(i, f"{t.name} · {t.hospital_name}")
-            for i, t in self.types.items()
-            if t.active and (t.bookable_online or not online_only)
-        )
-        return tuple(sorted(found, key=lambda o: (o.label, o.id.value)))
-
-    def clinician_options(self) -> tuple[WaitlistOption, ...]:
-        found = (
-            WaitlistOption(i, f"{c.name} · {c.department}")
-            for i, c in self.clinicians.items()
-            if c.active
-        )
-        return tuple(sorted(found, key=lambda o: (o.label, o.id.value)))
-
-    def booking_options(self, appointment_type_id: Id) -> BookingOptions:
-        kind = self.types.get(appointment_type_id)
-        department = kind.department_id if kind else None
-        if department is None:
-            return BookingOptions((), ())
-        clinicians = (
-            o for o in self.clinician_options() if self.clinicians[o.id].department_id == department
-        )
-        rooms = (
-            WaitlistOption(i, r.label)
-            for i, r in self.rooms.items()
-            if r.department_id == department and r.active
-        )
-        return BookingOptions(
-            tuple(clinicians), tuple(sorted(rooms, key=lambda o: (o.label, o.id.value)))
-        )
-
     def _row(self, entry: WaitlistEntry) -> WaitlistRow:
         kind = self.types.get(entry.appointment_type_id, WaitlistType())
         patient = self.users.rows.get(entry.patient_id)
@@ -655,7 +616,7 @@ class InMemoryWaitlistQueries(WaitlistQueries):
             appointment_type=kind.name,
             hospital_name=kind.hospital_name,
             time_zone=kind.time_zone,
-            clinician_name=clinician.name if clinician else None,
+            clinician_name=clinician,
             offered_start=appointment.start if appointment else None,
         )
 

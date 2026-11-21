@@ -8,10 +8,10 @@ from drlibre.booking.application.ports.inbound import (
     AdminAppointmentRow,
     AppointmentFile,
     AppointmentStatus,
+    BookingOption,
     ClinicianAction,
     ExportRow,
     Source,
-    WaitlistOption,
 )
 from drlibre.identity.application.ports.inbound import PatientMatch
 from drlibre.interfaces.web.presenters.forms import ChoiceView, FormView, build_form
@@ -134,7 +134,7 @@ class AppointmentsListView:
 
 
 def _choices(
-    options: tuple[Option, ...] | tuple[WaitlistOption, ...], selected: Id | None
+    options: tuple[Option, ...] | tuple[BookingOption, ...], selected: Id | None
 ) -> tuple[ChoiceView, ...]:
     return tuple(ChoiceView(str(o.id), o.label, o.id == selected) for o in options)
 
@@ -167,7 +167,7 @@ def list_page(
     shown: AdminAppointmentFilter,
     *,
     departments: tuple[Option, ...],
-    clinicians: tuple[WaitlistOption, ...],
+    clinicians: tuple[BookingOption, ...],
 ) -> AppointmentsListView:
     """Rows latest first, start in each hospital's zone; pagination and export keep the filters."""
     kept = filter_query(shown)
@@ -372,9 +372,9 @@ def book_page(
     choice: BookChoice,
     *,
     patients: tuple[PatientMatch, ...],
-    types: tuple[WaitlistOption, ...],
-    clinicians: tuple[WaitlistOption, ...],
-    rooms: tuple[WaitlistOption, ...],
+    types: tuple[BookingOption, ...],
+    clinicians: tuple[BookingOption, ...],
+    rooms: tuple[BookingOption, ...],
     week: FreeWeek | None,
     error: DomainError | None = None,
 ) -> BookPage:

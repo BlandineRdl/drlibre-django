@@ -1,12 +1,15 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
+from drlibre.bootstrap.container import Container
 from drlibre.identity.infrastructure.django.models import UserRecord
+from drlibre.organisation.infrastructure.django.models import AppointmentTypeRecord
 from drlibre.search.application.ports.inbound import SearchCriteria
 from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
-from drlibre.shared_kernel.errors import DomainError
-from tests.integration.bookable import NOW, SLOT_START, bookable
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
+from drlibre.shared_kernel.ids import Id
+from tests.integration.bookable import NOW, SLOT_START, Bookable, bookable
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
 
@@ -89,3 +92,59 @@ def test_an_inactive_clinician_shows_no_slot_in_search_and_none_in_booking() -> 
                 start=start,
                 end=start + WINDOW,
             )
+
+
+def test_a_slot_whose_department_rooms_are_all_taken_is_neither_shown_nor_booked() -> None:
+    """Règle §6.2 : un créneau aux salles du département toutes prises n'est pas proposé."""
+    with bookable() as world:
+        AppointmentTypeRecord.objects.filter(pk=world.scene.kind.value).update(needs_room=True)
+        app = world.app()
+        free, other = world.scene.clinicians
+        taken = book(app, world, other.id, SLOT_START)
+        start = NOW + BOOKING_LEAD_TIME
+
+        def accepted(clinician: Id, ignoring: Id | None = None) -> list:
+            return [
+                s.start
+                for s in app.find_free_slots.execute(
+                    appointment_type_id=world.scene.kind,
+                    clinician_id=clinician,
+                    start=start,
+                    end=start + WINDOW,
+                    ignoring_appointment=ignoring,
+                )
+            ]
+
+        shown = {p.id: p for p in app.search_providers.execute(SearchCriteria()).items}
+        next_slots = shown[free.id].next_slots
+        assert next_slots is not None
+        assert list(next_slots.starts) == accepted(free.id)[:3]
+        assert SLOT_START not in next_slots.starts
+        week = app.view_provider_page.execute(
+            provider_id=free.id, type_id=world.scene.kind, week=SLOT_START.date()
+        )
+        assert SLOT_START not in week.starts
+        assert SLOT_START in accepted(other.id, ignoring=taken)
+
+        refused = verify(app, world, free.id, SLOT_START)
+        assert isinstance(refused, DomainError)
+        assert refused.code is ErrorCode.NO_ROOM_AVAILABLE
+        assert not isinstance(verify(app, world, free.id, next_slots.starts[0]), DomainError)
+
+
+def verify(app: Container, world: Bookable, clinician: Id, at: datetime) -> object:
+    created = app.create_hold.execute(
+        appointment_type_id=world.scene.kind,
+        clinician_id=clinician,
+        start=at,
+        **world.visitor(),  # type: ignore[arg-type]
+    )
+    return app.verify_hold.execute(
+        hold_id=created.hold_id, code=world.code(), user_agent="test"
+    ).outcome
+
+
+def book(app: Container, world: Bookable, clinician: Id, at: datetime) -> Id:
+    booked = verify(app, world, clinician, at)
+    assert not isinstance(booked, DomainError)
+    return booked.id  # type: ignore[attr-defined]

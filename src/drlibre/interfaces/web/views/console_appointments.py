@@ -72,7 +72,7 @@ def list_appointments(request: HttpRequest) -> HttpResponse:
         page,
         shown,
         departments=c.reference_queries.department_options(),
-        clinicians=c.waitlist_queries.clinician_options(),
+        clinicians=c.booking_option_queries.clinician_options(),
     )
     return _render(request, "console/appointments.html", {"view": view})
 
@@ -235,7 +235,7 @@ def _book_view(
 ) -> HttpResponse:
     c = container()
     kind_id = parse_id(choice.appointment_type)
-    options = c.waitlist_queries.booking_options(kind_id) if kind_id else None
+    options = c.booking_option_queries.booking_options(kind_id) if kind_id else None
     clinicians = options.clinicians if options else ()
     clinician = next((o.id for o in clinicians if str(o.id) == choice.clinician), None)
     free = None
@@ -249,7 +249,7 @@ def _book_view(
     view = book_page(
         choice,
         patients=c.patient_lookup.active_patients(choice.search) if choice.search else (),
-        types=c.waitlist_queries.type_options(online_only=False),
+        types=c.booking_option_queries.type_options(online_only=False),
         clinicians=clinicians,
         rooms=options.rooms if options else (),
         week=free,

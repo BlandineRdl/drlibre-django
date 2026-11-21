@@ -2,8 +2,10 @@ import uuid
 
 from django.db import models
 
+from drlibre.persistence.records import TrackedRecord
 
-class UserRecord(models.Model):
+
+class UserRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.CharField(max_length=254, unique=True)
     full_name = models.CharField(max_length=150)
@@ -25,7 +27,7 @@ class UserRecord(models.Model):
         return str(self.id)
 
 
-class SessionRecord(models.Model):
+class SessionRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     token_hash = models.CharField(max_length=64, unique=True)
     user = models.ForeignKey(UserRecord, on_delete=models.CASCADE, related_name="sessions")
@@ -38,7 +40,7 @@ class SessionRecord(models.Model):
         return str(self.id)
 
 
-class SignInLinkRecord(models.Model):
+class SignInLinkRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     token_hash = models.CharField(max_length=64, unique=True)
     patient = models.ForeignKey(UserRecord, on_delete=models.CASCADE, related_name="sign_in_links")

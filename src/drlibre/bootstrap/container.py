@@ -13,6 +13,7 @@ from drlibre.booking.application.ports.inbound import (
     AcceptWaitlistOffer,
     BookAppointment,
     BookAppointmentAsCaller,
+    BookingOptionQueries,
     CancelAppointment,
     CheckInAppointment,
     ClinicianAppointment,
@@ -118,6 +119,7 @@ from drlibre.booking.application.use_cases.waitlist_offers import WaitlistOffers
 from drlibre.booking.application.use_cases.write_clinical_notes import WriteClinicalNotesUseCase
 from drlibre.booking.infrastructure.admin_appointments import SqlAdminAppointments
 from drlibre.booking.infrastructure.audit_history import AuditAppointmentHistory
+from drlibre.booking.infrastructure.booking_option_queries import SqlBookingOptionQueries
 from drlibre.booking.infrastructure.booking_slot_refresh import BookingSlotRefresh
 from drlibre.booking.infrastructure.clinician_agenda import SqlClinicianAgenda
 from drlibre.booking.infrastructure.code_issuer import HmacCodeIssuer
@@ -309,6 +311,7 @@ from drlibre.scheduling.application.ports.inbound import (
 from drlibre.scheduling.application.ports.outbound import (
     AvailabilityRules,
     ClinicianAppointments,
+    RoomBookings,
     SchedulingDirectory,
     SlotHolds,
     SlotQueries,
@@ -333,6 +336,7 @@ from drlibre.scheduling.application.use_cases.save_availability_rule import (
 )
 from drlibre.scheduling.infrastructure.booking_appointments import BookingClinicianAppointments
 from drlibre.scheduling.infrastructure.booking_holds import BookingSlotHolds
+from drlibre.scheduling.infrastructure.booking_rooms import BookingRoomBookings
 from drlibre.scheduling.infrastructure.directory import OrganisationSchedulingDirectory
 from drlibre.scheduling.infrastructure.queries import DjangoAvailabilityQueries
 from drlibre.scheduling.infrastructure.repositories import (
@@ -389,6 +393,7 @@ class BookingAdapters:
     history: AppointmentHistory
     waitlist: Waitlist
     waitlist_queries: WaitlistQueries
+    booking_option_queries: BookingOptionQueries
     staff: Staff
     admin_appointments: AdminAppointments
     network_hourly_limit: int = 20
@@ -432,6 +437,7 @@ class Adapters:
     slot_queries: SlotQueries
     availability_queries: AvailabilityQueries
     slot_holds: SlotHolds
+    room_bookings: RoomBookings
     booking: BookingAdapters
     links: SignInLinks
     link_notices: LinkNotices
@@ -516,6 +522,7 @@ class Container:
     accept_waitlist_offer: AcceptWaitlistOffer
     expire_waitlist: ExpireWaitlist
     waitlist_queries: WaitlistQueries
+    booking_option_queries: BookingOptionQueries
     list_all_appointments: ListAllAppointments
     export_appointments: ExportAppointments
     run_reminders: RunReminders
@@ -546,6 +553,7 @@ def wire(a: Adapters) -> Container:
         directory=directory,
         queries=a.slot_queries,
         holds=a.slot_holds,
+        rooms=a.room_bookings,
         computation=SlotComputation(
             directory=directory,
             rules=a.availability_rules,
@@ -785,6 +793,7 @@ def wire(a: Adapters) -> Container:
         accept_waitlist_offer=booking.accept_waitlist_offer,
         expire_waitlist=booking.expire_waitlist,
         waitlist_queries=booking.waitlist_queries,
+        booking_option_queries=booking.booking_option_queries,
         list_all_appointments=booking.list_all_appointments,
         export_appointments=booking.export_appointments,
         run_reminders=booking.run_reminders,
@@ -863,6 +872,7 @@ class _BookingUseCases:
     accept_waitlist_offer: AcceptWaitlistOffer
     expire_waitlist: ExpireWaitlist
     waitlist_queries: WaitlistQueries
+    booking_option_queries: BookingOptionQueries
     list_all_appointments: ListAllAppointments
     export_appointments: ExportAppointments
     run_reminders: RunReminders
@@ -1068,6 +1078,7 @@ def _wire_booking(
             clock=a.clock, uow=a.uow, audit=a.audit, waitlist=booking.waitlist
         ),
         waitlist_queries=booking.waitlist_queries,
+        booking_option_queries=booking.booking_option_queries,
         list_all_appointments=list_all_appointments,
         export_appointments=ExportAppointmentsUseCase(
             clock=a.clock,
@@ -1162,6 +1173,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         slot_store=slot_store,
         slot_queries=slot_queries,
         slot_holds=slot_holds,
+        room_bookings=BookingRoomBookings(booking_queries),
         availability_queries=availability_queries,
         slot_refresh=SchedulingSlotRefresh(refresh=refresh),
         booking=BookingAdapters(
@@ -1192,6 +1204,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             history=AuditAppointmentHistory(DjangoAuditQueries()),
             waitlist=DjangoWaitlist(),
             waitlist_queries=SqlWaitlistQueries(),
+            booking_option_queries=SqlBookingOptionQueries(),
             staff=IdentityStaff(user_queries),
             admin_appointments=SqlAdminAppointments(),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,

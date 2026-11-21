@@ -98,7 +98,6 @@ __all__ = [
     "ViewAppointment",
     "ViewHold",
     "WaitlistEntry",
-    "WaitlistOption",
     "WaitlistQueries",
     "WaitlistRow",
     "WaitlistStatus",
@@ -296,11 +295,25 @@ class BookedPeriod:
     status: AppointmentStatus
 
 
+@dataclass(frozen=True, slots=True)
+class RoomPeriod:
+    appointment_id: Id
+    room_id: Id
+    start: datetime
+    end: datetime
+
+
 class AppointmentQueries(Protocol):
     def periods_of(
         self, clinician_id: Id, *, start: datetime, end: datetime
     ) -> tuple[BookedPeriod, ...]:
         """The clinician's appointments overlapping the range, whatever their status."""
+        ...
+
+    def room_periods(
+        self, room_ids: tuple[Id, ...], *, start: datetime, end: datetime
+    ) -> tuple[RoomPeriod, ...]:
+        """Active appointments held in these rooms overlapping the range."""
         ...
 
     def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
@@ -542,20 +555,6 @@ class WaitlistRow:
     offered_start: datetime | None
 
 
-@dataclass(frozen=True, slots=True)
-class WaitlistOption:
-    id: Id
-    label: str
-
-
-@dataclass(frozen=True, slots=True)
-class BookingOptions:
-    """Who and where a type can be booked with; empty for an unknown type."""
-
-    clinicians: tuple[WaitlistOption, ...]
-    rooms: tuple[WaitlistOption, ...]
-
-
 class WaitlistQueries(Protocol):
     def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
         """The patient's entries, newest first."""
@@ -565,11 +564,29 @@ class WaitlistQueries(Protocol):
         """Entries of every hospital, oldest first, 20 a page; an unknown status lists all."""
         ...
 
-    def type_options(self, *, online_only: bool) -> tuple[WaitlistOption, ...]:
+
+@dataclass(frozen=True, slots=True)
+class BookingOption:
+    id: Id
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class BookingOptions:
+    """Who and where a type can be booked with; empty for an unknown type."""
+
+    clinicians: tuple[BookingOption, ...]
+    rooms: tuple[BookingOption, ...]
+
+
+class BookingOptionQueries(Protocol):
+    """Picklists of the booking and waitlist forms, one statement per list."""
+
+    def type_options(self, *, online_only: bool) -> tuple[BookingOption, ...]:
         """Active types of active hospitals, labelled with their hospital, by label."""
         ...
 
-    def clinician_options(self) -> tuple[WaitlistOption, ...]:
+    def clinician_options(self) -> tuple[BookingOption, ...]:
         """Active clinicians labelled with their department, by label."""
         ...
 

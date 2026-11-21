@@ -6,7 +6,7 @@ from django.conf import settings
 from django.test import Client
 
 from drlibre.identity.domain.user import Role
-from drlibre.organisation.infrastructure.repositories import DjangoAppointmentTypes
+from drlibre.organisation.infrastructure.repositories import DjangoAppointmentTypes, DjangoRooms
 from drlibre.shared_kernel.ids import Id
 from tests import builders_organisation as build
 from tests.builders import stored_session, stored_user
@@ -60,6 +60,7 @@ def test_a_created_rule_then_a_recorded_time_off_change_the_next_answer(client: 
     profile = stored_profile(department, user_id=clinician.id)
     kind = build.appointment_type(department.id)
     DjangoAppointmentTypes().save(kind)
+    DjangoRooms().save(build.room(department.id))
     client.cookies[settings.SESSION_COOKIE_NAME] = stored_session(clinician)
     monday = next_monday()
     url = slots_url(kind.id, monday, monday + timedelta(days=1)) + f"&clinician={profile.id}"

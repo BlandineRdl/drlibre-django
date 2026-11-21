@@ -31,6 +31,7 @@ from tests.fakes.booking import (
     RecordingScheduleLocks,
     RecordingSlotRefresh,
 )
+from tests.fakes.booking_options import InMemoryBookingOptionQueries
 from tests.fakes.clinician_agenda import InMemoryClinicianAgenda
 from tests.fakes.clock import FixedClock
 from tests.fakes.database_probe import InMemoryDatabaseProbe
@@ -58,6 +59,7 @@ from tests.fakes.scheduling import (
     InMemoryAvailabilityQueries,
     InMemoryAvailabilityRules,
     InMemoryClinicianAppointments,
+    InMemoryRoomBookings,
     InMemorySlotHolds,
     InMemorySlotStore,
     InMemoryTimeOffs,
@@ -105,6 +107,7 @@ class FakeWorld:
         self.clinician_appointments = InMemoryClinicianAppointments()
         self.slots = InMemorySlotStore()
         self.slot_holds = InMemorySlotHolds()
+        self.room_bookings = InMemoryRoomBookings()
         self.slot_refresh = InMemorySlotRefresh()
         self.availability_queries = InMemoryAvailabilityQueries(
             rules=self.availability_rules, time_offs=self.time_offs
@@ -112,6 +115,7 @@ class FakeWorld:
         self.booking_appointments = InMemoryAppointments()
         self.waitlist = InMemoryWaitlist(self.booking_appointments)
         self.waitlist_queries = InMemoryWaitlistQueries(self.waitlist, self.users)
+        self.booking_option_queries = InMemoryBookingOptionQueries()
         self.admin_appointments = InMemoryAdminAppointments(self.booking_appointments, self.users)
         self.audit_queries = InMemoryAuditQueries(self.audit)
         self.booking_queries = InMemoryAppointmentQueries(self.booking_appointments, self.waitlist)
@@ -213,6 +217,7 @@ class FakeWorld:
             slot_store=self.slots,
             slot_queries=self.slots,
             slot_holds=self.slot_holds,
+            room_bookings=self.room_bookings,
             availability_queries=self.availability_queries,
             slot_refresh=self.slot_refresh,
             booking=BookingAdapters(
@@ -234,6 +239,7 @@ class FakeWorld:
                 history=InMemoryAppointmentHistory(self.audit),
                 waitlist=self.waitlist,
                 waitlist_queries=self.waitlist_queries,
+                booking_option_queries=self.booking_option_queries,
                 staff=InMemoryStaff(self.users),
                 admin_appointments=self.admin_appointments,
             ),

@@ -3,10 +3,12 @@ import uuid
 from django.db import models
 from django.db.models import Q
 
+from drlibre.persistence.records import TrackedRecord
+
 REMINDER_UNIQUE = "notification_one_reminder_per_appointment"
 
 
-class NotificationRecord(models.Model):
+class NotificationRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # Identity owns users and booking owns appointments; contexts share no foreign key.
     recipient_id = models.UUIDField()

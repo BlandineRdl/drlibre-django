@@ -38,4 +38,4 @@ class ViewAuditJournalUseCase(ViewAuditJournal):
             else self._queries.page(audit_filter, query.request)
         )
         ids = frozenset(r.actor_id for r in page.items if r.actor_id is not None)
-        return AuditJournal(page, audit_filter, types, self._actors.emails_of(ids))
+        return AuditJournal(page, audit_filter, types, self._actors.emails_of(ids), self._zone)

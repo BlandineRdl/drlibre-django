@@ -2,8 +2,11 @@ import uuid
 
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateTimeRangeField, RangeBoundary, RangeOperators
+from django.contrib.postgres.indexes import GistIndex
 from django.db import models
 from django.db.models import F, Func, Q
+
+from drlibre.persistence.records import TrackedRecord
 
 INACTIVE_STATUSES = ("CANCELLED", "NO_SHOW")
 STATUSES = ("BOOKED", "CHECKED_IN", "COMPLETED", *INACTIVE_STATUSES)
@@ -25,7 +28,7 @@ def _no_overlap(name: str, column: str) -> ExclusionConstraint:
     )
 
 
-class AppointmentRecord(models.Model):
+class AppointmentRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # Identity owns users; contexts share no foreign key, only the id.
     patient_id = models.UUIDField()
@@ -59,6 +62,13 @@ class AppointmentRecord(models.Model):
             models.Index(fields=("clinician", "start"), name="appointment_clinician_start"),
             models.Index(fields=("patient_id", "start"), name="appointment_patient_start"),
             models.Index(fields=("room", "start"), name="appointment_room_start"),
+            # The search room filter probes a room's active appointments overlapping a slot.
+            GistIndex(
+                "room",
+                TsTzRange("start", "end", RangeBoundary()),
+                name="appointment_room_period",
+                condition=~Q(status__in=INACTIVE_STATUSES),
+            ),
             # Admin lists and exports scan every hospital by start.
             models.Index(fields=("start",), name="appointment_start"),
         )
@@ -92,7 +102,7 @@ class AppointmentRecord(models.Model):
         return str(self.id)
 
 
-class BookingHoldRecord(models.Model):
+class BookingHoldRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # A hold is short-lived: it goes with its clinician or type rather than blocking their deletion.
     clinician = models.ForeignKey(
@@ -134,7 +144,7 @@ class BookingHoldRecord(models.Model):
         return str(self.id)
 
 
-class VerificationCodeRecord(models.Model):
+class VerificationCodeRecord(TrackedRecord):
     hold = models.OneToOneField(
         BookingHoldRecord, on_delete=models.CASCADE, primary_key=True, related_name="code"
     )
@@ -152,7 +162,7 @@ class VerificationCodeRecord(models.Model):
 WAITLIST_STATUSES = ("WAITING", "OFFERED", "BOOKED", "EXPIRED")
 
 
-class WaitlistEntryRecord(models.Model):
+class WaitlistEntryRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # Identity owns users; contexts share no foreign key, only the id.
     patient_id = models.UUIDField(db_index=True)

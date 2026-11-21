@@ -27,6 +27,7 @@ Tranchées au plan E3 (`aidd_docs/tasks/2026_11/2026_11_21_e3-reservation-sans-c
 ## E3 suivi
 Restée ouverte après la revue E3.
 - Les créneaux de la recherche et de `GET /slots` ignorent les salles (§5.1), alors que §6.2 dit « les créneaux affichés sont exactement ceux que la réservation accepterait » : un créneau affiché peut échouer en `no_room_available` à la réservation (reproduction : un type avec salle, toutes les salles du département prises à cette heure, le créneau reste listé). Compter la capacité des salles dans les créneaux (lecture plus coûteuse, p95 à re-prouver) ou accepter l'écart et le documenter en §6.2 ?
+  → Tranchée en E7 : les créneaux comptent les salles. Pour un type avec salle, la recherche, la page praticien, `GET /slots` et `FindFreeSlots` (réservation, déplacement, assistant) écartent un créneau quand toutes les salles actives du département sont prises, filtre à la lecture comme les holds ; p95 à re-prouver au prochain `./scripts/load-run.sh`.
 
 ## E4 Portail patient et notifications
 Tranchées au plan E4 (`aidd_docs/tasks/2026_11/2026_11_21_e4-portail-patient-notifications/plan.md`, Decisions).

@@ -9,6 +9,7 @@ from django.shortcuts import redirect, render
 
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
+from drlibre.persistence.provenance import act_as, stop_acting
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 type View = Callable[..., HttpResponseBase]
@@ -59,7 +60,11 @@ class SessionMiddleware:
         token = session_token(request)
         identity = container().authenticate_session.execute(token=token) if token else None
         setattr(request, _ATTR, identity)
-        response = self.get_response(request)
+        acting = act_as(identity.user_id.value if identity else None)
+        try:
+            response = self.get_response(request)
+        finally:
+            stop_acting(acting)
         if token and identity is None and settings.SESSION_COOKIE_NAME not in response.cookies:
             clear_session_cookie(response)
         elif token and identity and identity.session_renewed:

@@ -103,6 +103,8 @@ class AuditJournal:
     entity_types: tuple[str, ...]
     # Email of each actor of the page.
     emails: Mapping[Id, str]
+    # Zone the filter dates are read in and the times shown in.
+    time_zone: str
 
 
 class ViewAuditJournal(Protocol):

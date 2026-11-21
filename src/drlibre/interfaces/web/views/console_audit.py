@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
@@ -33,7 +32,7 @@ def journal(request: HttpRequest) -> HttpResponse:
         email=email,
         entity_types=journal.entity_types,
         emails=journal.emails,
-        time_zone=settings.TIME_ZONE,
+        time_zone=journal.time_zone,
     )
     context = {"view": view, "section_nav": console_nav(AUDIT_URL)}
     return render(request, "console/audit.html", context)

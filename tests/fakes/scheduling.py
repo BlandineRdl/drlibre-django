@@ -5,11 +5,13 @@ from drlibre.scheduling.application.ports.inbound import AvailabilityQueries, Ro
 from drlibre.scheduling.application.ports.outbound import (
     AppointmentType,
     AvailabilityRules,
+    BusyRoom,
     Clinician,
     ClinicianAppointments,
     ClinicianSlot,
     HeldPeriod,
     Room,
+    RoomBookings,
     SchedulingDirectory,
     SlotHolds,
     SlotQueries,
@@ -78,6 +80,16 @@ class InMemoryClinicianAppointments(ClinicianAppointments):
 
     def for_clinician(self, clinician_id: Id, *, within: Period) -> tuple[Appointment, ...]:
         return tuple(a for c, a in self.rows if c == clinician_id and a.period.overlaps(within))
+
+
+class InMemoryRoomBookings(RoomBookings):
+    """Holds the rooms' active appointments as rows."""
+
+    def __init__(self) -> None:
+        self.rows: list[BusyRoom] = []
+
+    def busy(self, room_ids: tuple[Id, ...], *, within: Period) -> tuple[BusyRoom, ...]:
+        return tuple(r for r in self.rows if r.room_id in room_ids and r.period.overlaps(within))
 
 
 class InMemorySlotStore(SlotStore, SlotQueries):
@@ -152,6 +164,11 @@ class FixedSchedulingDirectory(SchedulingDirectory):
 
     def room(self, room_id: Id) -> Room | None:
         return self.rooms.get(room_id)
+
+    def active_rooms(self, department_id: Id) -> tuple[Id, ...]:
+        return tuple(
+            r.id for r in self.rooms.values() if r.department_id == department_id and r.active
+        )
 
 
 def _weekly(rule: AvailabilityRule) -> tuple[int, object, object]:

@@ -24,6 +24,7 @@ from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
     InMemoryAvailabilityRules,
     InMemoryClinicianAppointments,
+    InMemoryRoomBookings,
     InMemorySlotHolds,
     InMemorySlotStore,
     InMemoryTimeOffs,
@@ -180,7 +181,12 @@ def _free_slots(
     )
     window = day_window(setting.day)
     return FindFreeSlotsUseCase(
-        clock=clock, directory=directory, queries=store, holds=holds, computation=computation
+        clock=clock,
+        directory=directory,
+        queries=store,
+        holds=holds,
+        rooms=InMemoryRoomBookings(),
+        computation=computation,
     ).execute(
         appointment_type_id=setting.kind.id,
         clinician_id=CLINICIAN,

@@ -1,3 +1,4 @@
+from bisect import bisect_left
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
@@ -20,11 +21,24 @@ class SlotEngine:
     time_zone: ZoneInfo
 
     def free_slots(self, window: Period) -> tuple[Slot, ...]:
-        blocked = [t.period for t in self.time_off] + [b.extended(self.buffer) for b in self.busy]
+        blocked = sorted(
+            [t.period for t in self.time_off] + [b.extended(self.buffer) for b in self.busy],
+            key=lambda b: b.start,
+        )
+        starts = [b.start for b in blocked]
+        longest = max((b.end - b.start for b in blocked), default=timedelta())
+
+        def is_blocked(slot: Slot) -> bool:
+            # Only periods starting within `longest` before the slot can overlap it.
+            near = blocked[
+                bisect_left(starts, slot.start - longest) : bisect_left(starts, slot.end)
+            ]
+            return any(b.end > slot.start for b in near)
+
         found = {
             slot
             for slot in self._proposed(window)
-            if window.covers(slot.period) and not any(slot.period.overlaps(b) for b in blocked)
+            if window.covers(slot.period) and not is_blocked(slot)
         }
         return tuple(sorted(found, key=lambda s: s.start))
 
