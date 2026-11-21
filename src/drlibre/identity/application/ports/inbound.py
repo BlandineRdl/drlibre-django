@@ -8,12 +8,15 @@ from drlibre.shared_kernel.pagination import Page, PageRequest
 
 __all__ = [
     "AuthenticateSession",
+    "AuthenticateToken",
     "ChangePassword",
     "DeleteUser",
     "Identity",
+    "IssueApiToken",
     "OpenPatientSession",
     "ProvidePatientAccount",
     "RequestSignInLink",
+    "RevokeApiTokens",
     "Role",
     "SaveUser",
     "SignIn",
@@ -61,6 +64,24 @@ class SignOut(Protocol):
 class AuthenticateSession(Protocol):
     def execute(self, *, token: str) -> Identity | None:
         """Return who holds this token, extending the session; None if expired or inactive."""
+        ...
+
+
+class IssueApiToken(Protocol):
+    def execute(self, *, user_email: str, label: str, days: int = 90) -> str:
+        """Return a new bearer token of an active user, shown once; not_found, invalid_input."""
+        ...
+
+
+class RevokeApiTokens(Protocol):
+    def execute(self, *, user_email: str) -> int:
+        """Delete every token of the user and return how many there were; not_found."""
+        ...
+
+
+class AuthenticateToken(Protocol):
+    def execute(self, *, token: str) -> Identity | None:
+        """Return who holds this bearer token; None if unknown, expired or inactive."""
         ...
 
 

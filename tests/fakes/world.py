@@ -9,6 +9,7 @@ from drlibre.notifications.application.use_cases.reminded_appointments import (
     RemindedAppointmentsUseCase,
 )
 from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
+from tests.fakes.api_tokens import InMemoryApiTokens
 from tests.fakes.appointment_history import InMemoryAppointmentHistory
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
@@ -53,6 +54,7 @@ from tests.fakes.organisation import (
 )
 from tests.fakes.password_hasher import InMemoryPasswordHasher
 from tests.fakes.rate_limiter import InMemoryRateLimiter
+from tests.fakes.readers import InMemoryReaders
 from tests.fakes.reporting import InMemoryActivityQueries, InMemoryAdmins
 from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
@@ -85,6 +87,7 @@ class FakeWorld:
         self.audit = InMemoryAuditLog()
         self.users = InMemoryUsers()
         self.sessions = InMemorySessions()
+        self.api_tokens = InMemoryApiTokens()
         self.links = InMemorySignInLinks()
         self.hasher = InMemoryPasswordHasher()
         self.failures = InMemoryFailedSignIns()
@@ -153,6 +156,7 @@ class FakeWorld:
             self.audit,
             self.users,
             self.sessions,
+            self.api_tokens,
             self.links,
             self.hospitals,
             self.specialties,
@@ -184,6 +188,7 @@ class FakeWorld:
             audit=self.audit,
             users=self.users,
             sessions=self.sessions,
+            api_tokens=self.api_tokens,
             hasher=self.hasher,
             failures=self.failures,
             tokens=self.tokens,
@@ -250,6 +255,7 @@ class FakeWorld:
             # Search is a read side tested on PostgreSQL: the real adapter, never reached by fakes.
             search_queries=SqlSearchQueries(),
             activity_queries=self.activity,
+            readers=InMemoryReaders(self.users, self.profiles),
             admins=InMemoryAdmins(self.users),
             journal_actors=InMemoryJournalActors(self.users),
             notifications=self.notifications,

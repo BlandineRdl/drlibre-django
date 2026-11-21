@@ -149,12 +149,15 @@ from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
 from drlibre.health.infrastructure.database_probe import DjangoDatabaseProbe
 from drlibre.identity.application.ports.inbound import (
     AuthenticateSession,
+    AuthenticateToken,
     ChangePassword,
     DeleteUser,
+    IssueApiToken,
     OpenPatientSession,
     PatientLookup,
     ProvidePatientAccount,
     RequestSignInLink,
+    RevokeApiTokens,
     SaveUser,
     SignIn,
     SignOut,
@@ -164,6 +167,7 @@ from drlibre.identity.application.ports.inbound import (
     UseSignInLink,
 )
 from drlibre.identity.application.ports.outbound import (
+    ApiTokens,
     AuditActors,
     FailedSignIns,
     LinkNotices,
@@ -174,6 +178,11 @@ from drlibre.identity.application.ports.outbound import (
     TokenGenerator,
     UpcomingAppointments,
     Users,
+)
+from drlibre.identity.application.use_cases.api_tokens import (
+    AuthenticateTokenUseCase,
+    IssueApiTokenUseCase,
+    RevokeApiTokensUseCase,
 )
 from drlibre.identity.application.use_cases.authenticate_session import (
     AuthenticateSessionUseCase,
@@ -197,6 +206,7 @@ from drlibre.identity.infrastructure.password_hasher import DjangoPasswordHasher
 from drlibre.identity.infrastructure.queries import DjangoUserQueries
 from drlibre.identity.infrastructure.rate_limiter import RedisRateLimiter
 from drlibre.identity.infrastructure.repositories import (
+    DjangoApiTokens,
     DjangoSessions,
     DjangoSignInLinks,
     DjangoUsers,
@@ -204,6 +214,8 @@ from drlibre.identity.infrastructure.repositories import (
 from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
+from drlibre.interop.application.ports.inbound import Readers
+from drlibre.interop.infrastructure.sql_readers import SqlReaders
 from drlibre.notifications.application.ports.inbound import (
     CountUnread,
     ListNotifications,
@@ -410,6 +422,7 @@ class Adapters:
     audit: AuditLog
     users: Users
     sessions: Sessions
+    api_tokens: ApiTokens
     hasher: PasswordHasher
     failures: FailedSignIns
     tokens: TokenGenerator
@@ -443,6 +456,7 @@ class Adapters:
     link_notices: LinkNotices
     search_queries: SearchQueries
     activity_queries: ActivityQueries
+    readers: Readers
     admins: Admins
     journal_actors: JournalActors
     notifications: Notifications
@@ -462,6 +476,10 @@ class Container:
     sign_in: SignIn
     sign_out: SignOut
     authenticate_session: AuthenticateSession
+    issue_api_token: IssueApiToken
+    revoke_api_tokens: RevokeApiTokens
+    authenticate_token: AuthenticateToken
+    readers: Readers
     change_password: ChangePassword
     update_profile: UpdateProfile
     save_hospital: SaveHospital
@@ -595,6 +613,21 @@ def wire(a: Adapters) -> Container:
         authenticate_session=AuthenticateSessionUseCase(
             clock=clock, users=a.users, sessions=a.sessions
         ),
+        issue_api_token=IssueApiTokenUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            users=a.users,
+            api_tokens=a.api_tokens,
+            tokens=a.tokens,
+        ),
+        revoke_api_tokens=RevokeApiTokensUseCase(
+            clock=clock, uow=uow, audit=audit, users=a.users, api_tokens=a.api_tokens
+        ),
+        authenticate_token=AuthenticateTokenUseCase(
+            clock=clock, users=a.users, api_tokens=a.api_tokens
+        ),
+        readers=a.readers,
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
         ),
@@ -1145,6 +1178,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         audit=DjangoAuditLog(),
         users=DjangoUsers(),
         sessions=DjangoSessions(),
+        api_tokens=DjangoApiTokens(),
         hasher=DjangoPasswordHasher(),
         failures=RedisFailedSignIns(),
         tokens=SecretsTokenGenerator(),
@@ -1215,6 +1249,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         ),
         search_queries=SqlSearchQueries(),
         activity_queries=SqlActivityQueries(),
+        readers=SqlReaders(),
         admins=IdentityAdmins(user_queries),
         journal_actors=IdentityJournalActors(users=user_queries, staff=user_queries),
         notifications=notifications,

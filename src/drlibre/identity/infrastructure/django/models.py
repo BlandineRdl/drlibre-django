@@ -50,3 +50,14 @@ class SignInLinkRecord(TrackedRecord):
 
     def __str__(self) -> str:
         return str(self.id)
+
+
+class ApiTokenRecord(TrackedRecord):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token_hash = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(UserRecord, on_delete=models.CASCADE, related_name="api_tokens")
+    label = models.CharField(max_length=100)
+    expires_at = models.DateTimeField()
+
+    def __str__(self) -> str:
+        return str(self.id)
