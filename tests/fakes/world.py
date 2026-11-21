@@ -1,8 +1,18 @@
 from datetime import UTC, datetime
 
-from drlibre.bootstrap.container import Adapters, Container, wire
+from drlibre.bootstrap.container import Adapters, BookingAdapters, Container, wire
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
+from tests.fakes.booking import (
+    FixedBookingDirectory,
+    InMemoryAppointments,
+    InMemoryFreeSlots,
+    InMemoryPatients,
+    InMemoryRoundRobinLedger,
+    RecordingBookingNotices,
+    RecordingScheduleLocks,
+    RecordingSlotRefresh,
+)
 from tests.fakes.clock import FixedClock
 from tests.fakes.database_probe import InMemoryDatabaseProbe
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
@@ -71,6 +81,14 @@ class FakeWorld:
         self.availability_queries = InMemoryAvailabilityQueries(
             rules=self.availability_rules, time_offs=self.time_offs
         )
+        self.booking_appointments = InMemoryAppointments()
+        self.booking_directory = FixedBookingDirectory()
+        self.free_slots = InMemoryFreeSlots()
+        self.booking_slot_refresh = RecordingSlotRefresh()
+        self.schedule_locks = RecordingScheduleLocks()
+        self.patients = InMemoryPatients()
+        self.notices = RecordingBookingNotices()
+        self.ledger = InMemoryRoundRobinLedger()
         self.uow = InMemoryUnitOfWork(
             self.audit,
             self.users,
@@ -85,6 +103,10 @@ class FakeWorld:
             self.time_offs,
             self.slots,
             self.slot_refresh,
+            self.booking_appointments,
+            self.booking_slot_refresh,
+            self.notices,
+            self.ledger,
         )
         self.app: Container = wire(self.adapters())
 
@@ -129,4 +151,14 @@ class FakeWorld:
             slot_queries=self.slots,
             availability_queries=self.availability_queries,
             slot_refresh=self.slot_refresh,
+            booking=BookingAdapters(
+                appointments=self.booking_appointments,
+                directory=self.booking_directory,
+                free_slots=self.free_slots,
+                slot_refresh=self.booking_slot_refresh,
+                locks=self.schedule_locks,
+                patients=self.patients,
+                notices=self.notices,
+                ledger=self.ledger,
+            ),
         )

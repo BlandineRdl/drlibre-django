@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Contexte `booking` : placement, règles, premier disponible sur fakes

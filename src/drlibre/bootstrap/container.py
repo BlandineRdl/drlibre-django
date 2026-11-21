@@ -4,6 +4,22 @@ from drlibre.audit.application.ports.outbound import AuditLog
 from drlibre.audit.infrastructure.audit_log import DjangoAuditLog
 from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
+from drlibre.booking.application.ports.inbound import BookAppointment
+from drlibre.booking.application.ports.outbound import (
+    Appointments as BookingAppointments,
+)
+from drlibre.booking.application.ports.outbound import (
+    BookingDirectory,
+    BookingNotices,
+    FreeSlots,
+    Patients,
+    RoundRobinLedger,
+    ScheduleLocks,
+)
+from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefresh
+from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
+from drlibre.booking.application.use_cases.placement import Placement
+from drlibre.booking.infrastructure.unwired import UnwiredBookAppointment
 from drlibre.health.application.ports.inbound import CheckHealth
 from drlibre.health.application.ports.outbound import DatabaseProbe
 from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
@@ -153,6 +169,20 @@ from drlibre.shared_kernel.unit_of_work import UnitOfWork
 
 
 @dataclass(frozen=True, slots=True)
+class BookingAdapters:
+    """Outbound adapters of the booking context."""
+
+    appointments: BookingAppointments
+    directory: BookingDirectory
+    free_slots: FreeSlots
+    slot_refresh: BookingSlotRefresh
+    locks: ScheduleLocks
+    patients: Patients
+    notices: BookingNotices
+    ledger: RoundRobinLedger
+
+
+@dataclass(frozen=True, slots=True)
 class Adapters:
     """Every outbound adapter; tests pass in-memory fakes in their place."""
 
@@ -189,6 +219,8 @@ class Adapters:
     availability_queries: AvailabilityQueries
     # None wires organisation to scheduling's own RefreshSlots.
     slot_refresh: SlotRefresh | None = None
+    # None until the Django booking adapters exist (E3 phase 3).
+    booking: BookingAdapters | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,6 +257,7 @@ class Container:
     availability_queries: AvailabilityQueries
     extend_slot_horizon: ExtendSlotHorizon
     find_free_slots: FindFreeSlots
+    book_appointment: BookAppointment
 
 
 def wire(a: Adapters) -> Container:
@@ -239,6 +272,7 @@ def wire(a: Adapters) -> Container:
         store=a.slot_store,
     )
     slots = a.slot_refresh or SchedulingSlotRefresh(refresh=refresh)
+    book_appointment = _wire_booking(a)
     return Container(
         clock=clock,
         check_health=CheckHealthUseCase(clock=clock, database=a.database),
@@ -419,6 +453,33 @@ def wire(a: Adapters) -> Container:
         find_free_slots=FindFreeSlotsUseCase(
             clock=clock, directory=directory, queries=a.slot_queries
         ),
+        book_appointment=book_appointment,
+    )
+
+
+def _wire_booking(a: Adapters) -> BookAppointment:
+    booking = a.booking
+    if booking is None:
+        return UnwiredBookAppointment()
+    placement = Placement(
+        clock=a.clock,
+        uow=a.uow,
+        audit=a.audit,
+        directory=booking.directory,
+        appointments=booking.appointments,
+        free_slots=booking.free_slots,
+        slot_refresh=booking.slot_refresh,
+        locks=booking.locks,
+        patients=booking.patients,
+        notices=booking.notices,
+    )
+    return BookAppointmentUseCase(
+        clock=a.clock,
+        uow=a.uow,
+        placement=placement,
+        directory=booking.directory,
+        free_slots=booking.free_slots,
+        ledger=booking.ledger,
     )
 
 
