@@ -89,10 +89,7 @@ class CountSearchResults(Protocol):
 
 class ViewProviderPage(Protocol):
     def execute(self, *, provider_id: Id, type_id: Id | None, week: date | None) -> ProviderWeek:
-        """The provider's free starts of one week; not_found when absent or not bookable.
-
-        An unusable type or a week outside the horizon falls back to the default.
-        """
+        """Free starts of the provider's week; not_found if absent, bad type or week default."""
         ...
 
 

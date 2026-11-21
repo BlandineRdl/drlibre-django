@@ -105,10 +105,7 @@ class SlotHolds(Protocol):
     def open(
         self, clinician_ids: tuple[Id, ...], *, within: Period, at: datetime, ignoring: Id | None
     ) -> tuple[HeldPeriod, ...]:
-        """Periods of holds open at the instant on these clinicians overlapping the range.
-
-        The hold named in `ignoring` is left out.
-        """
+        """Open holds of these clinicians overlapping the range, except the one in `ignoring`."""
         ...
 
 

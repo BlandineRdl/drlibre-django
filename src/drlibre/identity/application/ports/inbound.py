@@ -125,10 +125,7 @@ class StaffLookup(Protocol):
 
 class ProvidePatientAccount(Protocol):
     def execute(self, *, full_name: str, email: str, birth_date: date, phone: str | None) -> Id:
-        """The patient for a proven email, created without password when unknown.
-
-        An active patient is reused unchanged; staff or an inactive user raises forbidden.
-        """
+        """Reuse or create the patient of a proven email; staff or inactive get forbidden."""
         ...
 
 
@@ -140,11 +137,7 @@ class OpenPatientSession(Protocol):
 
 class RequestSignInLink(Protocol):
     def execute(self, *, email: str, network: str) -> None:
-        """Email a one-time link to an active patient; answer alike for every other address.
-
-        Over a limit nothing is sent and nothing changes for the caller; invalid_input only
-        for a malformed address.
-        """
+        """Email a sign-in link to an active patient, silent for others; malformed is refused."""
         ...
 
 

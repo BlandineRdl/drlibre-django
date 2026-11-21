@@ -38,10 +38,7 @@ class FindFreeSlots(Protocol):
 
 class NextBookableSlots(Protocol):
     def execute(self, *, appointment_type_id: Id, clinician_id: Id | None) -> tuple[Slot, ...]:
-        """Sorted free slots a patient can still book, from the booking lead time on.
-
-        Empty when the type or clinician is unknown; a clinician of None means the whole department.
-        """
+        """Sorted bookable slots; empty if type or clinician is unknown, None is the department."""
         ...
 
 

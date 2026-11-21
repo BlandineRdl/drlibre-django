@@ -30,10 +30,7 @@ __all__ = [
 
 class RequirePatient(Protocol):
     def execute(self, *, user_id: Id) -> None:
-        """Let an active patient through.
-
-        Refused with forbidden for staff, inactive or unknown users.
-        """
+        """Let an active patient through; staff, inactive or unknown users get forbidden."""
         ...
 
 
@@ -46,12 +43,7 @@ class BookAppointment(Protocol):
         clinician_id: Id | None,
         start: datetime,
     ) -> Appointment:
-        """Book for the signed-in patient, the first available clinician when none is named.
-
-        Refused with not_found, conflict, rule_violation, no_room_available,
-        no_clinician_available or forbidden (not an active patient), writing nothing;
-        the end time and the room are never accepted.
-        """
+        """Book for the signed-in patient, any clinician if none named; refused writes nothing."""
         ...
 
 
@@ -77,12 +69,7 @@ class CreateHold(Protocol):
         accepted_terms: bool,
         network: str,
     ) -> HoldCreated:
-        """Hold the slot 10 minutes for the email and send it a code, replacing its open hold.
-
-        Refused with invalid_input, not_found, conflict, rule_violation (a rule, or
-        too_many_requests past 3 holds an hour per email or 20 per network address); nothing
-        about any patient is returned.
-        """
+        """Hold the slot 10 minutes and email a code; refused on bad input, conflict or limits."""
         ...
 
 
@@ -98,23 +85,13 @@ class VerifiedBooking:
 
 class VerifyHold(Protocol):
     def execute(self, *, hold_id: Id, code: str, user_agent: str) -> VerifiedBooking:
-        """Check the code, then book for the patient of the hold's email and open their session.
-
-        A wrong, expired or exhausted code raises invalid_input on `code`; an unknown or expired
-        hold raises not_found; a staff or inactive email raises forbidden, creating nothing. A
-        placement refused after a correct code keeps the account and session and is returned
-        as the failure.
-        """
+        """Book on the right code, else refused; a placement refusal is returned, account kept."""
         ...
 
 
 class ResendCode(Protocol):
     def execute(self, *, hold_id: Id, network: str) -> None:
-        """Void the previous code and send a new one, the hold's expiry unchanged.
-
-        Refused with not_found for an unknown or expired hold, rule_violation too_many_requests
-        past 3 an hour per email or 20 per network address.
-        """
+        """Send a new code voiding the old, expiry unchanged; refused if unknown or over limits."""
         ...
 
 
