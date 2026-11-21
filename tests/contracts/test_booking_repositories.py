@@ -295,3 +295,23 @@ def test_a_code_is_replaced_per_hold_and_removed_with_it(scene: Scene) -> None:
     scene.codes.delete_for_hold(held.id)
     assert scene.codes.for_hold(held.id) is None
     assert scene.codes.for_hold_locked(held.id) is None
+
+
+def test_booked_appointments_starting_in_a_window_come_back_by_start(scene: Scene) -> None:
+    """Story rappel : seuls les RDV `BOOKED` qui commencent dans la fenêtre sont rappelés."""
+    later = appointment(scene, patient=Id(), start=at(23))
+    sooner = appointment(scene, patient=Id(), start=at(2), clinician=scene.other)
+    edge = appointment(scene, patient=Id(), start=at(24), clinician=scene.other)
+    outside = (
+        appointment(scene, patient=Id(), start=NOW),
+        appointment(scene, patient=Id(), start=at(25)),
+        appointment(scene, patient=Id(), start=at(5), status=AppointmentStatus.CHECKED_IN),
+        appointment(scene, patient=Id(), start=at(7), status=AppointmentStatus.CANCELLED),
+    )
+    for made in (later, sooner, edge, *outside):
+        scene.appointments.add(made)
+    mine = {made.id for made in (later, sooner, edge, *outside)}
+
+    found = scene.appointments.booked_starting(NOW, at(24))
+
+    assert [a.id for a in found if a.id in mine] == [sooner.id, later.id, edge.id]

@@ -62,6 +62,10 @@ class Appointments(Protocol):
         """The stored appointment, whatever its status."""
         ...
 
+    def booked_starting(self, after: datetime, until: datetime) -> tuple[Appointment, ...]:
+        """BOOKED appointments starting after the first instant, up to the second, by start."""
+        ...
+
     def conflicting_resources(
         self,
         *,

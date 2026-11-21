@@ -45,3 +45,11 @@ def expire_booking_holds() -> int:
         expired = container().expire_holds.execute()
         logger.info("booking_holds_expired", count=expired)
     return expired
+
+
+@shared_task(name="drlibre.send_appointment_reminders")
+def send_appointment_reminders() -> int:
+    with structlog.contextvars.bound_contextvars(correlation_id=str(uuid.uuid4())):
+        sent = container().send_reminders.execute()
+        logger.info("appointment_reminders_sent", count=sent)
+    return sent

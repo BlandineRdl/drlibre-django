@@ -76,6 +76,23 @@ def _excluding(
     return rows if excluding is None else rows.exclude(id=excluding.value)
 
 
+def _appointment(row: AppointmentRecord) -> Appointment:
+    return Appointment(
+        id=Id(row.id),
+        patient_id=Id(row.patient_id),
+        clinician_id=Id(row.clinician_id),
+        appointment_type_id=Id(row.appointment_type_id),
+        room_id=Id(row.room_id) if row.room_id else None,
+        start=row.start,
+        end=row.end,
+        status=AppointmentStatus(row.status),
+        source=Source(row.source),
+        reason=row.reason,
+        cancelled_at=row.cancelled_at,
+        cancellation_reason=row.cancellation_reason,
+    )
+
+
 class DjangoAppointments(Appointments):
     def add(self, appointment: Appointment) -> None:
         with _overlap_is_conflict():
@@ -91,22 +108,13 @@ class DjangoAppointments(Appointments):
 
     def get(self, appointment_id: Id) -> Appointment | None:
         row = AppointmentRecord.objects.filter(id=appointment_id.value).first()
-        if row is None:
-            return None
-        return Appointment(
-            id=appointment_id,
-            patient_id=Id(row.patient_id),
-            clinician_id=Id(row.clinician_id),
-            appointment_type_id=Id(row.appointment_type_id),
-            room_id=Id(row.room_id) if row.room_id else None,
-            start=row.start,
-            end=row.end,
-            status=AppointmentStatus(row.status),
-            source=Source(row.source),
-            reason=row.reason,
-            cancelled_at=row.cancelled_at,
-            cancellation_reason=row.cancellation_reason,
+        return _appointment(row) if row else None
+
+    def booked_starting(self, after: datetime, until: datetime) -> tuple[Appointment, ...]:
+        rows = AppointmentRecord.objects.filter(
+            status=AppointmentStatus.BOOKED.value, start__gt=after, start__lte=until
         )
+        return tuple(_appointment(row) for row in rows.order_by("start", "id"))
 
     def conflicting_resources(
         self,

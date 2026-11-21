@@ -18,7 +18,7 @@ from drlibre.booking.application.ports.outbound import (
     Venue,
     VerificationCodes,
 )
-from drlibre.booking.domain.appointment import Appointment, Source
+from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
 from drlibre.identity.domain.user import Role
@@ -44,6 +44,14 @@ class InMemoryAppointments(Appointments):
 
     def get(self, appointment_id: Id) -> Appointment | None:
         return next((a for a in self.rows if a.id == appointment_id), None)
+
+    def booked_starting(self, after: datetime, until: datetime) -> tuple[Appointment, ...]:
+        found = (
+            a
+            for a in self.rows
+            if a.status is AppointmentStatus.BOOKED and after < a.start <= until
+        )
+        return tuple(sorted(found, key=lambda a: (a.start, str(a.id))))
 
     def conflicting_resources(
         self,

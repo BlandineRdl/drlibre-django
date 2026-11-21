@@ -15,6 +15,7 @@ from drlibre.booking.application.ports.inbound import (
     RequirePatient,
     RescheduleAppointment,
     ResendCode,
+    SendReminders,
     VerifyHold,
     ViewAppointment,
     ViewHold,
@@ -45,6 +46,7 @@ from drlibre.booking.application.use_cases.reschedule_appointment import (
     RescheduleAppointmentUseCase,
 )
 from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
+from drlibre.booking.application.use_cases.send_reminders import SendRemindersUseCase
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
@@ -392,6 +394,7 @@ class Container:
     view_appointment: ViewAppointment
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
+    send_reminders: SendReminders
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -630,6 +633,7 @@ def wire(a: Adapters) -> Container:
         view_appointment=booking.view_appointment,
         cancel_appointment=booking.cancel_appointment,
         reschedule_appointment=booking.reschedule_appointment,
+        send_reminders=booking.send_reminders,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -681,6 +685,7 @@ class _BookingUseCases:
     view_appointment: ViewAppointment
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
+    send_reminders: SendReminders
 
 
 def _wire_booking(
@@ -768,6 +773,13 @@ def _wire_booking(
             placement=placement,
             locks=booking.locks,
             slot_refresh=booking.slot_refresh,
+            notices=booking.notices,
+        ),
+        send_reminders=SendRemindersUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            appointments=booking.appointments,
             notices=booking.notices,
         ),
     )

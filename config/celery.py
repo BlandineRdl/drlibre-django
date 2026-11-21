@@ -13,6 +13,10 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 app.conf.beat_schedule = {
     "heartbeat": {"task": "drlibre.heartbeat", "schedule": 60.0},
     "expire-booking-holds": {"task": "drlibre.expire_booking_holds", "schedule": 60.0},
+    "send-appointment-reminders": {
+        "task": "drlibre.send_appointment_reminders",
+        "schedule": crontab(minute="*/15"),
+    },
     "extend-slot-horizon": {
         "task": "drlibre.extend_slot_horizon",
         "schedule": crontab(hour=0, minute=15),

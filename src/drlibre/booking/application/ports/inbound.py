@@ -23,6 +23,7 @@ __all__ = [
     "RequirePatient",
     "RescheduleAppointment",
     "ResendCode",
+    "SendReminders",
     "VerifiedBooking",
     "VerifyHold",
     "ViewAppointment",
@@ -111,6 +112,12 @@ class ResendCode(Protocol):
 class ExpireHolds(Protocol):
     def execute(self) -> int:
         """Delete expired holds and their codes, auditing each; returns how many."""
+        ...
+
+
+class SendReminders(Protocol):
+    def execute(self) -> int:
+        """Remind each BOOKED appointment of the next 24 hours once, auditing the count if any."""
         ...
 
 
