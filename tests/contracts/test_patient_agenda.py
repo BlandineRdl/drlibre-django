@@ -9,6 +9,7 @@ from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
 from drlibre.booking.infrastructure.patient_agenda import SqlPatientAgenda
 from drlibre.booking.infrastructure.repositories import DjangoAppointments
+from drlibre.organisation.infrastructure.django.models import AppointmentTypeRecord
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import existing_appointment, stored_scene
 from tests.fakes.booking import AgendaClinician, InMemoryAppointments, InMemoryPatientAgenda
@@ -34,6 +35,7 @@ class Scene:
     clinicians: tuple[Id, Id]
     kind: Id
     room: Id
+    take_offline: Callable[[Id], None]
 
 
 @pytest.fixture(
@@ -46,10 +48,21 @@ def scene(request: pytest.FixtureRequest) -> Scene:
         clinicians, kind, room = (Id(), Id()), Id(), Id()
         agenda.clinicians.update(dict.fromkeys(clinicians, CLINICIAN))
         agenda.labels.update({kind: "Consultation", room: "Salle 1"})
-        return Scene(agenda, appointments.add, clinicians, kind, room)
+        return Scene(agenda, appointments.add, clinicians, kind, room, agenda.offline_types.add)
     stored = stored_scene()
     clinicians = (stored.clinicians[0].id, stored.clinicians[1].id)
-    return Scene(SqlPatientAgenda(), DjangoAppointments().add, clinicians, stored.kind, stored.room)
+    return Scene(
+        SqlPatientAgenda(),
+        DjangoAppointments().add,
+        clinicians,
+        stored.kind,
+        stored.room,
+        take_type_offline,
+    )
+
+
+def take_type_offline(kind: Id) -> None:
+    AppointmentTypeRecord.objects.filter(id=kind.value).update(bookable_online=False)
 
 
 def stored_appointment(
@@ -101,9 +114,24 @@ def test_the_agenda_lists_only_the_patients_appointments_by_start_with_whom_and_
         CLINICIAN.department,
     )
     assert entries == (
-        AgendaEntry(sooner, *fields, room=None, appointment_type="Consultation"),
-        AgendaEntry(later, *fields, room="Salle 1", appointment_type="Consultation"),
+        AgendaEntry(
+            sooner, *fields, room=None, appointment_type="Consultation", bookable_online=True
+        ),
+        AgendaEntry(
+            later, *fields, room="Salle 1", appointment_type="Consultation", bookable_online=True
+        ),
     )
+
+
+def test_the_agenda_tells_whether_the_type_is_still_bookable_online(scene: Scene) -> None:
+    """Story « déplace » : « Déplacer » n'est proposée que quand les règles la permettent."""
+    patient = Id()
+    stored_appointment(scene, patient, 48)
+
+    scene.take_offline(scene.kind)
+
+    (entry,) = scene.agenda.entries(patient, AgendaFilter())
+    assert entry.bookable_online is False
 
 
 def test_the_agenda_narrows_to_a_clinician_a_status_and_a_start_range(scene: Scene) -> None:
@@ -137,6 +165,7 @@ def test_a_patients_agenda_page_costs_one_sql_query(
         (stored.clinicians[0].id, stored.clinicians[1].id),
         stored.kind,
         stored.room,
+        take_type_offline,
     )
     patient = Id()
     for hours in (24, 30, 48):

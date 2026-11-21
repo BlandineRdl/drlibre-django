@@ -48,6 +48,7 @@ def entry(**changes: Any) -> AgendaEntry:
         department="Rythmologie",
         room="Salle 1",
         appointment_type="Consultation",
+        bookable_online=True,
         allowed_actions=BOTH,
     )
     return dataclasses.replace(made, **changes)

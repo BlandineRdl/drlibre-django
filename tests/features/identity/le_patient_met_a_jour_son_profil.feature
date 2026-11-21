@@ -23,6 +23,11 @@ Feature: Le patient met à jour son profil
       | née aujourd'hui | 0601020304 | 2026-11-20 | 0601020304 | 2026-11-20 |
       | champs vides | none | none | none | none |
 
+  Scenario: Le téléphone accepte 7 à 20 caractères parmi chiffres, espaces et `+ ( ) -` ; la date de naissance est une date réelle, pas dans le futur ; un champ vide efface la valeur ; une valeur invalide donne `invalid_input` avec le message du champ. (née aujourd'hui, juste après minuit à Paris)
+    Given the clock is "2026-11-20T23:30:00+00:00"
+    When the patient saves the phone "0601020304" and the birth date "2026-11-21"
+    Then the patient has the phone "0601020304" and the birth date "2026-11-21"
+
   Scenario Outline: Le téléphone accepte 7 à 20 caractères parmi chiffres, espaces et `+ ( ) -` ; la date de naissance est une date réelle, pas dans le futur ; un champ vide efface la valeur ; une valeur invalide donne `invalid_input` avec le message du champ. (valeur refusée : <case>)
     When the patient saves the phone "<phone>" and the birth date "<birth_date>"
     Then the change is refused as invalid on "<field>" with its message

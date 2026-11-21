@@ -312,6 +312,7 @@ class AgendaEntry:
     department: str
     room: str | None
     appointment_type: str
+    bookable_online: bool
     allowed_actions: frozenset[PatientAction] = frozenset()
 
 

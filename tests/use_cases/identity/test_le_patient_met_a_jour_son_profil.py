@@ -67,6 +67,11 @@ def patient(
     profile.values = (phone, birth_date)
 
 
+@given(parsers.parse('the clock is "{instant}"'))
+def clock_is(world: FakeWorld, instant: str) -> None:
+    world.clock.at = datetime.fromisoformat(instant)
+
+
 @when(parsers.parse('the patient saves the phone "{phone}" and the birth date "{birth_date}"'))
 def saves(world: FakeWorld, profile: Profile, phone: str, birth_date: str) -> None:
     profile.values += (phone, birth_date)

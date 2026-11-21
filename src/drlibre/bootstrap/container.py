@@ -355,6 +355,8 @@ class Adapters:
     notifications: Notifications
     # Booking's notices write through it, so it is built with them.
     notify: Notify
+    # The application's zone, whose date is "today" for a patient's profile.
+    time_zone: str
     # None wires organisation to scheduling's own RefreshSlots.
     slot_refresh: SlotRefresh | None = None
 
@@ -478,7 +480,9 @@ def wire(a: Adapters) -> Container:
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
         ),
-        update_profile=UpdateProfileUseCase(clock=clock, uow=uow, audit=audit, users=a.users),
+        update_profile=UpdateProfileUseCase(
+            clock=clock, uow=uow, audit=audit, users=a.users, time_zone=a.time_zone
+        ),
         save_hospital=SaveHospitalUseCase(
             clock=clock,
             uow=uow,
@@ -922,6 +926,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         search_queries=SqlSearchQueries(),
         notifications=notifications,
         notify=notify,
+        time_zone=settings.TIME_ZONE,
     )
 
 

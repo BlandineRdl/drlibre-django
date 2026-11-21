@@ -374,12 +374,13 @@ class AgendaClinician:
 
 
 class InMemoryPatientAgenda(PatientAgenda):
-    """Joins the in-memory appointments to `clinicians` and to `labels` naming types and rooms."""
+    """Joins in-memory appointments to `clinicians`, `labels` (types, rooms) and `offline_types`."""
 
     def __init__(self, appointments: InMemoryAppointments) -> None:
         self.appointments = appointments
         self.clinicians: dict[Id, AgendaClinician] = {}
         self.labels: dict[Id, str] = {}
+        self.offline_types: set[Id] = set()
 
     def entries(self, patient_id: Id, agenda_filter: AgendaFilter) -> tuple[AgendaEntry, ...]:
         f = agenda_filter
@@ -410,4 +411,5 @@ class InMemoryPatientAgenda(PatientAgenda):
             department=who.department,
             room=self.labels.get(appointment.room_id) if appointment.room_id else None,
             appointment_type=self.labels.get(appointment.appointment_type_id, ""),
+            bookable_online=appointment.appointment_type_id not in self.offline_types,
         )

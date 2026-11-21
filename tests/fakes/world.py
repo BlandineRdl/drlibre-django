@@ -211,4 +211,5 @@ class FakeWorld:
             search_queries=SqlSearchQueries(),
             notifications=self.notifications,
             notify=self.notify,
+            time_zone="Europe/Paris",
         )

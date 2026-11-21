@@ -12,7 +12,6 @@ from django.test import Client
 from pytest_bdd import given, parsers, then, when
 
 from drlibre.booking.application.ports.inbound import AgendaFilter, HoldCreated, VerifiedBooking
-from drlibre.booking.domain import booking_rules
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.bootstrap.container import use_container
 from drlibre.identity.domain.session import Session, hash_token
@@ -26,7 +25,7 @@ from tests.builders_booking import (
     existing_appointment,
     patient_user,
 )
-from tests.fakes.booking import AgendaClinician
+from tests.fakes.booking import AgendaClinician, InMemoryAppointments
 from tests.fakes.world import FakeWorld
 
 NETWORK = "10.0.0.1"
@@ -154,6 +153,7 @@ def inactive_type(world: FakeWorld, scene: Scene) -> None:
 @given("the appointment type is not bookable online")
 def offline_type(world: FakeWorld, scene: Scene) -> None:
     amend_type(world, scene, bookable_online=False)
+    world.agenda.offline_types.add(scene.type)
 
 
 @given("the appointment type needs no room")
@@ -950,7 +950,11 @@ def nothing_changed(world: FakeWorld, scene: Scene) -> None:
 
 @then(parsers.parse('the patient is offered "{actions}"'))
 def offered(world: FakeWorld, scene: Scene, actions: str) -> None:
-    allowed = booking_rules.allowed_actions(mine(scene), world.clock.now())
+    listed = world.app.list_patient_appointments.execute(
+        patient_id=scene.patient, agenda_filter=AgendaFilter()
+    )
+    (entry,) = [e for e in listed.upcoming + listed.past if e.appointment.id == mine(scene).id]
+    allowed = entry.allowed_actions
     expected = set() if actions == "nothing" else set(csv(actions))
     assert {action.value for action in allowed} == expected
 
@@ -1172,6 +1176,22 @@ def opens_appointments(world: FakeWorld, scene: Scene, web: Client) -> None:
     open_session(world, web, scene.patient)
     scene.page = web.get("/portal/appointments")
     assert scene.page.status_code == 200, scene.page.content
+
+
+@given("the agenda no longer lists the appointment")
+def agenda_drops(world: FakeWorld) -> None:
+    world.agenda.appointments = InMemoryAppointments()
+
+
+@when("the patient opens the move page of the appointment")
+def opens_move_page(world: FakeWorld, scene: Scene, web: Client) -> None:
+    open_session(world, web, scene.patient)
+    scene.page = web.get(f"/portal/appointments/{mine(scene).id}/reschedule")
+
+
+@then(parsers.parse("the page answers {status:d}"))
+def page_answers(scene: Scene, status: int) -> None:
+    assert scene.page.status_code == status, scene.page.content
 
 
 @then(parsers.parse('the page offers "{actions}" for the appointment'))

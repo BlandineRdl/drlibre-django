@@ -11,7 +11,8 @@ SELECT a.id, a.patient_id, a.clinician_id, a.appointment_type_id, a.room_id, a.s
        a.status, a.source, a.reason, a.cancelled_at, a.cancellation_reason,
        u.full_name AS clinician_name, c.title AS clinician_title, sp.name AS specialty,
        h.name AS hospital_name, h.street, h.postal_code, h.city, h.time_zone,
-       d.name AS department, r.name AS room, t.name AS appointment_type
+       d.name AS department, r.name AS room, t.name AS appointment_type,
+       t.bookable_online
 FROM booking_appointmentrecord a
 JOIN organisation_clinicianprofilerecord c ON c.id = a.clinician_id
 JOIN identity_userrecord u ON u.id = c.user_id
@@ -55,6 +56,7 @@ def _entry(row: dict[str, Any]) -> AgendaEntry:
         department=row["department"],
         room=row["room"],
         appointment_type=row["appointment_type"],
+        bookable_online=row["bookable_online"],
     )
 
 

@@ -133,6 +133,17 @@ Feature: Le patient déplace un rendez-vous
       | arrivé                     | CHECKED_IN | 2026-11-23 09:00 | Annuler           |
       | réservé dans moins de 24 h | BOOKED     | 2026-11-21 09:00 | nothing           |
 
+  Scenario: Seul un RDV `BOOKED` se déplace ; l'action « Déplacer » n'est proposée que quand les règles la permettent. (page : type non réservable en ligne)
+    Given the agenda names the clinicians, the type and the rooms
+    And the appointment type is not bookable online
+    When the patient opens their appointments page
+    Then the page offers "Annuler" for the appointment
+
+  Scenario: Règle §12.3 : le RDV d'un autre patient est refusé en `forbidden`, un RDV inconnu en `not_found` (page d'un RDV que l'agenda ne liste pas)
+    Given the agenda no longer lists the appointment
+    When the patient opens the move page of the appointment
+    Then the page answers 404
+
   Scenario: `POST /appointments/{id}/reschedule` applique les mêmes règles, sur les seuls RDV du patient. (déplacement accepté)
     When the patient posts '{"start": "2026-11-23T10:00:00Z"}' to reschedule it
     Then the API answers 200 with the appointment "BOOKED"

@@ -130,6 +130,18 @@ def test_the_week_strip_offers_the_clinicians_free_slots_and_moves_the_appointme
     )
 
 
+def test_the_week_strip_offers_only_slots_starting_at_least_120_minutes_ahead(
+    portal: Portal,
+) -> None:
+    """Story « déplace » : le bandeau ne propose pas un créneau que la règle des 120 min refuse."""
+    use_container(portal.world.app(at=SLOT_START - timedelta(minutes=90)))
+
+    strip = page(portal.client.get(f"{portal.base}/reschedule?week={WEEK}"))
+
+    assert 'name="start" value="2026-11-23T08:00:00Z"' not in strip
+    assert 'name="start" value="2026-11-23T08:30:00Z"' in strip
+
+
 def test_a_refused_move_shows_the_strip_again_with_the_broken_rule(portal: Portal) -> None:
     """Story « déplace » : refus en rule_violation affiché avec ses règles, RDV inchangé."""
     refused = portal.client.post(

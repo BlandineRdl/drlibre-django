@@ -57,7 +57,10 @@ def _entry(identity: Identity, appointment_id: UUID) -> AgendaEntry:
         appointment_id=Id(appointment_id), patient_id=identity.user_id
     )
     agenda = _agenda(identity, AgendaFilter(start=found.start, end=found.start + _ONE_INSTANT))
-    return next(e for e in agenda.upcoming + agenda.past if e.appointment.id == found.id)
+    listed = next((e for e in agenda.upcoming + agenda.past if e.appointment.id == found.id), None)
+    if listed is None:
+        raise DomainError(ErrorCode.NOT_FOUND, "Rendez-vous introuvable.")
+    return listed
 
 
 def _private(response: HttpResponse) -> HttpResponse:

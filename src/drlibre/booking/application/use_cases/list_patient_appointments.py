@@ -29,7 +29,9 @@ class ListPatientAppointmentsUseCase(ListPatientAppointments):
         past: list[AgendaEntry] = []
         for entry in self._agenda.entries(patient_id, agenda_filter):
             appointment = entry.appointment
-            actions = booking_rules.allowed_actions(appointment, now)
+            actions = booking_rules.allowed_actions(
+                appointment, now, type_online=entry.bookable_online
+            )
             filled = dataclasses.replace(entry, allowed_actions=actions)
             if appointment.status in _UPCOMING and appointment.start > now:
                 upcoming.append(filled)

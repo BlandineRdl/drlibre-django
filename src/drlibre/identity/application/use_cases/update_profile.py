@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.identity.application.ports.inbound import UpdateProfile
 from drlibre.identity.application.ports.outbound import Users
@@ -10,15 +12,20 @@ from drlibre.shared_kernel.validation import changed_fields
 
 
 class UpdateProfileUseCase(UpdateProfile):
-    def __init__(self, *, clock: Clock, uow: UnitOfWork, audit: AuditLog, users: Users) -> None:
+    def __init__(
+        self, *, clock: Clock, uow: UnitOfWork, audit: AuditLog, users: Users, time_zone: str
+    ) -> None:
         self._clock = clock
+        self._zone = ZoneInfo(time_zone)
         self._uow = uow
         self._audit = audit
         self._users = users
 
     def execute(self, *, user_id: Id, phone: str, birth_date: str) -> None:
         at = self._clock.now()
-        profile = ProfileDetails.parse(phone=phone, birth_date=birth_date, today=at.date())
+        profile = ProfileDetails.parse(
+            phone=phone, birth_date=birth_date, today=at.astimezone(self._zone).date()
+        )
         with self._uow:
             before = self._users.get(user_id)
             if before is None:

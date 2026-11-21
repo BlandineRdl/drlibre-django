@@ -70,13 +70,15 @@ def reschedule_violations(
     return tuple(broken)
 
 
-def allowed_actions(appointment: Appointment, now: datetime) -> frozenset[PatientAction]:
+def allowed_actions(
+    appointment: Appointment, now: datetime, *, type_online: bool
+) -> frozenset[PatientAction]:
     """The changes a patient may ask for now, so a page offers only those."""
     if cancel_violations(start=appointment.start, now=now):
         return frozenset()
     allowed = set[PatientAction]()
     if appointment.cancellable:
         allowed.add(PatientAction.CANCEL)
-    if appointment.movable:
+    if appointment.movable and type_online:
         allowed.add(PatientAction.RESCHEDULE)
     return frozenset(allowed)
