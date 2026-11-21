@@ -122,3 +122,27 @@ def test_only_appointments_with_a_reminder_are_found_reminded(store: Notificatio
 
     assert store.reminded_among(frozenset({reminded, booked})) == {reminded}
     assert store.reminded_among(frozenset()) == frozenset()
+
+
+@pytest.mark.parametrize(
+    "event", [AppointmentEvent.WAITLIST_OFFERED, AppointmentEvent.WAITLIST_BOOKED]
+)
+def test_a_waitlist_notification_is_stored_with_or_without_its_appointment(
+    store: Notifications, event: AppointmentEvent
+) -> None:
+    """Règle §11 : l'offre ne désigne aucun RDV, la réservation désigne le nouveau RDV."""
+    patient = Id()
+    unlinked = Notification.for_event(
+        event=event,
+        recipient_id=patient,
+        appointment_id=None,
+        start=START,
+        zone_name="Europe/Paris",
+        at=NOW,
+    )
+    linked = notice(patient, event=event, minutes=1)
+
+    assert store.add(unlinked) is True
+    assert store.add(linked) is True
+    assert store.get(unlinked.id) == unlinked
+    assert store.page_for(patient, PageRequest()).items == (linked, unlinked)

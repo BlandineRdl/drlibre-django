@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Notifications et emails « Créneau proposé » et « Créneau réservé »

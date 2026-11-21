@@ -217,6 +217,14 @@ class BookingNotices(Protocol):
         """Those of the appointments whose reminder is already written."""
         ...
 
+    def waitlist_offered(self, entry: WaitlistEntry, start: datetime, clinician_id: Id) -> None:
+        """Write « Créneau proposé », linking no appointment, and queue its email."""
+        ...
+
+    def waitlist_booked(self, appointment: Appointment) -> None:
+        """Write the « Créneau réservé » notification and queue its email."""
+        ...
+
 
 class RoundRobinLedger(Protocol):
     def record(self, clinician_id: Id, at: datetime) -> None:

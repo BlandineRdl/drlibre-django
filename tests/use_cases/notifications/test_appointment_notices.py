@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from drlibre.booking.domain.appointment import Appointment
+from drlibre.booking.domain.waitlist import WaitlistEntry
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import booking_venue, existing_appointment, patient_user
@@ -68,3 +69,73 @@ def test_an_appointment_already_reminded_is_neither_notified_nor_emailed_again(
 
     assert len(world.notifications.rows) == 1
     assert len(world.outbox.queued) == 1
+
+
+def offered_entry(world: FakeWorld) -> tuple[WaitlistEntry, Id]:
+    patient, clinician = Id(), Id()
+    world.users.save(patient_user(patient))
+    world.booking_directory.venues[clinician] = booking_venue("Dr Alice Durand")
+    entry = WaitlistEntry.join(
+        patient_id=patient,
+        appointment_type_id=Id(),
+        clinician_id=None,
+        earliest=START - timedelta(days=1),
+        latest=START + timedelta(days=1),
+        at=START - timedelta(days=2),
+    )
+    return entry.offered(Id()), clinician
+
+
+def assert_waitlist_email(world: FakeWorld, subject: str) -> None:
+    (mail,) = world.outbox.queued
+    assert (mail.to, mail.subject) == (("patient@example.org",), subject)
+    for line in ("25/11/2026 à 14:30 (Europe/Paris)", "Hôpital Test", "Dr Alice Durand"):
+        assert line in mail.body
+    assert re.findall(r"https?://\S+", mail.body) == ["http://localhost:8000/sign-in"]
+
+
+def test_an_offered_slot_notifies_the_patient_with_its_time_only_and_emails_it(
+    world: FakeWorld,
+) -> None:
+    """Règle §11 : « Créneau proposé », sans lien vers le RDV d'un autre patient."""
+    entry, clinician = offered_entry(world)
+
+    world.notices.waitlist_offered(entry, START, clinician)
+
+    (notification,) = world.notifications.rows
+    assert (notification.title, notification.recipient_id) == ("Créneau proposé", entry.patient_id)
+    assert notification.body == "Un créneau vous est proposé le 25/11/2026 à 14:30 (Europe/Paris)."
+    assert notification.appointment_id is None
+    assert_waitlist_email(world, "Un créneau vous est proposé")
+
+
+def test_a_booked_offer_notifies_the_patient_with_the_new_appointment_and_emails_it(
+    world: FakeWorld,
+) -> None:
+    """Règle §11 : « Créneau réservé » désigne le nouveau RDV, jamais son motif."""
+    appointment = reason_appointment(world)
+
+    world.notices.waitlist_booked(appointment)
+
+    (notification,) = world.notifications.rows
+    assert (notification.title, notification.appointment_id) == ("Créneau réservé", appointment.id)
+    assert notification.body == "Votre créneau du 25/11/2026 à 14:30 (Europe/Paris) est réservé."
+    assert_waitlist_email(world, "Votre créneau est réservé")
+    assert "Douleur" not in world.outbox.queued[0].body
+
+
+def test_a_waitlist_notice_rolled_back_with_its_unit_leaves_no_row_and_no_email(
+    world: FakeWorld,
+) -> None:
+    entry, clinician = offered_entry(world)
+
+    def offer_then_fail() -> None:
+        with world.uow:
+            world.notices.waitlist_offered(entry, START, clinician)
+            raise RuntimeError("rolled back")
+
+    with pytest.raises(RuntimeError):
+        offer_then_fail()
+
+    assert world.notifications.rows == []
+    assert world.outbox.queued == []
