@@ -17,10 +17,13 @@ __all__ = [
     "ExpireHolds",
     "HeldPeriod",
     "HoldCreated",
+    "HoldSummary",
     "OpenHolds",
     "ResendCode",
     "VerifiedBooking",
     "VerifyHold",
+    "ViewAppointment",
+    "ViewHold",
 ]
 
 
@@ -160,4 +163,30 @@ class AppointmentQueries(Protocol):
 
     def any_for_user(self, user_id: Id) -> tuple[Dependent, ...]:
         """Appointments where the user is the patient, or the clinician through their profile."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class HoldSummary:
+    """What a booking hold shows its visitor: the slot and the provider, never the details."""
+
+    hold_id: Id
+    clinician_id: Id
+    appointment_type_id: Id
+    start: datetime
+    end: datetime
+    expires_at: datetime
+    open: bool
+    first_available: bool
+
+
+class ViewHold(Protocol):
+    def execute(self, *, hold_id: Id) -> HoldSummary:
+        """The hold's slot, open or just expired; not_found once it is gone."""
+        ...
+
+
+class ViewAppointment(Protocol):
+    def execute(self, *, appointment_id: Id, patient_id: Id) -> Appointment:
+        """The patient's own appointment; not_found when absent, forbidden for another patient."""
         ...

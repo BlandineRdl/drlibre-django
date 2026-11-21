@@ -130,6 +130,17 @@ def test_an_appointment_conflicts_on_the_clinician_and_on_the_patient_while_acti
     assert not scene.appointments.clinician_busy(scene.other, at(5), at(6))
 
 
+def test_a_stored_appointment_is_read_back_whatever_its_status(scene: Scene) -> None:
+    """Story confirmation : la page de confirmation relit le rendez-vous enregistré."""
+    cancelled = appointment(
+        scene, patient=Id(), start=at(5), status=AppointmentStatus.CANCELLED, room=scene.room
+    )
+    scene.appointments.add(cancelled)
+
+    assert scene.appointments.get(cancelled.id) == cancelled
+    assert scene.appointments.get(Id()) is None
+
+
 def test_only_future_active_online_appointments_count_as_open_bookings(scene: Scene) -> None:
     """Story réservation : trois réservations en ligne ouvertes au plus par patient."""
     patient = Id()

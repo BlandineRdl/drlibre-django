@@ -35,6 +35,9 @@ class InMemoryAppointments(Appointments):
     def add(self, appointment: Appointment) -> None:
         self.rows.append(appointment)
 
+    def get(self, appointment_id: Id) -> Appointment | None:
+        return next((a for a in self.rows if a.id == appointment_id), None)
+
     def conflicting_resources(
         self, *, clinician_id: Id, patient_id: Id, start: datetime, end: datetime
     ) -> tuple[str, ...]:

@@ -54,6 +54,10 @@ class Appointments(Protocol):
         """Store the appointment."""
         ...
 
+    def get(self, appointment_id: Id) -> Appointment | None:
+        """The stored appointment, whatever its status."""
+        ...
+
     def conflicting_resources(
         self, *, clinician_id: Id, patient_id: Id, start: datetime, end: datetime
     ) -> tuple[str, ...]:

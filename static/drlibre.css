@@ -21,3 +21,6 @@ caption { text-align: left; }
 .slot-list a[role="button"] { margin: 0; padding: 0.25rem 0.75rem; }
 .week-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 1rem; }
 .week-strip h3 { font-size: 1rem; }
+.steps { display: flex; flex-wrap: wrap; gap: 1rem; list-style: none; padding: 0; }
+.steps li { padding: 0; margin: 0; }
+.steps li[aria-current="step"] { border-bottom: 0.2rem solid var(--pico-primary); }

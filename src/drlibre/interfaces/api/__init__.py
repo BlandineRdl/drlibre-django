@@ -2,7 +2,9 @@ from django.http import HttpRequest, HttpResponse
 from ninja import NinjaAPI
 from ninja.errors import ValidationError
 
+from drlibre.interfaces.api.appointments import router as appointments_router
 from drlibre.interfaces.api.auth import router as auth_router
+from drlibre.interfaces.api.booking import router as booking_router
 from drlibre.interfaces.api.health import router as health_router
 from drlibre.interfaces.api.public import router as public_router
 from drlibre.interfaces.api.search import router as search_router
@@ -15,6 +17,8 @@ api.add_router("/", auth_router)
 api.add_router("/", slots_router)
 api.add_router("/", search_router)
 api.add_router("/", public_router)
+api.add_router("/", booking_router)
+api.add_router("/", appointments_router)
 
 
 @api.exception_handler(DomainError)

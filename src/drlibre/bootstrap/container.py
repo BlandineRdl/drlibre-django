@@ -13,6 +13,8 @@ from drlibre.booking.application.ports.inbound import (
     OpenHolds,
     ResendCode,
     VerifyHold,
+    ViewAppointment,
+    ViewHold,
 )
 from drlibre.booking.application.ports.outbound import (
     Appointments as BookingAppointments,
@@ -36,6 +38,8 @@ from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
+from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
+from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
 from drlibre.booking.infrastructure.code_issuer import HmacCodeIssuer
 from drlibre.booking.infrastructure.directory import OrganisationBookingDirectory
 from drlibre.booking.infrastructure.free_slots import SchedulingFreeSlots
@@ -353,6 +357,8 @@ class Container:
     resend_code: ResendCode
     expire_holds: ExpireHolds
     open_holds: OpenHolds
+    view_hold: ViewHold
+    view_appointment: ViewAppointment
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -572,6 +578,8 @@ def wire(a: Adapters) -> Container:
         resend_code=booking.resend_code,
         expire_holds=booking.expire_holds,
         open_holds=booking.open_holds,
+        view_hold=booking.view_hold,
+        view_appointment=booking.view_appointment,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -613,6 +621,8 @@ class _BookingUseCases:
     resend_code: ResendCode
     expire_holds: ExpireHolds
     open_holds: OpenHolds
+    view_hold: ViewHold
+    view_appointment: ViewAppointment
 
 
 def _wire_booking(
@@ -678,6 +688,8 @@ def _wire_booking(
             clock=a.clock, uow=a.uow, audit=a.audit, holds=booking.holds, codes=booking.codes
         ),
         open_holds=OpenHoldsUseCase(holds=booking.holds),
+        view_hold=ViewHoldUseCase(clock=a.clock, holds=booking.holds),
+        view_appointment=ViewAppointmentUseCase(appointments=booking.appointments),
     )
 
 

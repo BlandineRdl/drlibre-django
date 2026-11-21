@@ -41,6 +41,23 @@ class DjangoAppointments(Appointments):
             reason=appointment.reason,
         )
 
+    def get(self, appointment_id: Id) -> Appointment | None:
+        row = AppointmentRecord.objects.filter(id=appointment_id.value).first()
+        if row is None:
+            return None
+        return Appointment(
+            id=appointment_id,
+            patient_id=Id(row.patient_id),
+            clinician_id=Id(row.clinician_id),
+            appointment_type_id=Id(row.appointment_type_id),
+            room_id=Id(row.room_id) if row.room_id else None,
+            start=row.start,
+            end=row.end,
+            status=AppointmentStatus(row.status),
+            source=Source(row.source),
+            reason=row.reason,
+        )
+
     def conflicting_resources(
         self, *, clinician_id: Id, patient_id: Id, start: datetime, end: datetime
     ) -> tuple[str, ...]:
