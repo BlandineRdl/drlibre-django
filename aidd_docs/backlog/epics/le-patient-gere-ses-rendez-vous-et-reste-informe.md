@@ -21,10 +21,11 @@ Un patient connecté, avec ou sans mot de passe, retrouve tous ses RDV, les dép
   - Fichier `.ics` pour chaque RDV (§8).
   - Notifications in-app : RDV réservé, déplacé, annulé, rappel ; créées dans la même transaction que l'événement ; heure seulement, sans nom, motif ni email ; liste avec « marquer comme lu » (§11, §8).
   - Email pour chaque notification patient, sans lien qui connecte (§7.6).
-  - Job de rappel idempotent pour les RDV `BOOKED` des 24 prochaines heures, exécuté sur planning, avec une entrée d'audit portant le nombre de rappels (§5.7, §17).
+  - Job de rappel idempotent pour les RDV `BOOKED` des 24 prochaines heures, exécuté sur planning, avec une entrée d'audit portant le nombre de rappels (§5.7, §17) ; l'idempotence est garantie en base par un index unique partiel « un rappel par RDV ».
   - Profil : téléphone et date de naissance modifiables ; accès au changement de mot de passe livré par l'Epic 1, masqué pour les patients sans mot de passe (§8).
   - La notification « RDV réservé » réutilise l'email de confirmation de l'Epic 3, sans second email ; tous les emails partent après la validation de la transaction.
   - API `GET /appointments` limitée à ce que l'appelant peut voir, et API d'annulation et de déplacement pour le patient (§14).
+  - Garde-fous PostgreSQL sur les RDV, seconde défense derrière les verrous de l'Epic 3 avant que d'autres chemins de réservation n'arrivent (déplacement ici, personnel et FHIR ensuite) : contrainte d'exclusion (`btree_gist`, `tstzrange`) interdisant deux RDV actifs qui se chevauchent pour le même praticien ou le même patient, et `CheckConstraint` sur `end > start` (RDV et réservations provisoires) et sur la cohérence statut / heure et motif d'annulation.
 - Excludes:
   - Liste d'attente : inscription, offres, acceptation, notifications et emails associés (Epic liste d'attente).
   - Déclenchement manuel du job de rappel depuis les réglages (Epic supervision admin).
@@ -45,3 +46,4 @@ Un patient connecté, avec ou sans mot de passe, retrouve tous ses RDV, les dép
 | Statut `CONFIRMED` retiré des statuts et des transitions (§5.6, §17) | decision | prise : supprimé |
 | Notification in-app « RDV réservé » ajoutée au placement livré par l'Epic 3 | assumption | acceptée |
 | Email unique à la réservation, endpoints patient de §14 | decision | prise : décision du rapport de zones d'ombre (aidd_docs/backlog/epics-shadow-report.md) |
+| Contraintes de base sur les RDV (exclusion de chevauchement, `CheckConstraint`), la salle restant sérialisée par verrou ; les réservations provisoires ne sont pas couvertes par l'exclusion | decision | prise : revue de l'Epic 3 (aidd_docs/tasks/2026_11/2026_11_21_e3-reservation-sans-compte/review.md) |
