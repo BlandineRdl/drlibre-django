@@ -95,7 +95,7 @@ def cancels(world: FakeWorld, scene: Scene, reason: str) -> None:
         world,
         scene,
         lambda: world.app.cancel_appointment.execute(
-            appointment_id=mine(scene).id, patient_id=scene.patient, reason=reason
+            appointment_id=mine(scene).id, actor_id=scene.patient, reason=reason
         ),
     )
 
@@ -111,7 +111,7 @@ def cancels_unknown(world: FakeWorld, scene: Scene) -> None:
         world,
         scene,
         lambda: world.app.cancel_appointment.execute(
-            appointment_id=Id(), patient_id=scene.patient, reason="Empêchement"
+            appointment_id=Id(), actor_id=scene.patient, reason="Empêchement"
         ),
     )
 
@@ -122,7 +122,7 @@ def moves(world: FakeWorld, scene: Scene, start: str) -> None:
         world,
         scene,
         lambda: world.app.reschedule_appointment.execute(
-            appointment_id=mine(scene).id, patient_id=scene.patient, start=at(start)
+            appointment_id=mine(scene).id, actor_id=scene.patient, start=at(start)
         ),
     )
 
@@ -133,7 +133,7 @@ def moves_unknown(world: FakeWorld, scene: Scene, start: str) -> None:
         world,
         scene,
         lambda: world.app.reschedule_appointment.execute(
-            appointment_id=Id(), patient_id=scene.patient, start=at(start)
+            appointment_id=Id(), actor_id=scene.patient, start=at(start)
         ),
     )
 
@@ -207,7 +207,7 @@ def moved_to(
 @then("the move offers no way to name an end time")
 def move_without_end() -> None:
     names = set(inspect.signature(FakeWorld().app.reschedule_appointment.execute).parameters)
-    assert names == {"appointment_id", "patient_id", "start"}
+    assert names == {"appointment_id", "actor_id", "start"}
 
 
 @then(parsers.parse('the patient has one "{title}" notification about the appointment'))

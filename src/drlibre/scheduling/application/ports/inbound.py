@@ -64,8 +64,9 @@ class FindFreeWeek(Protocol):
         clinician_id: Id,
         week: date | None,
         ignoring_appointment: Id | None = None,
+        for_patient: bool = True,
     ) -> FreeWeek:
-        """Free slots of the asked week, else the current one; not_found if type unknown."""
+        """Free slots of the asked or current week, lead time for patients; not_found if no type."""
         ...
 
 

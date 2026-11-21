@@ -8,6 +8,7 @@ from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
     BookAppointment,
+    BookForPatient,
     CancelAppointment,
     CheckInAppointment,
     CompleteAppointment,
@@ -42,6 +43,7 @@ from drlibre.booking.application.ports.outbound import (
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
+from drlibre.booking.application.use_cases.book_for_patient import BookForPatientUseCase
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.check_in_appointment import CheckInAppointmentUseCase
 from drlibre.booking.application.use_cases.complete_appointment import (
@@ -429,6 +431,7 @@ class Container:
     complete_appointment: CompleteAppointment
     mark_no_show: MarkNoShow
     write_clinical_notes: WriteClinicalNotes
+    book_for_patient: BookForPatient
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -679,6 +682,7 @@ def wire(a: Adapters) -> Container:
         complete_appointment=booking.complete_appointment,
         mark_no_show=booking.mark_no_show,
         write_clinical_notes=booking.write_clinical_notes,
+        book_for_patient=booking.book_for_patient,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -736,6 +740,7 @@ class _BookingUseCases:
     complete_appointment: CompleteAppointment
     mark_no_show: MarkNoShow
     write_clinical_notes: WriteClinicalNotes
+    book_for_patient: BookForPatient
 
 
 def _wire_booking(
@@ -822,6 +827,7 @@ def _wire_booking(
             uow=a.uow,
             audit=a.audit,
             appointments=booking.appointments,
+            directory=booking.directory,
             locks=booking.locks,
             slot_refresh=booking.slot_refresh,
             notices=booking.notices,
@@ -855,6 +861,9 @@ def _wire_booking(
             directory=booking.directory,
             appointments=booking.appointments,
             locks=booking.locks,
+        ),
+        book_for_patient=BookForPatientUseCase(
+            uow=a.uow, directory=booking.directory, placement=placement
         ),
     )
 

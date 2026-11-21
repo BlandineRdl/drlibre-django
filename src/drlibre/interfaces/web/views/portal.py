@@ -95,7 +95,7 @@ def cancel(request: HttpRequest, appointment_id: UUID) -> HttpResponse:
     try:
         container().cancel_appointment.execute(
             appointment_id=entry.appointment.id,
-            patient_id=identity.user_id,
+            actor_id=identity.user_id,
             reason=values["reason"],
         )
     except DomainError as error:
@@ -141,7 +141,7 @@ def reschedule(request: HttpRequest, appointment_id: UUID) -> HttpResponse:
     try:
         container().reschedule_appointment.execute(
             appointment_id=entry.appointment.id,
-            patient_id=identity.user_id,
+            actor_id=identity.user_id,
             start=_start(request.POST.get("start", "")),
         )
     except DomainError as error:

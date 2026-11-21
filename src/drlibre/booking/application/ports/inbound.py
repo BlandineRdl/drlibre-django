@@ -23,6 +23,7 @@ __all__ = [
     "AppointmentQueries",
     "AppointmentStatus",
     "BookAppointment",
+    "BookForPatient",
     "BookedPeriod",
     "BookingRule",
     "CancelAppointment",
@@ -71,14 +72,29 @@ class BookAppointment(Protocol):
 
 
 class CancelAppointment(Protocol):
-    def execute(self, *, appointment_id: Id, patient_id: Id, reason: str) -> Appointment:
-        """Cancel the patient's own appointment for a reason; a refusal writes or sends nothing."""
+    def execute(self, *, appointment_id: Id, actor_id: Id, reason: str) -> Appointment:
+        """Cancel the actor's own appointment, patient or clinician; a refusal writes nothing."""
         ...
 
 
 class RescheduleAppointment(Protocol):
-    def execute(self, *, appointment_id: Id, patient_id: Id, start: datetime) -> Appointment:
-        """Move the patient's own BOOKED appointment, end recomputed; a refusal writes nothing."""
+    def execute(self, *, appointment_id: Id, actor_id: Id, start: datetime) -> Appointment:
+        """Move the actor's own BOOKED appointment, patient or clinician; refusals write nothing."""
+        ...
+
+
+class BookForPatient(Protocol):
+    def execute(
+        self,
+        *,
+        actor_id: Id,
+        patient_id: Id,
+        appointment_type_id: Id,
+        start: datetime,
+        room_id: Id | None = None,
+        clinician_id: Id | None = None,
+    ) -> Appointment:
+        """Book an active patient in the caller's own calendar as STAFF; refusals write nothing."""
         ...
 
 

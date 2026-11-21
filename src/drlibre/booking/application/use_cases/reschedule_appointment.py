@@ -10,8 +10,8 @@ from drlibre.booking.application.ports.outbound import (
     ScheduleLocks,
     SlotRefresh,
 )
+from drlibre.booking.application.use_cases.own_clinician_appointment import own_appointment_of
 from drlibre.booking.application.use_cases.placement import Placement
-from drlibre.booking.application.use_cases.view_appointment import own_appointment
 from drlibre.booking.domain import booking_rules
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -45,13 +45,14 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
         self._slot_refresh = slot_refresh
         self._notices = notices
 
-    def execute(self, *, appointment_id: Id, patient_id: Id, start: datetime) -> Appointment:
+    def execute(self, *, appointment_id: Id, actor_id: Id, start: datetime) -> Appointment:
         with self._uow:
-            found = own_appointment(self._appointments, appointment_id, patient_id)
+            profile_id = self._directory.clinician_of_user(actor_id)
+            found = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
             self._locks.lock_clinician(found.clinician_id)
             self._locks.lock_patient(found.patient_id)
             # Read again under the locks, so a change committed meanwhile is seen.
-            current = own_appointment(self._appointments, appointment_id, patient_id)
+            current = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
             current.require_movable()
             kind = self._directory.appointment_type(current.appointment_type_id)
             clinician = self._directory.clinician(current.clinician_id)
@@ -59,11 +60,16 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
                 raise DomainError(ErrorCode.NOT_FOUND, "Rendez-vous introuvable.")
             end = start + timedelta(minutes=kind.duration_minutes)
             self._placement.refuse_conflicts(
-                patient_id, clinician.id, start, end, ignoring_hold=None, excluding=current.id
+                current.patient_id,
+                clinician.id,
+                start,
+                end,
+                ignoring_hold=None,
+                excluding=current.id,
             )
             now = self._clock.now()
             broken = booking_rules.reschedule_violations(
-                for_patient=True,
+                for_patient=profile_id is None,
                 current_start=current.start,
                 new_start=start,
                 now=now,
@@ -88,7 +94,7 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
             moved = current.moved(start=start, duration=end - start, room_id=room)
             self._appointments.save(moved)
             self._slot_refresh.refresh(moved.clinician_id)
-            self._audit.record(self._rescheduled_entry(moved, patient_id, now))
+            self._audit.record(self._rescheduled_entry(moved, actor_id, now))
             self._notices.rescheduled(moved)
             return moved
 

@@ -54,7 +54,7 @@ def test_two_patients_moving_to_one_slot_at_once_get_it_once() -> None:
         def move(appointment: Appointment):
             def run() -> object:
                 return app.reschedule_appointment.execute(
-                    appointment_id=appointment.id, patient_id=appointment.patient_id, start=target
+                    appointment_id=appointment.id, actor_id=appointment.patient_id, start=target
                 )
 
             return run
@@ -75,7 +75,7 @@ def test_two_cancellations_of_one_appointment_at_once_cancel_it_once() -> None:
 
         def cancel() -> object:
             return app.cancel_appointment.execute(
-                appointment_id=appointment.id, patient_id=appointment.patient_id, reason="Absent"
+                appointment_id=appointment.id, actor_id=appointment.patient_id, reason="Absent"
             )
 
         outcomes = race.run(cancel, cancel)
@@ -93,7 +93,7 @@ def test_a_move_overlapping_its_own_time_is_accepted_and_frees_the_old_slot() ->
         later = SLOT_START + timedelta(minutes=30)
 
         moved = world.app().reschedule_appointment.execute(
-            appointment_id=appointment.id, patient_id=appointment.patient_id, start=later
+            appointment_id=appointment.id, actor_id=appointment.patient_id, start=later
         )
 
         assert (moved.start, moved.end) == (later, later + timedelta(hours=1))

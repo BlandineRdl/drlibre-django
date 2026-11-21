@@ -130,7 +130,7 @@ def cancel(request: HttpRequest, appointment_id: UUID, payload: CancelIn) -> App
     c = container()
     c.require_patient.execute(user_id=identity.user_id)
     cancelled = c.cancel_appointment.execute(
-        appointment_id=Id(appointment_id), patient_id=identity.user_id, reason=payload.reason
+        appointment_id=Id(appointment_id), actor_id=identity.user_id, reason=payload.reason
     )
     return AppointmentOut.of(cancelled)
 
@@ -141,6 +141,6 @@ def reschedule(request: HttpRequest, appointment_id: UUID, payload: RescheduleIn
     c = container()
     c.require_patient.execute(user_id=identity.user_id)
     moved = c.reschedule_appointment.execute(
-        appointment_id=Id(appointment_id), patient_id=identity.user_id, start=payload.start
+        appointment_id=Id(appointment_id), actor_id=identity.user_id, start=payload.start
     )
     return AppointmentOut.of(moved)

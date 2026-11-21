@@ -24,14 +24,15 @@ class FindFreeWeekUseCase(FindFreeWeek):
         clinician_id: Id,
         week: date | None,
         ignoring_appointment: Id | None = None,
+        for_patient: bool = True,
     ) -> FreeWeek:
         kind = self._directory.appointment_type(appointment_type_id)
         if kind is None:
             raise DomainError(ErrorCode.NOT_FOUND, "Type de RDV introuvable.")
         now = self._clock.now()
         window = Week.within_horizon(asked=week, now=now, time_zone=kind.time_zone)
-        # Like search, offer only slots the lead time rule accepts.
-        start = max(window.start, now + BOOKING_LEAD_TIME)
+        # Like search, patients get only slots the lead time rule accepts; staff from now.
+        start = max(window.start, now + BOOKING_LEAD_TIME if for_patient else now)
         slots = (
             self._find_free_slots.execute(
                 appointment_type_id=appointment_type_id,
