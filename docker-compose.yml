@@ -2,7 +2,7 @@ x-app: &app
   build:
     context: .
     dockerfile: docker/Dockerfile
-  image: drlibre-app:dev
+  image: drlibre-app:${APP_IMAGE_TAG:-dev}
   env_file: .env
   environment:
     DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -10,6 +10,8 @@ x-app: &app
     EMAIL_HOST: mailpit
     EMAIL_PORT: "1025"
     ALLOWED_HOSTS: '["localhost","127.0.0.1","web"]'
+    # Load runs raise it without editing .env (scripts/load-run.sh).
+    NETWORK_HOURLY_LIMIT: ${NETWORK_HOURLY_LIMIT:-20}
   depends_on:
     postgres:
       condition: service_healthy
@@ -21,7 +23,7 @@ services:
     <<: *app
     command: ["/app/docker/entrypoint.sh"]
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 10s
@@ -43,7 +45,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -55,7 +57,7 @@ services:
   redis:
     image: redis:8
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -68,8 +70,8 @@ services:
       # Reverse DNS on each SMTP client stalls every send by seconds on localhost.
       MP_SMTP_DISABLE_RDNS: "true"
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_PORT:-8025}:8025"
 
 volumes:
   pgdata:
