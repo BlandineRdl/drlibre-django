@@ -1,0 +1,7 @@
+{% for button in buttons %}
+<form method="post" action="{{ button.url }}" class="inline-form">
+  {% csrf_token %}
+  <input type="hidden" name="from" value="{{ origin }}">
+  <button type="submit" class="outline" aria-label="{{ button.aria_label }}">{{ button.label }}</button>
+</form>
+{% endfor %}

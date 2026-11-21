@@ -30,3 +30,13 @@ caption { text-align: left; }
 .notification.unread { border-left: 0.25rem solid var(--pico-primary); }
 .profile-identity dt { font-weight: bold; }
 .profile-identity dd { margin: 0 0 0.5rem; }
+.week-grid td.appointment { border-left: 0.25rem solid var(--type-colour, var(--pico-primary)); font-weight: bold; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 1rem; }
+.tiles div { border-left: 0.25rem solid var(--pico-primary); padding-left: 0.75rem; }
+.tiles dt { font-weight: normal; }
+.tiles dd { margin: 0; font-size: 1.25rem; font-weight: bold; }
+.agenda-row { margin-bottom: 1rem; }
+.agenda-row p { margin-bottom: 0.5rem; }
+.facts dt { font-weight: bold; }
+.facts dd { margin: 0 0 0.5rem; }

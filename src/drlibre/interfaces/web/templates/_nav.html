@@ -1,10 +1,10 @@
 <ul>
   <li><a href="/">Rechercher</a></li>
   {% if shell.signed_in %}
-  <li><a href="{{ shell.home_url }}">Mon espace</a></li>
   {% if shell.is_clinician %}
-  <li><a href="/workspace/availability/">Mes plages</a></li>
-  <li><a href="/workspace/time-off/">Mes absences</a></li>
+  {% for link in shell.workspace_nav %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
+  {% else %}
+  <li><a href="{{ shell.home_url }}">Mon espace</a></li>
   {% endif %}
   {% if shell.is_patient %}
   <li><a href="/portal/appointments">Mes RDV</a></li>

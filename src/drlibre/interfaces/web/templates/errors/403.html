@@ -2,6 +2,6 @@
 {% block title %}Accès refusé{% endblock %}
 {% block content %}
 <h1>Accès refusé</h1>
-<p>{{ message|default:"Vous n'avez pas accès à cette page avec ce compte." }}</p>
+<p{% if message_lang %} lang="{{ message_lang }}"{% endif %}>{{ message|default:"Vous n'avez pas accès à cette page avec ce compte." }}</p>
 <p><a href="/">Retour à l'accueil</a></p>
 {% endblock %}

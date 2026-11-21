@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ view.heading }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+<h1>{{ view.heading }}</h1>
+<p>Fuseau : {{ view.time_zone }}</p>
+{% include "workspace/_day_nav.html" with nav=view.nav %}
+{% if view.notice %}<p role="status" class="notice">{{ view.notice }}</p>{% endif %}
+<section aria-labelledby="tiles-heading">
+  <h2 id="tiles-heading" class="visually-hidden">Indicateurs du jour</h2>
+  <dl class="tiles">
+    {% for tile in view.tiles %}<div><dt>{{ tile.label }}</dt><dd>{{ tile.value }}</dd></div>{% endfor %}
+  </dl>
+</section>
+{% if view.empty_text %}<p>{{ view.empty_text }}</p>{% endif %}
+{% for group in view.hours %}
+<section aria-labelledby="hour-{{ forloop.counter }}">
+  <h2 id="hour-{{ forloop.counter }}">{{ group.heading }}</h2>
+  {% for row in group.rows %}
+  <article class="agenda-row">
+    <p><strong>{{ row.time }}</strong> · {{ row.patient }} · {{ row.appointment_type }} · Salle : {{ row.room }} · Statut : {{ row.status }}</p>
+    <div class="actions">
+      {% include "workspace/_status_buttons.html" with buttons=row.buttons origin="day" %}
+      {% if row.cancel_url %}<a href="{{ row.cancel_url }}" aria-label="Annuler : {{ row.label }}">Annuler</a>{% endif %}
+      <a href="{{ row.page_url }}" aria-label="Ouvrir : {{ row.label }}">Ouvrir</a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

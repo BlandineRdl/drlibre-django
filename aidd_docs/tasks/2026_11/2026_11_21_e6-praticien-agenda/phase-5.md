@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Écrans Aujourd'hui, Calendrier et fiche RDV
