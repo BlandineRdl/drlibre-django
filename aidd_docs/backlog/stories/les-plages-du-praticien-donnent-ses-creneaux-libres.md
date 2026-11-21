@@ -12,7 +12,7 @@ depends_on: aidd_docs/backlog/stories/le-praticien-gere-ses-plages-hebdomadaires
 **So that** la recherche et chaque réservation reposent sur le même calcul
 
 ## Acceptance
-- `GET /slots` prend un type, un praticien et une période ; sans session, il répond `unauthenticated`.
+- `GET /slots` prend un type, un praticien et une période ; il répond sans session depuis E3 (spec §14, public **[new]**).
 - Pour chaque jour local de la période, chaque plage valable ce jour-là propose un début à son heure de début puis à chaque pas, tant que le début plus la durée du type ne dépasse pas sa fin ; chaque créneau dure la durée du type.
 - Un créneau qui commence avant la période, finit après elle ou commence dans le passé n'est pas renvoyé.
 - Les débuts renvoyés sont uniques et triés par ordre croissant.
