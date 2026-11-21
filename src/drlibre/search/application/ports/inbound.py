@@ -2,6 +2,12 @@ from datetime import date
 from typing import Protocol
 
 from drlibre.search.domain.criteria import (
+    DEFAULT_PAGE_SIZE as DEFAULT_PAGE_SIZE,
+)
+from drlibre.search.domain.criteria import (
+    PAGE_SIZES as PAGE_SIZES,
+)
+from drlibre.search.domain.criteria import (
     Location,
     Moment,
     SearchCriteria,

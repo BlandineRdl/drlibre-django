@@ -72,7 +72,11 @@ def _page(raw: str | None) -> int:
 
 
 def _size(raw: str | None) -> int:
-    return int(raw) if raw and raw.isascii() and raw.isdigit() and int(raw) in PAGE_SIZES else 20
+    return (
+        int(raw)
+        if raw and raw.isascii() and raw.isdigit() and int(raw) in PAGE_SIZES
+        else DEFAULT_PAGE_SIZE
+    )
 
 
 @dataclass(frozen=True, slots=True)

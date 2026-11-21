@@ -3,7 +3,6 @@ from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from drlibre.interfaces.web.presenters.search import (
-    DEFAULT_SIZE,
     OptionView,
     PaginationView,
     ResultView,
@@ -19,6 +18,7 @@ from drlibre.interfaces.web.presenters.slots import (
     slot_label,
 )
 from drlibre.search.application.ports.inbound import (
+    DEFAULT_PAGE_SIZE,
     HospitalPage,
     ProviderWeek,
     SearchCriteria,
@@ -157,7 +157,7 @@ def _specialty_url(specialty_id: object, criteria: SearchCriteria, page: int) ->
     query: dict[str, str] = {}
     if criteria.sort.value != "soonest":
         query["sort"] = criteria.sort.value
-    if criteria.size != DEFAULT_SIZE:
+    if criteria.size != DEFAULT_PAGE_SIZE:
         query["size"] = str(criteria.size)
     if page > 1:
         query["page"] = str(page)

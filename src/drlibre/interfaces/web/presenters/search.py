@@ -10,6 +10,8 @@ from drlibre.interfaces.web.presenters.slots import (
     slot_label,
 )
 from drlibre.search.application.ports.inbound import (
+    DEFAULT_PAGE_SIZE,
+    PAGE_SIZES,
     FilterOptions,
     FirstSlot,
     HospitalResult,
@@ -24,8 +26,6 @@ from drlibre.search.application.ports.inbound import (
     Window,
 )
 
-DEFAULT_SIZE = 20
-SIZES = (10, 20, 50)
 WINDOW_LABELS = {
     Window.ANY: "Toutes",
     Window.TODAY: "Aujourd'hui",
@@ -156,7 +156,7 @@ def search_url(criteria: SearchCriteria, kind: Kind, *, page: int | None = None)
         query["moment"] = criteria.moment.value
     if criteria.sort is not Sort.SOONEST:
         query["sort"] = criteria.sort.value
-    if criteria.size != DEFAULT_SIZE:
+    if criteria.size != DEFAULT_PAGE_SIZE:
         query["size"] = str(criteria.size)
     if criteria.location:
         query["lat"] = f"{criteria.location.latitude:g}"
@@ -347,7 +347,7 @@ def search_view(
     shown = criteria.on_page(page.number)
     previous = search_url(shown, kind, page=page.number - 1) if page.number > 1 else ""
     following = search_url(shown, kind, page=page.number + 1) if page.number < page.pages else ""
-    sizes = tuple(OptionView(str(n), str(n), n == criteria.size) for n in SIZES)
+    sizes = tuple(OptionView(str(n), str(n), n == criteria.size) for n in PAGE_SIZES)
     noun = _NOUNS[kind]
     return SearchView(
         kind=kind.value,
