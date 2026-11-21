@@ -1,12 +1,19 @@
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_form
-from drlibre.shared_kernel.errors import DomainError
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 SIGN_IN_FIELDS = (
     FieldSpec("email", "Email", kind="email", autocomplete="username"),
     FieldSpec("password", "Mot de passe", kind="password", autocomplete="current-password"),
 )
+LINK_FIELDS = (FieldSpec("link_email", "Email", kind="email", autocomplete="email"),)
+LINK_SENT_MESSAGE = (
+    "Si cette adresse est celle d'un compte patient, "
+    "un lien de connexion valable 15 minutes vient d'être envoyé."
+)
+NO_LINK_MESSAGE = "Ce lien n'est pas valable. Demandez-en un nouveau."
 PASSWORD_FIELDS = (
     FieldSpec(
         "current_password", "Mot de passe actuel", kind="password", autocomplete="current-password"
@@ -42,3 +49,62 @@ def password_form(*, forced: bool, error: DomainError | None = None) -> FormView
         values={},
         error=error,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class LinkSentView:
+    title: str
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class LinkContinueView:
+    """The page a link opens: one button holding the token, or a refusal with a new request."""
+
+    title: str
+    action: str
+    token: str
+    submit_label: str
+    message: str
+    request_form: FormView | None
+
+
+def link_request_form(values: Mapping[str, str], error: DomainError | None = None) -> FormView:
+    return build_form(
+        title="Recevoir un lien de connexion",
+        action="/sign-in/link/request",
+        submit_label="Recevoir un lien",
+        specs=LINK_FIELDS,
+        values=values,
+        error=error,
+    )
+
+
+def link_sent() -> LinkSentView:
+    return LinkSentView(title="Vérifiez vos emails", message=LINK_SENT_MESSAGE)
+
+
+def link_continue(token: str) -> LinkContinueView:
+    return LinkContinueView(
+        title="Votre lien de connexion",
+        action="/sign-in/link",
+        token=token,
+        submit_label="Continuer",
+        message="",
+        request_form=None,
+    )
+
+
+def link_refused(error: DomainError) -> LinkContinueView:
+    return LinkContinueView(
+        title="Votre lien de connexion",
+        action="/sign-in/link",
+        token="",
+        submit_label="Continuer",
+        message=error.message,
+        request_form=link_request_form({}),
+    )
+
+
+def link_missing() -> LinkContinueView:
+    return link_refused(DomainError(ErrorCode.UNAUTHENTICATED, NO_LINK_MESSAGE))

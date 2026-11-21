@@ -66,17 +66,21 @@ from drlibre.identity.application.ports.inbound import (
     DeleteUser,
     OpenPatientSession,
     ProvidePatientAccount,
+    RequestSignInLink,
     SaveUser,
     SignIn,
     SignOut,
     StaffLookup,
     UserQueries,
+    UseSignInLink,
 )
 from drlibre.identity.application.ports.outbound import (
     AuditActors,
     FailedSignIns,
+    LinkNotices,
     PasswordHasher,
     Sessions,
+    SignInLinks,
     StaffProfiles,
     TokenGenerator,
     UpcomingAppointments,
@@ -91,15 +95,22 @@ from drlibre.identity.application.use_cases.open_patient_session import OpenPati
 from drlibre.identity.application.use_cases.provide_patient_account import (
     ProvidePatientAccountUseCase,
 )
+from drlibre.identity.application.use_cases.request_sign_in_link import RequestSignInLinkUseCase
 from drlibre.identity.application.use_cases.save_user import SaveUserUseCase
 from drlibre.identity.application.use_cases.sign_in import SignInUseCase
 from drlibre.identity.application.use_cases.sign_out import SignOutUseCase
+from drlibre.identity.application.use_cases.use_sign_in_link import UseSignInLinkUseCase
 from drlibre.identity.infrastructure.audit_actors import AuditLogActors
 from drlibre.identity.infrastructure.failed_sign_ins import RedisFailedSignIns
+from drlibre.identity.infrastructure.outbox_link_notices import OutboxLinkNotices
 from drlibre.identity.infrastructure.password_hasher import DjangoPasswordHasher
 from drlibre.identity.infrastructure.queries import DjangoUserQueries
 from drlibre.identity.infrastructure.rate_limiter import RedisRateLimiter
-from drlibre.identity.infrastructure.repositories import DjangoSessions, DjangoUsers
+from drlibre.identity.infrastructure.repositories import (
+    DjangoSessions,
+    DjangoSignInLinks,
+    DjangoUsers,
+)
 from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
@@ -275,6 +286,8 @@ class Adapters:
     availability_queries: AvailabilityQueries
     slot_holds: SlotHolds
     booking: BookingAdapters
+    links: SignInLinks
+    link_notices: LinkNotices
     # None wires organisation to scheduling's own RefreshSlots.
     slot_refresh: SlotRefresh | None = None
 
@@ -321,6 +334,8 @@ class Container:
     open_holds: OpenHolds
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
+    request_sign_in_link: RequestSignInLink
+    use_sign_in_link: UseSignInLink
 
 
 def wire(a: Adapters) -> Container:
@@ -530,6 +545,26 @@ def wire(a: Adapters) -> Container:
         open_holds=booking.open_holds,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
+        request_sign_in_link=RequestSignInLinkUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            users=a.users,
+            links=a.links,
+            tokens=a.tokens,
+            notices=a.link_notices,
+            limiter=a.booking.limiter,
+            network_hourly_limit=a.booking.network_hourly_limit,
+        ),
+        use_sign_in_link=UseSignInLinkUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            users=a.users,
+            sessions=a.sessions,
+            links=a.links,
+            tokens=a.tokens,
+        ),
     )
 
 
@@ -696,6 +731,10 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             issuer=HmacCodeIssuer(key=settings.SECRET_KEY),
             limiter=RedisRateLimiter(prefix=RATE_LIMIT_PREFIX),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
+        ),
+        links=DjangoSignInLinks(),
+        link_notices=OutboxLinkNotices(
+            outbox=CeleryEmailOutbox(), public_base_url=settings.PUBLIC_BASE_URL
         ),
     )
 

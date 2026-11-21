@@ -1,7 +1,14 @@
-from drlibre.identity.application.ports.outbound import Sessions, Users
+from datetime import datetime
+
+from drlibre.identity.application.ports.outbound import Sessions, SignInLinks, Users
 from drlibre.identity.domain.session import Session
+from drlibre.identity.domain.sign_in_link import SignInLink
 from drlibre.identity.domain.user import Email, Role, User
-from drlibre.identity.infrastructure.django.models import SessionRecord, UserRecord
+from drlibre.identity.infrastructure.django.models import (
+    SessionRecord,
+    SignInLinkRecord,
+    UserRecord,
+)
 from drlibre.shared_kernel.ids import Id
 
 
@@ -92,3 +99,41 @@ class DjangoSessions(Sessions):
     def delete_for_user(self, user_id: Id) -> int:
         deleted, _ = SessionRecord.objects.filter(user_id=user_id.value).delete()
         return deleted
+
+
+def _to_link(record: SignInLinkRecord) -> SignInLink:
+    return SignInLink(
+        id=Id(record.id),
+        token_hash=record.token_hash,
+        patient_id=Id(record.patient_id),
+        expires_at=record.expires_at,
+        used_at=record.used_at,
+        cancelled_at=record.cancelled_at,
+    )
+
+
+class DjangoSignInLinks(SignInLinks):
+    def add(self, link: SignInLink) -> None:
+        SignInLinkRecord.objects.create(
+            id=link.id.value,
+            token_hash=link.token_hash,
+            patient_id=link.patient_id.value,
+            expires_at=link.expires_at,
+            used_at=link.used_at,
+            cancelled_at=link.cancelled_at,
+        )
+
+    def by_token_hash(self, token_hash: str) -> SignInLink | None:
+        # The row lock makes a link single-use when two requests race to consume it.
+        record = SignInLinkRecord.objects.select_for_update().filter(token_hash=token_hash).first()
+        return _to_link(record) if record else None
+
+    def cancel_open_for(self, patient_id: Id, *, at: datetime) -> None:
+        SignInLinkRecord.objects.filter(
+            patient_id=patient_id.value, used_at__isnull=True, cancelled_at__isnull=True
+        ).update(cancelled_at=at)
+
+    def save(self, link: SignInLink) -> None:
+        SignInLinkRecord.objects.filter(id=link.id.value).update(
+            used_at=link.used_at, cancelled_at=link.cancelled_at
+        )

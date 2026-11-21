@@ -13,6 +13,7 @@ __all__ = [
     "Identity",
     "OpenPatientSession",
     "ProvidePatientAccount",
+    "RequestSignInLink",
     "Role",
     "SaveUser",
     "SignIn",
@@ -20,6 +21,7 @@ __all__ = [
     "SignedIn",
     "StaffLookup",
     "StaffMember",
+    "UseSignInLink",
     "User",
     "UserQueries",
 ]
@@ -133,4 +135,20 @@ class ProvidePatientAccount(Protocol):
 class OpenPatientSession(Protocol):
     def execute(self, *, patient_id: Id, user_agent: str) -> SignedIn:
         """Open a 24 hour session that is never extended for the patient."""
+        ...
+
+
+class RequestSignInLink(Protocol):
+    def execute(self, *, email: str, network: str) -> None:
+        """Email a one-time link to an active patient; answer alike for every other address.
+
+        Over a limit nothing is sent and nothing changes for the caller; invalid_input only
+        for a malformed address.
+        """
+        ...
+
+
+class UseSignInLink(Protocol):
+    def execute(self, *, token: str, user_agent: str) -> SignedIn:
+        """Consume the link and open a 24 hour session; unauthenticated if it is unusable."""
         ...

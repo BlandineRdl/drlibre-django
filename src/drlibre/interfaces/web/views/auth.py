@@ -13,7 +13,15 @@ from drlibre.interfaces.web.auth import (
     session_token,
     set_session_cookie,
 )
-from drlibre.interfaces.web.presenters.auth import password_form, sign_in_form
+from drlibre.interfaces.web.presenters.auth import (
+    link_continue,
+    link_missing,
+    link_refused,
+    link_request_form,
+    link_sent,
+    password_form,
+    sign_in_form,
+)
 from drlibre.shared_kernel.errors import DomainError
 
 
@@ -33,7 +41,8 @@ def sign_in(request: HttpRequest) -> HttpResponse:
     next_url = request.POST.get("next") or request.GET.get("next", "")
     context: dict[str, object] = {"hidden_fields": [("next", next_url)] if next_url else []}
     if request.method == "GET":
-        return render(request, "auth/form_page.html", {**context, "form": sign_in_form({})})
+        forms = {"form": sign_in_form({}), "link_form": link_request_form({})}
+        return render(request, "auth/form_page.html", {**context, **forms})
     try:
         signed = container().sign_in.execute(
             email=request.POST.get("email", ""),
@@ -41,11 +50,55 @@ def sign_in(request: HttpRequest) -> HttpResponse:
             user_agent=request.headers.get("User-Agent", ""),
         )
     except DomainError as error:
-        form = sign_in_form({"email": request.POST.get("email", "")}, error)
+        forms = {
+            "form": sign_in_form({"email": request.POST.get("email", "")}, error),
+            "link_form": link_request_form({}),
+        }
         return render(
-            request, "auth/form_page.html", {**context, "form": form}, status=error.code.http_status
+            request, "auth/form_page.html", {**context, **forms}, status=error.code.http_status
         )
     response = redirect(_safe_next(request, next_url, HOMES[signed.role]))
+    set_session_cookie(response, signed.token, signed.expires_at)
+    return response
+
+
+@require_POST
+def request_link(request: HttpRequest) -> HttpResponse:
+    email = request.POST.get("link_email", "")
+    try:
+        container().request_sign_in_link.execute(
+            email=email, network=request.META.get("REMOTE_ADDR", "")
+        )
+    except DomainError as error:
+        forms = {
+            "form": sign_in_form({}),
+            "link_form": link_request_form({"link_email": email}, error),
+        }
+        return render(
+            request,
+            "auth/form_page.html",
+            {"hidden_fields": [], **forms},
+            status=error.code.http_status,
+        )
+    return render(request, "auth/link_sent.html", {"view": link_sent()})
+
+
+@require_http_methods(["GET", "POST"])
+def use_link(request: HttpRequest) -> HttpResponse:
+    if request.method == "GET":
+        # Opening the link consumes nothing: only the button on this page does.
+        token = request.GET.get("token", "")
+        if not token:
+            return render(request, "auth/link_continue.html", {"view": link_missing()}, status=401)
+        return render(request, "auth/link_continue.html", {"view": link_continue(token)})
+    try:
+        signed = container().use_sign_in_link.execute(
+            token=request.POST.get("token", ""), user_agent=request.headers.get("User-Agent", "")
+        )
+    except DomainError as error:
+        view = link_refused(error)
+        return render(request, "auth/link_continue.html", {"view": view}, status=401)
+    response = redirect(HOMES[signed.role])
     set_session_cookie(response, signed.token, signed.expires_at)
     return response
 

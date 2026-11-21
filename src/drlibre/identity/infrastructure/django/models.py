@@ -36,3 +36,15 @@ class SessionRecord(models.Model):
 
     def __str__(self) -> str:
         return str(self.id)
+
+
+class SignInLinkRecord(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token_hash = models.CharField(max_length=64, unique=True)
+    patient = models.ForeignKey(UserRecord, on_delete=models.CASCADE, related_name="sign_in_links")
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True)
+    cancelled_at = models.DateTimeField(null=True)
+
+    def __str__(self) -> str:
+        return str(self.id)

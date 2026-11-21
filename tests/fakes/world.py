@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.bootstrap.container import Adapters, BookingAdapters, Container, wire
+from drlibre.identity.infrastructure.outbox_link_notices import OutboxLinkNotices
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
 from tests.fakes.booking import (
@@ -45,6 +46,7 @@ from tests.fakes.scheduling import (
     InMemoryTimeOffs,
 )
 from tests.fakes.sessions import InMemorySessions
+from tests.fakes.sign_in_links import InMemorySignInLinks
 from tests.fakes.staff_directory import InMemoryStaffDirectory
 from tests.fakes.staff_profiles import InMemoryStaffProfiles
 from tests.fakes.tokens import InMemoryTokenGenerator
@@ -64,6 +66,7 @@ class FakeWorld:
         self.audit = InMemoryAuditLog()
         self.users = InMemoryUsers()
         self.sessions = InMemorySessions()
+        self.links = InMemorySignInLinks()
         self.hasher = InMemoryPasswordHasher()
         self.failures = InMemoryFailedSignIns()
         self.tokens = InMemoryTokenGenerator()
@@ -112,6 +115,7 @@ class FakeWorld:
             self.audit,
             self.users,
             self.sessions,
+            self.links,
             self.hospitals,
             self.specialties,
             self.departments,
@@ -186,5 +190,9 @@ class FakeWorld:
                 codes=self.codes,
                 issuer=self.issuer,
                 limiter=self.limiter,
+            ),
+            links=self.links,
+            link_notices=OutboxLinkNotices(
+                outbox=self.outbox, public_base_url="http://localhost:8000"
             ),
         )

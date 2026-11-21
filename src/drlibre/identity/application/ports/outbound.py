@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Protocol
 
 from drlibre.identity.domain.session import Session
+from drlibre.identity.domain.sign_in_link import SignInLink
 from drlibre.identity.domain.user import Email, User
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
@@ -98,4 +99,28 @@ class AuditActors(Protocol):
 class StaffProfiles(Protocol):
     def profile_of(self, user_id: Id) -> Dependent | None:
         """The clinician profile attached to the user, as a dependent, or None."""
+        ...
+
+
+class SignInLinks(Protocol):
+    def add(self, link: SignInLink) -> None:
+        """Store a new link."""
+        ...
+
+    def by_token_hash(self, token_hash: str) -> SignInLink | None:
+        """Return the link with this token hash, locked for the unit of work, or None."""
+        ...
+
+    def cancel_open_for(self, patient_id: Id, *, at: datetime) -> None:
+        """Cancel every link of the patient that is neither used nor cancelled."""
+        ...
+
+    def save(self, link: SignInLink) -> None:
+        """Replace a stored link by id."""
+        ...
+
+
+class LinkNotices(Protocol):
+    def link_sent(self, *, email: str, token: str) -> None:
+        """Queue the email carrying the sign-in link; it leaves once the unit of work commits."""
         ...

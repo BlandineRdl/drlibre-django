@@ -12,6 +12,8 @@ from drlibre.interfaces.web.views import (
 urlpatterns: list[URLPattern | URLResolver] = [
     path("", auth.home),
     path("sign-in", auth.sign_in),
+    path("sign-in/link", auth.use_link),
+    path("sign-in/link/request", auth.request_link),
     path("sign-out", auth.sign_out),
     path("account/password", auth.change_password),
     path("console/", areas.console_home),
