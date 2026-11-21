@@ -1,9 +1,12 @@
+import re
 from datetime import UTC, datetime
 
 from drlibre.booking.application.ports.inbound import Appointment
 
 CRLF = "\r\n"
 FOLD_AT = 75
+# RFC 5545 TEXT escapes backslash, semicolon and comma with a backslash.
+_TEXT_SPECIALS = re.compile(r"([\\;,])")
 
 
 def _stamp(instant: datetime) -> str:
@@ -11,7 +14,7 @@ def _stamp(instant: datetime) -> str:
 
 
 def _escape(text: str) -> str:
-    escaped = text.replace("\\", "\\\\").replace(";", r"\;").replace(",", "\\,")
+    escaped = _TEXT_SPECIALS.sub(r"\\\1", text)
     return escaped.replace("\r", "").replace("\n", "\\n")
 
 
