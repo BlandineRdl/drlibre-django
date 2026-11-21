@@ -8,6 +8,7 @@
 | A port or adapter | Contract suite run against the fake and the real adapter |
 | An ORM, SQL, mail or Redis adapter | Integration test on PostgreSQL, Mailpit or Redis |
 | The FHIR API | FHIR R4 contract test |
+| A concurrent write guarded by a lock | PostgreSQL test with `django_db(transaction=True)`, one thread per writer closing its connections; the first writer waits until `pg_stat_activity` shows a `Lock` waiter; it must fail with the lock removed |
 | A user journey | A few Playwright end-to-end tests |
 | Search or booking performance | Locust load scenario on the demo seed |
 
@@ -17,4 +18,5 @@
 - Contract tests keep each fake identical to its real adapter.
 - Time comes from the `Clock` port; test data comes from hand-written builders.
 - Unowned services are tested through their real adapter in integration.
+- Inside a transaction `pg_stat_activity` is a frozen snapshot: call `pg_stat_clear_snapshot()` before each read.
 - Mutation testing with mutmut measures test quality instead of coverage.
