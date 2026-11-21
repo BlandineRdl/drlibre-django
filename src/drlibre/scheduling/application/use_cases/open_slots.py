@@ -6,6 +6,7 @@ from drlibre.scheduling.application.ports.outbound import (
     SlotHolds,
     SlotQueries,
 )
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
 from drlibre.scheduling.domain.slot import Period
 from drlibre.shared_kernel.ids import Id
 
@@ -19,9 +20,14 @@ def open_slots(
     within: Period,
     now: datetime,
     ignoring_hold: Id | None = None,
+    computed: tuple[ClinicianSlot, ...] | None = None,
 ) -> tuple[ClinicianSlot, ...]:
-    """Stored free slots minus those an open hold covers, the hold stretched by the type buffer."""
-    stored = queries.free_slots(kind.id, clinicians, within=within, not_before=now)
+    """Free slots, stored unless computed given, minus those an open hold covers plus buffer."""
+    stored = (
+        queries.free_slots(kind.id, clinicians, within=within, not_before=now)
+        if computed is None
+        else computed
+    )
     if not stored:
         return ()
     buffer = timedelta(minutes=kind.buffer_minutes)
@@ -51,6 +57,8 @@ def clinicians_free_at(
     start: datetime,
     now: datetime,
     ignoring_hold: Id | None = None,
+    computation: SlotComputation | None = None,
+    ignoring_appointment: Id | None = None,
 ) -> tuple[Id, ...]:
     """The clinicians with an open slot of the type starting exactly at the start."""
     within = Period(start, start + timedelta(minutes=kind.duration_minutes))
@@ -62,5 +70,22 @@ def clinicians_free_at(
         within=within,
         now=now,
         ignoring_hold=ignoring_hold,
+        computed=computed_without(computation, ignoring_appointment, kind, clinicians, within, now),
     )
     return tuple(dict.fromkeys(s.clinician_id for s in slots if s.slot.start == start))
+
+
+def computed_without(
+    computation: SlotComputation | None,
+    appointment_id: Id | None,
+    kind: AppointmentType,
+    clinicians: tuple[Id, ...],
+    within: Period,
+    now: datetime,
+) -> tuple[ClinicianSlot, ...] | None:
+    """Slots recomputed without the appointment, or None to read the stored table."""
+    if computation is None or appointment_id is None:
+        return None
+    return computation.ignoring(
+        appointment_id, kind=kind, clinicians=clinicians, within=within, now=now
+    )

@@ -31,7 +31,8 @@ class DjangoBookingQueries(AppointmentQueries):
             clinician_id=clinician_id.value, start__lt=end, end__gt=start
         ).order_by("start")
         return tuple(
-            BookedPeriod(row.start, row.end, AppointmentStatus(row.status)) for row in rows
+            BookedPeriod(Id(row.id), row.start, row.end, AppointmentStatus(row.status))
+            for row in rows
         )
 
     def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:

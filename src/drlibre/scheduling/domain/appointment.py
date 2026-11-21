@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from drlibre.scheduling.domain.slot import Period
+from drlibre.shared_kernel.ids import Id
 
 
 class AppointmentStatus(StrEnum):
@@ -16,6 +17,7 @@ class AppointmentStatus(StrEnum):
 class Appointment:
     """A clinician's appointment as slots see it: when, and whether it still holds the time."""
 
+    id: Id
     period: Period
     status: AppointmentStatus
 

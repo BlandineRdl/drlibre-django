@@ -24,7 +24,7 @@ class Setup:
     appointments: ClinicianAppointments
     clinician: Id
     other: Id
-    book: Callable[[Id, datetime, datetime, str], None]
+    book: Callable[[Id, datetime, datetime, str], Id]
 
 
 def at(day: int, hour: int) -> datetime:
@@ -39,24 +39,26 @@ def setup(request: pytest.FixtureRequest) -> Setup:
         fake = InMemoryClinicianAppointments()
         first, second = Id(), Id()
 
-        def add(clinician: Id, start: datetime, end: datetime, status: str) -> None:
-            fake.rows.append(appointment(clinician, start, end, status=status))
+        def add(clinician: Id, start: datetime, end: datetime, status: str) -> Id:
+            row = appointment(clinician, start, end, status=status)
+            fake.rows.append(row)
+            return row[1].id
 
         return Setup(fake, first, second, add)
     scene = stored_scene()
     first, second = scene.clinicians[0].id, scene.clinicians[1].id
 
-    def store(clinician: Id, start: datetime, end: datetime, status: str) -> None:
-        DjangoAppointments().add(
-            existing_appointment(
-                patient_id=Id(),
-                clinician_id=clinician,
-                appointment_type_id=scene.kind,
-                start=start,
-                end=end,
-                status=AppointmentStatus(status),
-            )
+    def store(clinician: Id, start: datetime, end: datetime, status: str) -> Id:
+        made = existing_appointment(
+            patient_id=Id(),
+            clinician_id=clinician,
+            appointment_type_id=scene.kind,
+            start=start,
+            end=end,
+            status=AppointmentStatus(status),
         )
+        DjangoAppointments().add(made)
+        return made.id
 
     return Setup(BookingClinicianAppointments(DjangoBookingQueries()), first, second, store)
 
@@ -81,3 +83,13 @@ def test_appointments_overlapping_the_range_come_back_whatever_their_status(setu
         (at(23, 11), SlotStatus.CANCELLED),
     ]
     assert [a.active for a in sorted(found, key=lambda a: a.period.start)] == [True, False]
+
+
+def test_each_appointment_comes_back_with_its_own_id(setup: Setup) -> None:
+    """Story déplacement : le RDV déplacé est reconnu pour être ignoré dans ses créneaux."""
+    first = setup.book(setup.clinician, at(23, 9), at(23, 10), "BOOKED")
+    second = setup.book(setup.clinician, at(23, 10), at(23, 11), "BOOKED")
+
+    found = setup.appointments.for_clinician(setup.clinician, within=Period(at(23, 9), at(23, 11)))
+
+    assert sorted(str(a.id) for a in found) == sorted(str(i) for i in (first, second))

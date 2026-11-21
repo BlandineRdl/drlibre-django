@@ -132,7 +132,7 @@ class Placement:
                 patient_id=patient_id,
                 clinician_id=clinician_id,
                 appointment_type_id=kind.id,
-                room_id=self._room(kind, clinician, start, start + duration),
+                room_id=self.room(kind, clinician, start, start + duration),
                 start=start,
                 duration=duration,
                 source=source,
@@ -153,8 +153,9 @@ class Placement:
         end: datetime,
         *,
         ignoring_hold: Id | None,
+        excluding: Id | None = None,
     ) -> None:
-        """conflict when an active appointment or an open hold occupies the range."""
+        """conflict when another active appointment than the excluded, or an open hold, is there."""
         if patient_id is None:
             resources = (
                 ("clinician",)
@@ -163,7 +164,11 @@ class Placement:
             )
         else:
             resources = self._appointments.conflicting_resources(
-                clinician_id=clinician_id, patient_id=patient_id, start=start, end=end
+                clinician_id=clinician_id,
+                patient_id=patient_id,
+                start=start,
+                end=end,
+                excluding=excluding,
             )
         held = self._holds.held(
             clinician_id, start, end, at=self._clock.now(), excluding=ignoring_hold
@@ -206,16 +211,24 @@ class Placement:
                 {"rules": [rule.value for rule in broken]},
             )
 
-    def _room(
-        self, kind: BookableType, clinician: BookableClinician, start: datetime, end: datetime
+    def room(
+        self,
+        kind: BookableType,
+        clinician: BookableClinician,
+        start: datetime,
+        end: datetime,
+        *,
+        current: Id | None = None,
+        excluding: Id | None = None,
     ) -> Id | None:
+        """The current room, else the default, else the first free; locks the department's rooms."""
         if not kind.needs_room:
             return None
         self._locks.lock_rooms(kind.department_id)
         rooms = self._directory.rooms(kind.department_id)
-        preferred = (clinician.default_room_id,) if clinician.default_room_id in rooms else ()
-        order = (*preferred, *rooms)
-        busy = self._appointments.busy_rooms(order, start, end)
+        preferred = (current, clinician.default_room_id)
+        order = tuple(dict.fromkeys((*(r for r in preferred if r in rooms), *rooms)))
+        busy = self._appointments.busy_rooms(order, start, end, excluding)
         for room_id in order:
             if room_id not in busy:
                 return room_id

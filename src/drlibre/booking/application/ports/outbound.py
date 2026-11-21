@@ -119,8 +119,9 @@ class FreeSlots(Protocol):
         start: datetime,
         *,
         ignoring_hold: Id | None,
+        ignoring_appointment: Id | None = None,
     ) -> bool:
-        """Whether the start is exactly one of the clinician's free slots for the type."""
+        """Whether the start is one of the clinician's free slots, the ignored appointment freed."""
         ...
 
     def candidates_at(self, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:

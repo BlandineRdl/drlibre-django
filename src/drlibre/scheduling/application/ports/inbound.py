@@ -30,9 +30,15 @@ __all__ = [
 
 class FindFreeSlots(Protocol):
     def execute(
-        self, *, appointment_type_id: Id, clinician_id: Id | None, start: datetime, end: datetime
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id | None,
+        start: datetime,
+        end: datetime,
+        ignoring_appointment: Id | None = None,
     ) -> tuple[Slot, ...]:
-        """Sorted free slots; invalid_input over 31 days, not_found for a bad type or clinician."""
+        """Sorted free slots, the ignored appointment's time freed; invalid_input over 31 days."""
         ...
 
 
@@ -50,8 +56,9 @@ class IsSlotFree(Protocol):
         appointment_type_id: Id,
         start: datetime,
         ignoring_hold: Id | None,
+        ignoring_appointment: Id | None = None,
     ) -> bool:
-        """Whether the start is a free, unheld slot of the active clinician for the active type."""
+        """Whether the start is a free, unheld slot of the active clinician, appointment ignored."""
         ...
 
 

@@ -47,9 +47,16 @@ def time_off(clinician_id: Id, start: datetime, end: datetime) -> TimeOff:
 
 
 def appointment(
-    clinician_id: Id, start: datetime, end: datetime, *, status: str = "BOOKED"
+    clinician_id: Id,
+    start: datetime,
+    end: datetime,
+    *,
+    status: str = "BOOKED",
+    appointment_id: Id | None = None,
 ) -> tuple[Id, Appointment]:
-    return clinician_id, Appointment(Period(start, end), AppointmentStatus(status))
+    return clinician_id, Appointment(
+        appointment_id or Id(), Period(start, end), AppointmentStatus(status)
+    )
 
 
 def stored_department() -> Department:

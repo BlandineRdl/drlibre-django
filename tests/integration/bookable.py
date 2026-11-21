@@ -76,12 +76,12 @@ def recorded(at: datetime, outbox: RecordingEmailOutbox, limiter: RedisRateLimit
 
 
 @contextmanager
-def bookable() -> Generator[Bookable]:
+def bookable(*, duration_minutes: int = 30) -> Generator[Bookable]:
     """Two clinicians publishing Monday 09:00 to 12:00 every 30 minutes, slots stored."""
     client = redis.Redis.from_url(settings.REDIS_URL)
     prefix = f"drlibre-test:{uuid.uuid4().hex}"
     limiter = RedisRateLimiter(client, prefix=prefix)
-    scene = stored_scene()
+    scene = stored_scene(duration_minutes=duration_minutes)
     outbox = RecordingEmailOutbox()
     world = Bookable(scene, outbox, limiter)
     fields = {"weekday": "1", "start": "09:00", "end": "12:00", "step_minutes": "30"}

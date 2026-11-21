@@ -13,6 +13,7 @@ __all__ = [
     "AppointmentStatus",
     "BookAppointment",
     "BookedPeriod",
+    "CancelAppointment",
     "CreateHold",
     "ExpireHolds",
     "HeldPeriod",
@@ -20,6 +21,7 @@ __all__ = [
     "HoldSummary",
     "OpenHolds",
     "RequirePatient",
+    "RescheduleAppointment",
     "ResendCode",
     "VerifiedBooking",
     "VerifyHold",
@@ -44,6 +46,18 @@ class BookAppointment(Protocol):
         start: datetime,
     ) -> Appointment:
         """Book for the signed-in patient, any clinician if none named; refused writes nothing."""
+        ...
+
+
+class CancelAppointment(Protocol):
+    def execute(self, *, appointment_id: Id, patient_id: Id, reason: str) -> Appointment:
+        """Cancel the patient's own appointment for a reason; a refusal writes or sends nothing."""
+        ...
+
+
+class RescheduleAppointment(Protocol):
+    def execute(self, *, appointment_id: Id, patient_id: Id, start: datetime) -> Appointment:
+        """Move the patient's own BOOKED appointment, end recomputed; a refusal writes nothing."""
         ...
 
 
@@ -118,6 +132,7 @@ class OpenHolds(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class BookedPeriod:
+    id: Id
     start: datetime
     end: datetime
     status: AppointmentStatus

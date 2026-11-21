@@ -14,5 +14,6 @@ class BookingClinicianAppointments(ClinicianAppointments):
     def for_clinician(self, clinician_id: Id, *, within: Period) -> tuple[Appointment, ...]:
         booked = self._queries.periods_of(clinician_id, start=within.start, end=within.end)
         return tuple(
-            Appointment(Period(b.start, b.end), AppointmentStatus(b.status.value)) for b in booked
+            Appointment(b.id, Period(b.start, b.end), AppointmentStatus(b.status.value))
+            for b in booked
         )

@@ -8,10 +8,12 @@ from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
     BookAppointment,
+    CancelAppointment,
     CreateHold,
     ExpireHolds,
     OpenHolds,
     RequirePatient,
+    RescheduleAppointment,
     ResendCode,
     VerifyHold,
     ViewAppointment,
@@ -33,11 +35,15 @@ from drlibre.booking.application.ports.outbound import (
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
+from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
 from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.application.use_cases.require_patient import RequirePatientUseCase
+from drlibre.booking.application.use_cases.reschedule_appointment import (
+    RescheduleAppointmentUseCase,
+)
 from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
@@ -222,6 +228,7 @@ from drlibre.scheduling.application.ports.outbound import (
     SlotStore,
     TimeOffs,
 )
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
 from drlibre.scheduling.application.use_cases.delete_availability_rule import (
     DeleteAvailabilityRuleUseCase,
 )
@@ -383,6 +390,8 @@ class Container:
     open_holds: OpenHolds
     view_hold: ViewHold
     view_appointment: ViewAppointment
+    cancel_appointment: CancelAppointment
+    reschedule_appointment: RescheduleAppointment
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -404,7 +413,16 @@ def wire(a: Adapters) -> Container:
     clock, uow, audit = a.clock, a.uow, a.audit
     directory = a.scheduling_directory
     find_free_slots = FindFreeSlotsUseCase(
-        clock=clock, directory=directory, queries=a.slot_queries, holds=a.slot_holds
+        clock=clock,
+        directory=directory,
+        queries=a.slot_queries,
+        holds=a.slot_holds,
+        computation=SlotComputation(
+            directory=directory,
+            rules=a.availability_rules,
+            time_offs=a.time_offs,
+            appointments=a.clinician_appointments,
+        ),
     )
     refresh = RefreshSlotsUseCase(
         clock=clock,
@@ -610,6 +628,8 @@ def wire(a: Adapters) -> Container:
         open_holds=booking.open_holds,
         view_hold=booking.view_hold,
         view_appointment=booking.view_appointment,
+        cancel_appointment=booking.cancel_appointment,
+        reschedule_appointment=booking.reschedule_appointment,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -659,6 +679,8 @@ class _BookingUseCases:
     open_holds: OpenHolds
     view_hold: ViewHold
     view_appointment: ViewAppointment
+    cancel_appointment: CancelAppointment
+    reschedule_appointment: RescheduleAppointment
 
 
 def _wire_booking(
@@ -727,6 +749,27 @@ def _wire_booking(
         open_holds=booking.open_holds,
         view_hold=ViewHoldUseCase(clock=a.clock, holds=booking.holds),
         view_appointment=ViewAppointmentUseCase(appointments=booking.appointments),
+        cancel_appointment=CancelAppointmentUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            appointments=booking.appointments,
+            locks=booking.locks,
+            slot_refresh=booking.slot_refresh,
+            notices=booking.notices,
+        ),
+        reschedule_appointment=RescheduleAppointmentUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            appointments=booking.appointments,
+            directory=booking.directory,
+            free_slots=booking.free_slots,
+            placement=placement,
+            locks=booking.locks,
+            slot_refresh=booking.slot_refresh,
+            notices=booking.notices,
+        ),
     )
 
 
@@ -757,7 +800,16 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         store=slot_store,
     )
     is_slot_free = IsSlotFreeUseCase(
-        clock=clock, directory=scheduling_directory, queries=slot_queries, holds=slot_holds
+        clock=clock,
+        directory=scheduling_directory,
+        queries=slot_queries,
+        holds=slot_holds,
+        computation=SlotComputation(
+            directory=scheduling_directory,
+            rules=rules,
+            time_offs=time_offs,
+            appointments=clinician_appointments,
+        ),
     )
     free_clinicians_at = FreeCliniciansAtUseCase(
         clock=clock, directory=scheduling_directory, queries=slot_queries, holds=slot_holds

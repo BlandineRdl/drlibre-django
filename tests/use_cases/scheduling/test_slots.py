@@ -8,6 +8,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from drlibre.bootstrap.container import Container
 from drlibre.scheduling.application.ports.outbound import AppointmentType, Clinician
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
 from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.domain.appointment import AppointmentStatus
@@ -67,6 +68,12 @@ def ask(world: FakeWorld, outcome: Outcome, clinician_id: Id | None, start: str,
         directory=world.scheduling_directory,
         queries=world.slots,
         holds=world.slot_holds,
+        computation=SlotComputation(
+            directory=world.scheduling_directory,
+            rules=world.availability_rules,
+            time_offs=world.time_offs,
+            appointments=world.clinician_appointments,
+        ),
     )
     try:
         outcome.slots = use_case.execute(

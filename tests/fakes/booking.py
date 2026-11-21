@@ -123,6 +123,8 @@ class InMemoryFreeSlots(FreeSlots):
 
     def __init__(self, holds: "InMemoryHolds", clock: Clock) -> None:
         self.free: set[tuple[Id, Id, datetime]] = set()
+        # Rows an appointment covers, free only while that appointment is ignored.
+        self.behind: dict[tuple[Id, Id, datetime], Id] = {}
         self.durations: dict[Id, timedelta] = {}
         self.buffers: dict[Id, timedelta] = {}
         self.holds = holds
@@ -150,8 +152,12 @@ class InMemoryFreeSlots(FreeSlots):
         start: datetime,
         *,
         ignoring_hold: Id | None,
+        ignoring_appointment: Id | None = None,
     ) -> bool:
-        listed = (clinician_id, appointment_type_id, start) in self.free
+        row = (clinician_id, appointment_type_id, start)
+        listed = row in self.free or (
+            ignoring_appointment is not None and self.behind.get(row) == ignoring_appointment
+        )
         return listed and not self._held(clinician_id, appointment_type_id, start, ignoring_hold)
 
     def candidates_at(self, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
@@ -309,7 +315,7 @@ class InMemoryAppointmentQueries(AppointmentQueries):
         self, clinician_id: Id, *, start: datetime, end: datetime
     ) -> tuple[BookedPeriod, ...]:
         return tuple(
-            BookedPeriod(a.start, a.end, a.status)
+            BookedPeriod(a.id, a.start, a.end, a.status)
             for a in self.appointments.rows
             if a.clinician_id == clinician_id and a.start < end and start < a.end
         )
