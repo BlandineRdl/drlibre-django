@@ -1,15 +1,16 @@
 from datetime import datetime
 
 from drlibre.booking.application.ports.outbound import FreeSlots
-from drlibre.scheduling.application.ports.inbound import SlotAvailability
+from drlibre.scheduling.application.ports.inbound import FreeCliniciansAt, IsSlotFree
 from drlibre.shared_kernel.ids import Id
 
 
 class SchedulingFreeSlots(FreeSlots):
-    """Asks scheduling's SlotAvailability, so a booking accepts exactly the slots shown."""
+    """Asks scheduling's slot use cases, so a booking accepts exactly the slots shown."""
 
-    def __init__(self, availability: SlotAvailability) -> None:
-        self._availability = availability
+    def __init__(self, is_slot_free: IsSlotFree, free_clinicians_at: FreeCliniciansAt) -> None:
+        self._is_slot_free = is_slot_free
+        self._free_clinicians_at = free_clinicians_at
 
     def is_free(
         self,
@@ -19,7 +20,7 @@ class SchedulingFreeSlots(FreeSlots):
         *,
         ignoring_hold: Id | None,
     ) -> bool:
-        return self._availability.is_free(
+        return self._is_slot_free.execute(
             clinician_id=clinician_id,
             appointment_type_id=appointment_type_id,
             start=start,
@@ -27,6 +28,6 @@ class SchedulingFreeSlots(FreeSlots):
         )
 
     def candidates_at(self, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
-        return self._availability.free_clinicians(
+        return self._free_clinicians_at.execute(
             appointment_type_id=appointment_type_id, start=start
         )

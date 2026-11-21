@@ -14,7 +14,8 @@ from drlibre.booking.infrastructure.repositories import DjangoHolds
 from drlibre.identity.infrastructure.queries import DjangoUserQueries
 from drlibre.organisation.infrastructure.queries import DjangoReferenceQueries
 from drlibre.scheduling.application.ports.outbound import StoredSlot
-from drlibre.scheduling.application.use_cases.slot_availability import SlotAvailabilityUseCase
+from drlibre.scheduling.application.use_cases.free_clinicians_at import FreeCliniciansAtUseCase
+from drlibre.scheduling.application.use_cases.is_slot_free import IsSlotFreeUseCase
 from drlibre.scheduling.domain.slot import Slot
 from drlibre.scheduling.infrastructure.booking_holds import BookingSlotHolds
 from drlibre.scheduling.infrastructure.directory import OrganisationSchedulingDirectory
@@ -92,17 +93,16 @@ def scene(request: pytest.FixtureRequest) -> Scene:
         DjangoHolds().add(made)
         return made.id
 
-    availability = SlotAvailabilityUseCase(
-        clock=FixedClock(NOW),
-        directory=OrganisationSchedulingDirectory(
+    ports = {
+        "clock": FixedClock(NOW),
+        "directory": OrganisationSchedulingDirectory(
             queries=DjangoReferenceQueries(), lookup=DjangoUserQueries()
         ),
-        queries=DjangoSlotQueries(),
-        holds=BookingSlotHolds(OpenHoldsUseCase(holds=DjangoHolds())),
-    )
-    return Scene(
-        SchedulingFreeSlots(availability), first, second, stored.kind, list_stored, store_hold
-    )
+        "queries": DjangoSlotQueries(),
+        "holds": BookingSlotHolds(OpenHoldsUseCase(holds=DjangoHolds())),
+    }
+    real = SchedulingFreeSlots(IsSlotFreeUseCase(**ports), FreeCliniciansAtUseCase(**ports))
+    return Scene(real, first, second, stored.kind, list_stored, store_hold)
 
 
 def test_a_listed_slot_is_free_for_its_clinician_only(scene: Scene) -> None:

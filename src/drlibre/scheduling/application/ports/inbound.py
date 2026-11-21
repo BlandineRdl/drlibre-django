@@ -16,13 +16,14 @@ __all__ = [
     "DeleteTimeOff",
     "ExtendSlotHorizon",
     "FindFreeSlots",
+    "FreeCliniciansAt",
+    "IsSlotFree",
     "NextBookableSlots",
     "RecordTimeOff",
     "RefreshSlots",
     "RoomUsage",
     "SaveAvailabilityRule",
     "Slot",
-    "SlotAvailability",
     "TimeOff",
 ]
 
@@ -44,8 +45,8 @@ class NextBookableSlots(Protocol):
         ...
 
 
-class SlotAvailability(Protocol):
-    def is_free(
+class IsSlotFree(Protocol):
+    def execute(
         self,
         *,
         clinician_id: Id,
@@ -56,7 +57,9 @@ class SlotAvailability(Protocol):
         """Whether the start is a free, unheld slot of the active clinician for the active type."""
         ...
 
-    def free_clinicians(self, *, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
+
+class FreeCliniciansAt(Protocol):
+    def execute(self, *, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
         """Active clinicians of the type's department with a free slot at the start."""
         ...
 

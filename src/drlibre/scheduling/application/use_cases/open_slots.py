@@ -40,3 +40,27 @@ def open_slots(
             for h in held
         )
     )
+
+
+def clinicians_free_at(
+    *,
+    queries: SlotQueries,
+    holds: SlotHolds,
+    kind: AppointmentType,
+    clinicians: tuple[Id, ...],
+    start: datetime,
+    now: datetime,
+    ignoring_hold: Id | None = None,
+) -> tuple[Id, ...]:
+    """The clinicians with an open slot of the type starting exactly at the start."""
+    within = Period(start, start + timedelta(minutes=kind.duration_minutes))
+    slots = open_slots(
+        queries=queries,
+        holds=holds,
+        kind=kind,
+        clinicians=clinicians,
+        within=within,
+        now=now,
+        ignoring_hold=ignoring_hold,
+    )
+    return tuple(dict.fromkeys(s.clinician_id for s in slots if s.slot.start == start))

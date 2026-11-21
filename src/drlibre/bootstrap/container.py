@@ -213,13 +213,14 @@ from drlibre.scheduling.application.use_cases.delete_availability_rule import (
 from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
 from drlibre.scheduling.application.use_cases.extend_slot_horizon import ExtendSlotHorizonUseCase
 from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
+from drlibre.scheduling.application.use_cases.free_clinicians_at import FreeCliniciansAtUseCase
+from drlibre.scheduling.application.use_cases.is_slot_free import IsSlotFreeUseCase
 from drlibre.scheduling.application.use_cases.next_bookable_slots import NextBookableSlotsUseCase
 from drlibre.scheduling.application.use_cases.record_time_off import RecordTimeOffUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.application.use_cases.save_availability_rule import (
     SaveAvailabilityRuleUseCase,
 )
-from drlibre.scheduling.application.use_cases.slot_availability import SlotAvailabilityUseCase
 from drlibre.scheduling.infrastructure.booking_appointments import BookingClinicianAppointments
 from drlibre.scheduling.infrastructure.booking_holds import BookingSlotHolds
 from drlibre.scheduling.infrastructure.directory import OrganisationSchedulingDirectory
@@ -727,7 +728,10 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         appointments=clinician_appointments,
         store=slot_store,
     )
-    availability = SlotAvailabilityUseCase(
+    is_slot_free = IsSlotFreeUseCase(
+        clock=clock, directory=scheduling_directory, queries=slot_queries, holds=slot_holds
+    )
+    free_clinicians_at = FreeCliniciansAtUseCase(
         clock=clock, directory=scheduling_directory, queries=slot_queries, holds=slot_holds
     )
     patients = IdentityPatients(user_queries)
@@ -771,7 +775,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         booking=BookingAdapters(
             appointments=DjangoAppointments(),
             directory=booking_directory,
-            free_slots=SchedulingFreeSlots(availability),
+            free_slots=SchedulingFreeSlots(is_slot_free, free_clinicians_at),
             slot_refresh=BookingSchedulingSlotRefresh(refresh),
             locks=DjangoScheduleLocks(),
             patients=patients,
