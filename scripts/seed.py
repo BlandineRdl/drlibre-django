@@ -318,7 +318,7 @@ def seed_demo_appointments(app: Container) -> None:
         )
         if not slots:
             return
-        app.book_for_patient.execute(
+        app.book_appointment_as_caller.execute(
             actor_id=clinician, patient_id=patient, appointment_type_id=kind, start=slots[0].start
         )
 

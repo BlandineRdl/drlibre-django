@@ -8,7 +8,7 @@ from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
     BookAppointment,
-    BookForPatient,
+    BookAppointmentAsCaller,
     CancelAppointment,
     CheckInAppointment,
     ClinicianAppointment,
@@ -51,6 +51,9 @@ from drlibre.booking.application.ports.outbound import (
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
+from drlibre.booking.application.use_cases.book_appointment_as_caller import (
+    BookAppointmentAsCallerUseCase,
+)
 from drlibre.booking.application.use_cases.book_for_patient import BookForPatientUseCase
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.check_in_appointment import CheckInAppointmentUseCase
@@ -453,7 +456,7 @@ class Container:
     complete_appointment: CompleteAppointment
     mark_no_show: MarkNoShow
     write_clinical_notes: WriteClinicalNotes
-    book_for_patient: BookForPatient
+    book_appointment_as_caller: BookAppointmentAsCaller
     clinician_day: ClinicianDay
     clinician_week: ClinicianWeek
     clinician_appointment: ClinicianAppointment
@@ -710,7 +713,7 @@ def wire(a: Adapters) -> Container:
         complete_appointment=booking.complete_appointment,
         mark_no_show=booking.mark_no_show,
         write_clinical_notes=booking.write_clinical_notes,
-        book_for_patient=booking.book_for_patient,
+        book_appointment_as_caller=booking.book_appointment_as_caller,
         clinician_day=booking.clinician_day,
         clinician_week=booking.clinician_week,
         clinician_appointment=booking.clinician_appointment,
@@ -774,7 +777,7 @@ class _BookingUseCases:
     complete_appointment: CompleteAppointment
     mark_no_show: MarkNoShow
     write_clinical_notes: WriteClinicalNotes
-    book_for_patient: BookForPatient
+    book_appointment_as_caller: BookAppointmentAsCaller
     clinician_day: ClinicianDay
     clinician_week: ClinicianWeek
     clinician_appointment: ClinicianAppointment
@@ -809,13 +812,11 @@ def _wire_booking(
         locks=booking.locks,
         slot_refresh=booking.slot_refresh,
     )
+    book_appointment = BookAppointmentUseCase(
+        clock=a.clock, uow=a.uow, placement=placement, ledger=booking.ledger
+    )
     return _BookingUseCases(
-        book_appointment=BookAppointmentUseCase(
-            clock=a.clock,
-            uow=a.uow,
-            placement=placement,
-            ledger=booking.ledger,
-        ),
+        book_appointment=book_appointment,
         require_patient=RequirePatientUseCase(patients=booking.patients),
         create_hold=CreateHoldUseCase(
             clock=a.clock,
@@ -902,8 +903,12 @@ def _wire_booking(
             appointments=booking.appointments,
             locks=booking.locks,
         ),
-        book_for_patient=BookForPatientUseCase(
-            uow=a.uow, directory=booking.directory, placement=placement
+        book_appointment_as_caller=BookAppointmentAsCallerUseCase(
+            directory=booking.directory,
+            book_appointment=book_appointment,
+            book_for_patient=BookForPatientUseCase(
+                uow=a.uow, directory=booking.directory, placement=placement
+            ),
         ),
         clinician_day=ClinicianDayUseCase(
             clock=a.clock, directory=booking.directory, agenda=booking.clinician_agenda

@@ -35,6 +35,7 @@ __all__ = [
     "AppointmentQueries",
     "AppointmentStatus",
     "BookAppointment",
+    "BookAppointmentAsCaller",
     "BookForPatient",
     "BookedPeriod",
     "BookingRule",
@@ -124,6 +125,21 @@ class BookForPatient(Protocol):
         clinician_id: Id | None = None,
     ) -> Appointment:
         """Book an active patient in the caller's own calendar as STAFF; refusals write nothing."""
+        ...
+
+
+class BookAppointmentAsCaller(Protocol):
+    def execute(
+        self,
+        *,
+        actor_id: Id,
+        appointment_type_id: Id,
+        start: datetime,
+        clinician_id: Id | None = None,
+        patient_id: Id | None = None,
+        room_id: Id | None = None,
+    ) -> Appointment:
+        """Clinicians book a named patient, others themself and no room; refusals write nothing."""
         ...
 
 

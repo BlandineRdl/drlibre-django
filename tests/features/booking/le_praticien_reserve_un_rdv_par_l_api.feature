@@ -32,6 +32,12 @@ Feature: Le praticien réserve un RDV par l'API
     Then the booking is refused as "forbidden"
     And nothing was written
 
+  Scenario: La requête nomme un patient actif ; la fin est calculée à partir de la durée du type. (patient omis)
+    When the clinician books at "2026-11-20 10:30" without naming a patient
+    Then the booking is refused as "invalid_input"
+    And the refusal names the field "patient"
+    And nothing was written
+
   Scenario: Le type doit être actif et du département du praticien ; sinon `not_found`. (type inactif)
     Given the appointment type is inactive
     When the clinician books the patient at "2026-11-20 10:30"

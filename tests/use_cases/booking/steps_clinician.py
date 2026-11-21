@@ -163,12 +163,13 @@ def book_for_patient(
     *,
     clinician: str | None = None,
     room: str | None = None,
+    patient: bool = True,
 ) -> None:
     scene.rows_before = len(world.booking_appointments.rows)
     try:
-        scene.appointment = world.app.book_for_patient.execute(
+        scene.appointment = world.app.book_appointment_as_caller.execute(
             actor_id=caller(scene),
-            patient_id=scene.patient,
+            patient_id=scene.patient if patient else None,
             appointment_type_id=scene.type,
             start=at(start),
             room_id=scene.rooms[room] if room else None,
@@ -237,6 +238,11 @@ def clinician_moves(world: FakeWorld, scene: Scene, start: str) -> None:
 @when(parsers.re(r'the clinician books the patient at "(?P<start>[^"]+)"$'))
 def clinician_books(world: FakeWorld, scene: Scene, start: str) -> None:
     book_for_patient(world, scene, start)
+
+
+@when(parsers.parse('the clinician books at "{start}" without naming a patient'))
+def clinician_books_no_patient(world: FakeWorld, scene: Scene, start: str) -> None:
+    book_for_patient(world, scene, start, patient=False)
 
 
 @when(parsers.parse('the clinician books the patient at "{start}" with "{name}"'))

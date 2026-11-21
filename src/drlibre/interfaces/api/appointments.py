@@ -15,9 +15,7 @@ from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
 from drlibre.interfaces.api.booking import AppointmentOut
 from drlibre.interfaces.web.auth import current_identity
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
-from drlibre.shared_kernel.validation import invalid_field
 
 router = Router(tags=["appointments"])
 
@@ -36,33 +34,16 @@ def _optional_id(raw: UUID | None) -> Id | None:
     return Id(raw) if raw else None
 
 
-def _book_as_clinician(identity: Identity, payload: BookingIn) -> Status[AppointmentOut]:
-    if payload.patient is None:
-        raise invalid_field("patient", "Indiquez le patient.")
-    appointment = container().book_for_patient.execute(
-        actor_id=identity.user_id,
-        patient_id=Id(payload.patient),
-        appointment_type_id=Id(payload.type),
-        start=payload.start,
-        room_id=_optional_id(payload.room),
-        clinician_id=_optional_id(payload.clinician),
-    )
-    return Status(201, AppointmentOut.of(appointment))
-
-
 @router.post("/appointments", response={201: AppointmentOut}, auth=None)
 def book(request: HttpRequest, payload: BookingIn) -> Status[AppointmentOut]:
     identity = current_identity(request)
-    if identity.role is Role.CLINICIAN:
-        return _book_as_clinician(identity, payload)
-    # A patient books for themselves and never picks a room (spec 5.4).
-    if payload.room or payload.patient not in (None, identity.user_id.value):
-        raise DomainError(ErrorCode.FORBIDDEN, "Seul le personnel choisit le patient ou la salle.")
-    appointment = container().book_appointment.execute(
-        patient_id=identity.user_id,
+    appointment = container().book_appointment_as_caller.execute(
+        actor_id=identity.user_id,
         appointment_type_id=Id(payload.type),
-        clinician_id=_optional_id(payload.clinician),
         start=payload.start,
+        clinician_id=_optional_id(payload.clinician),
+        patient_id=_optional_id(payload.patient),
+        room_id=_optional_id(payload.room),
     )
     return Status(201, AppointmentOut.of(appointment))
 

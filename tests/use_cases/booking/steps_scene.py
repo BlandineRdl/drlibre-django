@@ -6,6 +6,7 @@ from datetime import timedelta
 from pytest_bdd import given, parsers, then, when
 
 from drlibre.booking.domain.appointment import AppointmentStatus, Source
+from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import (
     bookable_type,
@@ -151,7 +152,7 @@ def room_busy(world: FakeWorld, scene: Scene, room: str, start: str, end: str) -
     )
 
 
-@when(parsers.parse('the patient books "{name}" at "{start}"'))
+@when(parsers.re(r'the patient books "(?P<name>[^"]+)" at "(?P<start>[^"]+)"$'))
 def books_named(world: FakeWorld, scene: Scene, name: str, start: str) -> None:
     book(world, scene, name, start)
 
@@ -246,7 +247,33 @@ def no_end_time() -> None:
     assert "end" not in inspect.signature(FakeWorld().app.book_appointment.execute).parameters
 
 
-@then("the booking offers no way to name a patient or a room")
-def no_other_patient_or_room() -> None:
-    names = set(inspect.signature(FakeWorld().app.book_appointment.execute).parameters)
-    assert names == {"patient_id", "appointment_type_id", "clinician_id", "start"}
+def book_as_caller(
+    world: FakeWorld, scene: Scene, name: str, start: str, *, patient: Id, room: Id | None
+) -> None:
+    scene.rows_before = len(world.booking_appointments.rows)
+    try:
+        scene.appointment = world.app.book_appointment_as_caller.execute(
+            actor_id=scene.patient,
+            appointment_type_id=scene.type,
+            start=at(start),
+            clinician_id=scene.clinicians[name],
+            patient_id=patient,
+            room_id=room,
+        )
+    except DomainError as error:
+        scene.error = error
+
+
+@when(parsers.parse('the patient books "{name}" at "{start}" naming themself'))
+def patient_books_naming_self(world: FakeWorld, scene: Scene, name: str, start: str) -> None:
+    book_as_caller(world, scene, name, start, patient=scene.patient, room=None)
+
+
+@when(parsers.parse('the patient books "{name}" at "{start}" naming another patient'))
+def patient_books_other(world: FakeWorld, scene: Scene, name: str, start: str) -> None:
+    book_as_caller(world, scene, name, start, patient=Id(), room=None)
+
+
+@when(parsers.parse('the patient books "{name}" at "{start}" in room "{room}"'))
+def patient_books_room(world: FakeWorld, scene: Scene, name: str, start: str, room: str) -> None:
+    book_as_caller(world, scene, name, start, patient=scene.patient, room=scene.rooms[room])
