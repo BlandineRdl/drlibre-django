@@ -59,6 +59,7 @@
 - One reminder per appointment: a partial unique index on `APPOINTMENT_REMINDER`, inserted in a savepoint; its `IntegrityError` means already sent, so no email.
 - PostgreSQL guards behind the locks: `btree_gist` exclusions `appointment_clinician_no_overlap` and `appointment_patient_no_overlap` on active appointments, checks on end after start, known status, cancellation fields; an exclusion hit becomes `conflict`, never a 500.
 - Cancel and reschedule take the booking lock order and re-read the appointment under the locks; reschedule ignores its own appointment: `IsSlotFree`, `FindFreeSlots` and `FindFreeWeek` take `ignoring_appointment` and recompute that clinician's slots with `SlotEngine`, `conflicting_resources` and `busy_rooms` take `excluding`.
+- The audit log is append-only in PostgreSQL: triggers refuse every `UPDATE`, `DELETE` and `TRUNCATE` on `audit_auditentryrecord` (migration `audit.0002`), ORM bulk calls and raw SQL included; the test database disables only the `TRUNCATE` trigger in `tests/conftest.py` so transactional tests can flush.
 - Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 
 ## Flow

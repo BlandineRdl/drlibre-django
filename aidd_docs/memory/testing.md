@@ -11,7 +11,7 @@
 | The FHIR API | FHIR R4 contract test |
 | A concurrent write guarded by a lock | PostgreSQL test with `django_db(transaction=True)`, one thread per writer closing its connections; the first writer waits until `pg_stat_activity` shows a `Lock` waiter; it must fail with the lock removed |
 | A user journey | A few Playwright end-to-end tests |
-| Search or booking performance | Locust on the load seed: `uv run python -m scripts.seed --size load` (reseed: `docker compose down -v`, then `up`), `NETWORK_HOURLY_LIMIT=100000` in `.env`, recreate web and worker, then `uv run locust -f loadtests/locustfile.py --headless -u 20 -r 5 -t 2m --host http://localhost:8000`; restore `.env`; results in the plan's `load-results.md` |
+| Search or booking performance | Locust on the load seed: `./scripts/load-run.sh` (own compose project `drlibre-load`, ports 18000/15432/16379/18025, `NETWORK_HOURLY_LIMIT=100000`, volume removed at exit; `--keep` leaves it up, extra args go to Locust); the demo stack and `.env` stay untouched; results in the plan's `load-results.md` |
 
 ## Conventions
 - Test behaviour, not functions: a refactoring that keeps behaviour breaks no test.
