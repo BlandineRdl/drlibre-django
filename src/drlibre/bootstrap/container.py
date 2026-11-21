@@ -225,6 +225,7 @@ from drlibre.scheduling.application.ports.inbound import (
     DeleteTimeOff,
     ExtendSlotHorizon,
     FindFreeSlots,
+    FindFreeWeek,
     NextBookableSlots,
     RecordTimeOff,
     SaveAvailabilityRule,
@@ -245,6 +246,7 @@ from drlibre.scheduling.application.use_cases.delete_availability_rule import (
 from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
 from drlibre.scheduling.application.use_cases.extend_slot_horizon import ExtendSlotHorizonUseCase
 from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
+from drlibre.scheduling.application.use_cases.find_free_week import FindFreeWeekUseCase
 from drlibre.scheduling.application.use_cases.free_clinicians_at import FreeCliniciansAtUseCase
 from drlibre.scheduling.application.use_cases.is_slot_free import IsSlotFreeUseCase
 from drlibre.scheduling.application.use_cases.next_bookable_slots import NextBookableSlotsUseCase
@@ -392,6 +394,7 @@ class Container:
     availability_queries: AvailabilityQueries
     extend_slot_horizon: ExtendSlotHorizon
     find_free_slots: FindFreeSlots
+    find_free_week: FindFreeWeek
     next_bookable_slots: NextBookableSlots
     book_appointment: BookAppointment
     require_patient: RequirePatient
@@ -633,6 +636,9 @@ def wire(a: Adapters) -> Container:
             uow=uow, rules=a.availability_rules, refresh=refresh
         ),
         find_free_slots=find_free_slots,
+        find_free_week=FindFreeWeekUseCase(
+            clock=clock, directory=directory, find_free_slots=find_free_slots
+        ),
         next_bookable_slots=NextBookableSlotsUseCase(clock=clock, find_free_slots=find_free_slots),
         book_appointment=booking.book_appointment,
         require_patient=booking.require_patient,

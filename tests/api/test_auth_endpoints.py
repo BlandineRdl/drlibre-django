@@ -147,8 +147,10 @@ def test_patient_without_password_cannot_change_one(client: Client) -> None:
     client.cookies[COOKIE] = stored_session(patient)
 
     portal = client.get("/portal/").content.decode()
+    profile = client.get("/portal/profile").content.decode()
 
-    assert "/account/password" not in portal
+    assert f"<h1>Bonjour {patient.full_name}</h1>" in portal
+    assert "/account/password" not in portal + profile
     assert client.get("/account/password").status_code == 403
 
 

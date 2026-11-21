@@ -1,18 +1,21 @@
 import dataclasses
 import inspect
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.conf import settings
+from django.test import Client
 from pytest_bdd import given, parsers, then, when
 
 from drlibre.booking.application.ports.inbound import AgendaFilter, HoldCreated, VerifiedBooking
 from drlibre.booking.domain import booking_rules
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
-from drlibre.identity.domain.session import hash_token
+from drlibre.bootstrap.container import use_container
+from drlibre.identity.domain.session import Session, hash_token
 from drlibre.identity.domain.user import Role, User
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
@@ -23,6 +26,7 @@ from tests.builders_booking import (
     existing_appointment,
     patient_user,
 )
+from tests.fakes.booking import AgendaClinician
 from tests.fakes.world import FakeWorld
 
 NETWORK = "10.0.0.1"
@@ -53,6 +57,8 @@ class Scene:
         self.successes = 0
         self.existing: User | None = None
         self.mine: Appointment | None = None
+        self.caller: Id | None = None
+        self.page: Any = None
 
 
 @pytest.fixture
@@ -1103,3 +1109,112 @@ def audit_counted(world: FakeWorld, action: str, count: int) -> None:
     (entry,) = [e for e in world.audit.entries if e.action == action]
     assert entry.actor is None
     assert dict(entry.metadata) == {"count": count}
+
+
+# --- pages and API through the fake wiring -----------------------------------
+
+COOKIE = settings.SESSION_COOKIE_NAME
+TYPE_NAME = "Consultation de suivi"
+
+
+def clinician_named(name: str) -> AgendaClinician:
+    return AgendaClinician(
+        name=f"Claire {name}",
+        title="Dr",
+        specialty="Cardiologie",
+        hospital_name="Hôpital du Lamentin",
+        hospital_address="1 rue des Alizés, 97232 Le Lamentin",
+        time_zone="America/Martinique",
+        department="Rythmologie",
+    )
+
+
+@pytest.fixture
+def web(world: FakeWorld) -> Iterator[Client]:
+    """A browser stand-in served by the real pages and API over the fake wiring."""
+    use_container(world.app)
+    yield Client()
+    use_container(None)
+
+
+def open_session(world: FakeWorld, web: Client, user_id: Id) -> None:
+    token = f"token-{user_id}"
+    user = world.users.rows[user_id]
+    world.sessions.add(
+        Session.after_password(
+            token=token, user_id=user.id, role=user.role, user_agent="test", at=world.clock.now()
+        )
+    )
+    web.cookies[COOKIE] = token
+
+
+@given("the agenda names the clinicians, the type and the rooms")
+def agenda_names(world: FakeWorld, scene: Scene) -> None:
+    for name, clinician_id in scene.clinicians.items():
+        world.agenda.clinicians[clinician_id] = clinician_named(name)
+    world.agenda.labels[scene.type] = TYPE_NAME
+    world.agenda.labels.update({room_id: name for name, room_id in scene.rooms.items()})
+
+
+def page_text(scene: Scene) -> str:
+    assert scene.page is not None
+    return scene.page.content.decode()
+
+
+@given("the caller is a clinician")
+def caller_is_clinician(world: FakeWorld, scene: Scene) -> None:
+    scene.caller = Id()
+    world.users.save(patient_user(scene.caller, email="dr@example.org", role=Role.CLINICIAN))
+
+
+@when("the patient opens their appointments page")
+def opens_appointments(world: FakeWorld, scene: Scene, web: Client) -> None:
+    open_session(world, web, scene.patient)
+    scene.page = web.get("/portal/appointments")
+    assert scene.page.status_code == 200, scene.page.content
+
+
+@then(parsers.parse('the page offers "{actions}" for the appointment'))
+def page_offers(scene: Scene, actions: str) -> None:
+    body = page_text(scene)
+    base = f"/portal/appointments/{mine(scene).id}"
+    shown = {
+        label
+        for label, url in (("Déplacer", f"{base}/reschedule"), ("Annuler", f"{base}/cancel"))
+        if f'href="{url}"' in body
+    }
+    assert shown == (set() if actions == "nothing" else set(csv(actions)))
+    assert f'href="{base}.ics"' in body
+
+
+@when(parsers.parse("the {who} posts '{body}' to {action} it"))
+def posts_to_api(
+    world: FakeWorld, scene: Scene, web: Client, who: str, body: str, action: str
+) -> None:
+    caller = scene.caller if who == "caller" else None
+    open_session(world, web, caller or scene.patient)
+    url = f"/api/v1/appointments/{mine(scene).id}/{action}"
+    scene.page = web.post(url, body, content_type="application/json")
+
+
+@then(parsers.parse('the API answers 200 with the appointment "{status}"'))
+def api_accepted(scene: Scene, status: str) -> None:
+    assert scene.page.status_code == 200, scene.page.content
+    body = scene.page.json()
+    assert (body["id"], body["status"]) == (str(mine(scene).id), status)
+
+
+@then(parsers.parse('the API refuses with {status:d} "{code}"'))
+def api_refused(scene: Scene, status: int, code: str) -> None:
+    assert scene.page.status_code == status, scene.page.content
+    assert scene.page.json()["code"] == code
+
+
+@then(parsers.parse('the API refusal names the rules "{names}"'))
+def api_refused_rules(scene: Scene, names: str) -> None:
+    assert scene.page.json()["details"]["rules"] == csv(names)
+
+
+@then(parsers.parse('the API refusal names the field "{field}"'))
+def api_refused_field(scene: Scene, field: str) -> None:
+    assert field in [item["field"] for item in scene.page.json()["details"]["fields"]]

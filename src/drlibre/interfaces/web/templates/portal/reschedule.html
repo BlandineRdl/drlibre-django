@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Déplacer le rendez-vous{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+<h1>Déplacer le rendez-vous</h1>
+{% include "portal/_card.html" with card=view.appointment heading_level="h2" %}
+{% if view.refusal %}
+<div role="alert" class="error-summary" tabindex="-1" id="refusal" autofocus>
+  <p><strong>{{ view.refusal }}</strong></p>
+  {% if view.reasons %}<ul>{% for reason in view.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+<nav aria-label="Semaines" class="pagination">
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Semaine précédente</a>{% endif %}
+  <h2>{{ view.week_label }}</h2>
+  {% if view.next_url %}<a href="{{ view.next_url }}">Semaine suivante ›</a>{% endif %}
+</nav>
+{% if view.empty_week_text %}<p>{{ view.empty_week_text }}</p>{% endif %}
+<form method="post" action="{{ view.action }}">
+  {% csrf_token %}
+  <input type="hidden" name="week" value="{{ view.week_value }}">
+  <div class="week-strip">
+    {% for day in view.days %}
+    <section aria-labelledby="day-{{ forloop.counter }}">
+      <h3 id="day-{{ forloop.counter }}">{{ day.label }}</h3>
+      {% if day.slots %}
+      <ul class="slot-list">
+        {% for slot in day.slots %}<li><button type="submit" name="start" value="{{ slot.value }}" class="outline secondary" aria-describedby="day-{{ forloop.parentloop.counter }}">{{ slot.label }}</button></li>{% endfor %}
+      </ul>
+      {% else %}<p>{{ day.empty_text }}</p>{% endif %}
+    </section>
+    {% endfor %}
+  </div>
+</form>
+<p><a href="{{ view.back_url }}">Retour à mes rendez-vous</a></p>
+{% endblock %}

@@ -45,3 +45,23 @@ Feature: Le patient met à jour son profil
   Scenario: La modification laisse une entrée d'audit avec le nom des champs changés, jamais leurs valeurs. (sans changement)
     When the patient saves the phone "0601020304" and the birth date "1990-05-17"
     Then nothing is audited
+
+  Scenario Outline: Un patient qui a un mot de passe accède au changement de mot de passe ; un patient sans mot de passe ne le voit pas. (<case>)
+    Given the patient <password>
+    When the patient opens their profile page
+    Then the profile page shows "Léa Martin" and "lea@example.org" without a field to change them
+    And the link to change the password is <link>
+    And the password change page answers <status>
+
+    Examples:
+      | case              | password            | link   | status |
+      | avec mot de passe | has a password      | shown  | 200    |
+      | sans mot de passe | has no password     | hidden | 403    |
+
+  Scenario: Le téléphone accepte 7 à 20 caractères parmi chiffres, espaces et `+ ( ) -` ; la date de naissance est une date réelle, pas dans le futur ; un champ vide efface la valeur ; une valeur invalide donne `invalid_input` avec le message du champ. (page du profil)
+    Given the patient has no password
+    When the patient submits the profile page with the phone "12" and the birth date "1990-05-17"
+    Then the profile page is shown again with the error tied to the phone field, focused
+    When the patient submits the profile page with the phone "none" and the birth date "none"
+    Then the patient lands on the profile with the message "Votre profil est enregistré."
+    And the patient has the phone "none" and the birth date "none"

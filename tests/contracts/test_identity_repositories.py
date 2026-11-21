@@ -1,6 +1,6 @@
 import dataclasses
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -59,6 +59,19 @@ def test_saving_again_replaces_the_user(stores: tuple[Users, Sessions]) -> None:
     users.save(dataclasses.replace(user, full_name="Ana Belle", active=False))
 
     assert users.get(user.id) == dataclasses.replace(user, full_name="Ana Belle", active=False)
+
+
+def test_clearing_the_phone_and_the_birth_date_is_kept(stores: tuple[Users, Sessions]) -> None:
+    """Story « met à jour son profil » : un champ vide efface la valeur."""
+    users, _ = stores
+    user = dataclasses.replace(a_user(), phone="0601020304", birth_date=date(1990, 5, 17))
+    users.save(user)
+
+    users.save(dataclasses.replace(user, phone=None, birth_date=None))
+
+    found = users.get(user.id)
+    assert found is not None
+    assert (found.phone, found.birth_date) == (None, None)
 
 
 def test_sessions_are_found_by_token_hash_extended_and_deleted(

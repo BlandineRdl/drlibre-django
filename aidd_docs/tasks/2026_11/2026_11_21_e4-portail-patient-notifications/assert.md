@@ -73,3 +73,18 @@
 | `uv run ruff check .` | 0 | |
 | `uv run ruff format --check .` | 0 | |
 | `uv run pytest -m e2e` | not run | phase 5 changes no page |
+
+## Round 6
+- Head: `4ec2a4d`
+- Uncommitted changes: yes
+- Verdict: PASS
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run pre-commit run --all-files` | 0 | |
+| `uv run lint-imports` | 0 | |
+| `uv run pytest` | 0 | |
+| `curl -i localhost:8000/api/v1/health` | 0 | |
+| `uv run ruff check .` | 0 | |
+| `uv run ruff format --check .` | 0 | |
+| `uv run pytest -m e2e` | 0 | portal pages also checked with axe at 375 and 1440 px for the passwordless demo patient: no violation |

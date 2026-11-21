@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Mon espace patient{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau de l'hôpital, nommé sur le rendez-vous.{% endblock %}
+{% block content %}
+<h1>{{ view.greeting }}</h1>
+<section aria-labelledby="next-heading">
+  <h2 id="next-heading">Prochain rendez-vous</h2>
+  {% if view.next_appointment %}
+  {% include "portal/_card.html" with card=view.next_appointment with_actions=True %}
+  {% else %}
+  <p>{{ view.no_appointment_text }}</p>
+  {% endif %}
+  <p><a href="{{ view.appointments_url }}">Voir tous mes rendez-vous</a></p>
+</section>
+<section aria-labelledby="unread-heading">
+  <h2 id="unread-heading">Notifications</h2>
+  <p>{{ view.unread_text }} <a href="{{ view.notifications_url }}">Voir mes notifications</a></p>
+</section>
+<p><a href="{{ view.book_url }}" role="button">Prendre un RDV</a></p>
+{% endblock %}

@@ -110,3 +110,37 @@ def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> AgendaOut:
         upcoming=[AgendaEntryOut.of(e) for e in agenda.upcoming],
         past=[AgendaEntryOut.of(e) for e in agenda.past],
     )
+
+
+class CancelIn(Schema):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str
+
+
+class RescheduleIn(Schema):
+    model_config = ConfigDict(extra="forbid")
+
+    start: AwareDatetime
+
+
+@router.post("/appointments/{appointment_id}/cancel", response=AppointmentOut, auth=None)
+def cancel(request: HttpRequest, appointment_id: UUID, payload: CancelIn) -> AppointmentOut:
+    identity = current_identity(request)
+    c = container()
+    c.require_patient.execute(user_id=identity.user_id)
+    cancelled = c.cancel_appointment.execute(
+        appointment_id=Id(appointment_id), patient_id=identity.user_id, reason=payload.reason
+    )
+    return AppointmentOut.of(cancelled)
+
+
+@router.post("/appointments/{appointment_id}/reschedule", response=AppointmentOut, auth=None)
+def reschedule(request: HttpRequest, appointment_id: UUID, payload: RescheduleIn) -> AppointmentOut:
+    identity = current_identity(request)
+    c = container()
+    c.require_patient.execute(user_id=identity.user_id)
+    moved = c.reschedule_appointment.execute(
+        appointment_id=Id(appointment_id), patient_id=identity.user_id, start=payload.start
+    )
+    return AppointmentOut.of(moved)

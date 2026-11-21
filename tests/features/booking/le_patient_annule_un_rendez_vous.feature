@@ -86,3 +86,72 @@ Feature: Le patient annule un rendez-vous
     And nothing was changed or notified
     When the patient cancels an unknown appointment
     Then the booking is refused as "not_found"
+
+  Scenario: L'annulation passe par une boîte de confirmation avec un motif obligatoire ; sans motif, `invalid_input`. (page de confirmation sans motif)
+    Given the agenda names the clinicians, the type and the rooms
+    When the patient opens the cancel page of the appointment
+    Then the page recalls the appointment and asks for the reason
+    When the patient confirms the cancellation on the page giving the reason " "
+    Then the page is shown again with the error tied to the reason field, focused
+    And nothing was changed or notified
+
+  Scenario: L'annulation passe par une boîte de confirmation avec un motif obligatoire ; sans motif, `invalid_input`. (page de confirmation avec motif)
+    Given the agenda names the clinicians, the type and the rooms
+    When the patient confirms the cancellation on the page giving the reason "Empêchement"
+    Then the patient lands on their appointments with the message "Le rendez-vous est annulé."
+    And the appointment is cancelled now for the reason "Empêchement"
+
+  Scenario Outline: Un RDV qui commence dans moins de 24 h est refusé en `rule_violation` avec `cancellation_window_closed` ; l'action « Annuler » n'est proposée que quand les règles la permettent. (page : <case>)
+    Given the agenda names the clinicians, the type and the rooms
+    And the patient has a "<status>" appointment with "A" at "<start>" in room "R1"
+    When the patient opens their appointments page
+    Then the page offers "<actions>" for the appointment
+
+    Examples:
+      | case | status | start | actions |
+      | réservé dans plus de 24 h | BOOKED | 2026-11-23 09:00 | Déplacer, Annuler |
+      | arrivé dans plus de 24 h | CHECKED_IN | 2026-11-23 09:00 | Annuler |
+      | réservé dans moins de 24 h | BOOKED | 2026-11-21 09:00 | nothing |
+      | annulé | CANCELLED | 2026-11-23 09:00 | nothing |
+
+  Scenario: `POST /appointments/{id}/cancel` applique les mêmes règles, sur les seuls RDV du patient. (annulation acceptée)
+    When the patient posts '{"reason": "Empêchement"}' to cancel it
+    Then the API answers 200 with the appointment "CANCELLED"
+    And the appointment is cancelled now for the reason "Empêchement"
+    And the patient has one "RDV annulé" notification about the appointment
+
+  Scenario: `POST /appointments/{id}/cancel` applique les mêmes règles, sur les seuls RDV du patient. (sans motif)
+    When the patient posts '{"reason": "  "}' to cancel it
+    Then the API refuses with 400 "invalid_input"
+    And the API refusal names the field "reason"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/cancel` applique les mêmes règles, sur les seuls RDV du patient. (moins de 24 h)
+    Given the patient has a "BOOKED" appointment with "A" at "2026-11-21 09:00" in room "R1"
+    When the patient posts '{"reason": "Empêchement"}' to cancel it
+    Then the API refuses with 422 "rule_violation"
+    And the API refusal names the rules "cancellation_window_closed"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/cancel` applique les mêmes règles, sur les seuls RDV du patient. (RDV terminé)
+    Given the patient has a "COMPLETED" appointment with "A" at "2026-11-23 09:00" in room "R1"
+    When the patient posts '{"reason": "Empêchement"}' to cancel it
+    Then the API refuses with 409 "invalid_transition"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/cancel` applique les mêmes règles, sur les seuls RDV du patient. (RDV d'un autre patient)
+    Given the appointment belongs to another patient
+    When the patient posts '{"reason": "Empêchement"}' to cancel it
+    Then the API refuses with 403 "forbidden"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/cancel` applique les mêmes règles, sur les seuls RDV du patient. (appel d'un praticien)
+    Given the caller is a clinician
+    When the caller posts '{"reason": "Empêchement"}' to cancel it
+    Then the API refuses with 403 "forbidden"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/cancel` applique les mêmes règles, sur les seuls RDV du patient. (champ inconnu)
+    When the patient posts '{"reason": "Empêchement", "patient": "autre"}' to cancel it
+    Then the API refuses with 400 "invalid_input"
+    And nothing was changed or notified

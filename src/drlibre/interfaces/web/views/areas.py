@@ -23,10 +23,3 @@ def console_home(request: HttpRequest) -> HttpResponse:
 def workspace_home(request: HttpRequest) -> HttpResponse:
     context = {"title": "Mon espace praticien", "intro": "Votre agenda apparaîtra ici."}
     return render(request, "areas/home.html", context)
-
-
-@require_GET
-@require_role(Role.PATIENT)
-def portal_home(request: HttpRequest) -> HttpResponse:
-    context = {"title": "Mon portail patient", "intro": "Vos rendez-vous apparaîtront ici."}
-    return render(request, "areas/home.html", context)

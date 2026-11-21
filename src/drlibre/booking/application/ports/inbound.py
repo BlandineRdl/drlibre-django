@@ -3,12 +3,18 @@ from datetime import datetime
 from typing import Protocol
 
 from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
-from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
+from drlibre.booking.domain.appointment import (
+    MAX_CANCELLATION_REASON,
+    Appointment,
+    AppointmentStatus,
+)
+from drlibre.booking.domain.booking_rules import BookingRule, PatientAction
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
 __all__ = [
+    "MAX_CANCELLATION_REASON",
     "AgendaEntry",
     "AgendaFilter",
     "Appointment",
@@ -16,6 +22,7 @@ __all__ = [
     "AppointmentStatus",
     "BookAppointment",
     "BookedPeriod",
+    "BookingRule",
     "CancelAppointment",
     "CreateHold",
     "ExpireHolds",
@@ -24,6 +31,7 @@ __all__ = [
     "HoldSummary",
     "ListPatientAppointments",
     "OpenHolds",
+    "PatientAction",
     "PatientAppointments",
     "RequirePatient",
     "RescheduleAppointment",

@@ -1,0 +1,12 @@
+<article class="appointment-card">
+  <header><{{ heading_level|default:"h3" }} class="card-when">{{ card.when }}</{{ heading_level|default:"h3" }}></header>
+  <p><strong>{{ card.status }}</strong></p>
+  {% for line in card.lines %}<p class="result-line">{{ line }}</p>{% endfor %}
+  {% if with_actions %}
+  <footer class="actions">
+    {% if card.move_url %}<a href="{{ card.move_url }}" role="button" class="outline">Déplacer</a>{% endif %}
+    {% if card.cancel_url %}<a href="{{ card.cancel_url }}" role="button" class="outline secondary">Annuler</a>{% endif %}
+    <a href="{{ card.calendar_url }}">Ajouter à mon agenda (.ics)</a>
+  </footer>
+  {% endif %}
+</article>

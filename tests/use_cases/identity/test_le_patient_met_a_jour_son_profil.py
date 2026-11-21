@@ -1,9 +1,17 @@
+import dataclasses
 import inspect
+import re
+from collections.abc import Iterator
 from datetime import UTC, date, datetime
+from typing import Any
 
 import pytest
+from django.conf import settings
+from django.test import Client
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from drlibre.bootstrap.container import use_container
+from drlibre.identity.domain.session import Session
 from drlibre.identity.domain.user import Email, Role, User
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -17,6 +25,7 @@ class Profile:
         self.user_id = Id()
         self.error: DomainError | None = None
         self.values: tuple[str, ...] = ()
+        self.page: Any = None
 
 
 @pytest.fixture
@@ -117,3 +126,94 @@ def audit_names_fields(world: FakeWorld, profile: Profile, action: str, fields: 
 def audit_without_values(world: FakeWorld, profile: Profile) -> None:
     text = repr(world.audit.entries)
     assert not [v for v in profile.values if v != "none" and v in text]
+
+
+@pytest.fixture
+def web(world: FakeWorld) -> Iterator[Client]:
+    """A browser stand-in served by the real pages over the fake wiring."""
+    use_container(world.app)
+    yield Client()
+    use_container(None)
+
+
+def signed_in(world: FakeWorld, profile: Profile, web: Client) -> Client:
+    token = f"token-{profile.user_id}"
+    world.sessions.add(
+        Session.after_password(
+            token=token,
+            user_id=profile.user_id,
+            role=Role.PATIENT,
+            user_agent="test",
+            at=world.clock.now(),
+        )
+    )
+    web.cookies[settings.SESSION_COOKIE_NAME] = token
+    return web
+
+
+def body(profile: Profile) -> str:
+    return profile.page.content.decode()
+
+
+@given("the patient has a password")
+def has_password(world: FakeWorld, profile: Profile) -> None:
+    world.users.save(dataclasses.replace(stored(world, profile), password_hash="hashed"))
+
+
+@given("the patient has no password")
+def has_no_password(world: FakeWorld, profile: Profile) -> None:
+    assert stored(world, profile).password_hash is None
+
+
+@when("the patient opens their profile page")
+def opens_profile(world: FakeWorld, profile: Profile, web: Client) -> None:
+    profile.page = signed_in(world, profile, web).get("/portal/profile")
+    assert profile.page.status_code == 200
+
+
+@when(
+    parsers.parse(
+        'the patient submits the profile page with the phone "{phone}" and the birth date "{birth}"'
+    )
+)
+def submits_profile(
+    world: FakeWorld, profile: Profile, web: Client, phone: str, birth: str
+) -> None:
+    form = {"phone": typed(phone), "birth_date": typed(birth)}
+    profile.page = signed_in(world, profile, web).post("/portal/profile", form)
+
+
+@then(parsers.parse('the profile page shows "{name}" and "{email}" without a field to change them'))
+def shows_identity(profile: Profile, name: str, email: str) -> None:
+    page = body(profile)
+    assert f"<dd>{name}</dd>" in page
+    assert f"<dd>{email}</dd>" in page
+    assert set(re.findall(r'<input type="[a-z]+" id="field-([a-z_]+)"', page)) == {
+        "phone",
+        "birth_date",
+    }
+
+
+@then(parsers.parse("the link to change the password is {state}"))
+def password_link(profile: Profile, state: str) -> None:
+    assert ('href="/account/password"' in body(profile)) is (state == "shown")
+
+
+@then(parsers.parse("the password change page answers {status:d}"))
+def password_page(web: Client, status: int) -> None:
+    assert web.get("/account/password").status_code == status
+
+
+@then("the profile page is shown again with the error tied to the phone field, focused")
+def phone_error(profile: Profile) -> None:
+    page = body(profile)
+    assert profile.page.status_code == 400
+    assert 'href="#field-phone"' in page
+    assert 'aria-invalid="true" aria-describedby="help-phone error-phone" autofocus' in page
+
+
+@then(parsers.parse('the patient lands on the profile with the message "{message}"'))
+def lands_on_profile(profile: Profile, web: Client, message: str) -> None:
+    assert profile.page.status_code == 302
+    shown = web.get(profile.page["Location"]).content.decode()
+    assert f'<p role="status" class="notice">{message}</p>' in shown

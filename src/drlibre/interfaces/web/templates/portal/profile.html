@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Mon profil{% endblock %}
+{% block content %}
+<h1>Mon profil</h1>
+{% if view.notice %}<p role="status" class="notice">{{ view.notice }}</p>{% endif %}
+<dl class="profile-identity">
+  <dt>Nom</dt><dd>{{ view.name }}</dd>
+  <dt>Email</dt><dd>{{ view.email }}</dd>
+</dl>
+<h2>{{ view.form.title }}</h2>
+{% include "_form.html" with form=view.form %}
+{% if view.password_url %}<p><a href="{{ view.password_url }}">Changer mon mot de passe</a></p>{% endif %}
+{% endblock %}

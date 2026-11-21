@@ -6,6 +6,11 @@
   <li><a href="/workspace/availability/">Mes plages</a></li>
   <li><a href="/workspace/time-off/">Mes absences</a></li>
   {% endif %}
+  {% if shell.is_patient %}
+  <li><a href="/portal/appointments">Mes RDV</a></li>
+  <li><a href="/portal/notifications">{{ shell.notifications_label }}</a></li>
+  <li><a href="/portal/profile">Profil</a></li>
+  {% endif %}
   {% if shell.can_change_password %}<li><a href="/account/password">Mot de passe</a></li>{% endif %}
   <li>
     <form method="post" action="/sign-out" class="inline-form">

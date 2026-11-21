@@ -120,3 +120,51 @@ Feature: Le patient déplace un rendez-vous
     And nothing was changed or notified
     When the patient moves an unknown appointment to "2026-11-23 10:00"
     Then the booking is refused as "not_found"
+
+  Scenario Outline: Seul un RDV `BOOKED` se déplace ; l'action « Déplacer » n'est proposée que quand les règles la permettent. (page : <case>)
+    Given the agenda names the clinicians, the type and the rooms
+    And the patient has a "<status>" appointment with "A" at "<start>" in room "R2"
+    When the patient opens their appointments page
+    Then the page offers "<actions>" for the appointment
+
+    Examples:
+      | case                       | status     | start            | actions           |
+      | réservé dans plus de 24 h  | BOOKED     | 2026-11-23 09:00 | Déplacer, Annuler |
+      | arrivé                     | CHECKED_IN | 2026-11-23 09:00 | Annuler           |
+      | réservé dans moins de 24 h | BOOKED     | 2026-11-21 09:00 | nothing           |
+
+  Scenario: `POST /appointments/{id}/reschedule` applique les mêmes règles, sur les seuls RDV du patient. (déplacement accepté)
+    When the patient posts '{"start": "2026-11-23T10:00:00Z"}' to reschedule it
+    Then the API answers 200 with the appointment "BOOKED"
+    And the appointment is "BOOKED" from "2026-11-23 10:00" for 30 minutes in room "R2"
+    And the patient has one "RDV déplacé" notification about the appointment
+
+  Scenario: `POST /appointments/{id}/reschedule` applique les mêmes règles, sur les seuls RDV du patient. (fin envoyée par l'appelant)
+    When the patient posts '{"start": "2026-11-23T10:00:00Z", "end": "2026-11-23T11:00:00Z"}' to reschedule it
+    Then the API refuses with 400 "invalid_input"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/reschedule` applique les mêmes règles, sur les seuls RDV du patient. (règles enfreintes)
+    Given the appointment type is not bookable online
+    When the patient posts '{"start": "2026-11-20T11:15:00Z"}' to reschedule it
+    Then the API refuses with 422 "rule_violation"
+    And the API refusal names the rules "lead_time_too_short, type_not_bookable_online, outside_availability"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/reschedule` applique les mêmes règles, sur les seuls RDV du patient. (RDV arrivé)
+    Given the patient has a "CHECKED_IN" appointment with "A" at "2026-11-23 09:00" in room "R2"
+    When the patient posts '{"start": "2026-11-23T10:00:00Z"}' to reschedule it
+    Then the API refuses with 409 "invalid_transition"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/reschedule` applique les mêmes règles, sur les seuls RDV du patient. (RDV d'un autre patient)
+    Given the appointment belongs to another patient
+    When the patient posts '{"start": "2026-11-23T10:00:00Z"}' to reschedule it
+    Then the API refuses with 403 "forbidden"
+    And nothing was changed or notified
+
+  Scenario: `POST /appointments/{id}/reschedule` applique les mêmes règles, sur les seuls RDV du patient. (appel d'un praticien)
+    Given the caller is a clinician
+    When the caller posts '{"start": "2026-11-23T10:00:00Z"}' to reschedule it
+    Then the API refuses with 403 "forbidden"
+    And nothing was changed or notified

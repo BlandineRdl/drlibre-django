@@ -1,39 +1,30 @@
 import dataclasses
-from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
 
 import pytest
-from django.conf import settings
 from django.test import Client
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from drlibre.booking.application.ports.inbound import AgendaFilter, PatientAppointments
 from drlibre.booking.domain.appointment import AppointmentStatus
-from drlibre.bootstrap.container import use_container
-from drlibre.identity.domain.session import Session
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import existing_appointment, patient_user
-from tests.fakes.booking import AgendaClinician
 from tests.fakes.world import FakeWorld
-from tests.use_cases.booking.conftest import VISIT_REASON, Scene, at, csv, typed_patient, verified
+from tests.use_cases.booking.conftest import (
+    COOKIE,
+    TYPE_NAME,
+    VISIT_REASON,
+    Scene,
+    at,
+    clinician_named,
+    csv,
+    open_session,
+    typed_patient,
+    verified,
+)
 
 scenarios("../../features/booking/le_patient_retrouve_ses_rendez_vous_a_venir_et_passes.feature")
-
-COOKIE = settings.SESSION_COOKIE_NAME
-TYPE_NAME = "Consultation de suivi"
-
-
-def clinician_named(name: str) -> AgendaClinician:
-    return AgendaClinician(
-        name=f"Claire {name}",
-        title="Dr",
-        specialty="Cardiologie",
-        hospital_name="Hôpital du Lamentin",
-        hospital_address="1 rue des Alizés, 97232 Le Lamentin",
-        time_zone="America/Martinique",
-        department="Rythmologie",
-    )
 
 
 class Listing:
@@ -48,39 +39,12 @@ def listing() -> Listing:
     return Listing()
 
 
-@pytest.fixture
-def web(world: FakeWorld) -> Iterator[Client]:
-    """A browser stand-in served by the real API over the fake wiring."""
-    use_container(world.app)
-    yield Client()
-    use_container(None)
-
-
 def starts(raw: str) -> list[str]:
     return [] if raw == "none" else csv(raw)
 
 
 def shown(start: str) -> str:
     return at(start).isoformat()
-
-
-def open_session(world: FakeWorld, web: Client, patient_id: Id) -> None:
-    token = f"token-{patient_id}"
-    user = world.users.rows[patient_id]
-    world.sessions.add(
-        Session.after_password(
-            token=token, user_id=user.id, role=user.role, user_agent="test", at=world.clock.now()
-        )
-    )
-    web.cookies[COOKIE] = token
-
-
-@given("the agenda names the clinicians, the type and the rooms")
-def agenda_names(world: FakeWorld, scene: Scene) -> None:
-    for name, clinician_id in scene.clinicians.items():
-        world.agenda.clinicians[clinician_id] = clinician_named(name)
-    world.agenda.labels[scene.type] = TYPE_NAME
-    world.agenda.labels.update({room_id: name for name, room_id in scene.rooms.items()})
 
 
 @given(

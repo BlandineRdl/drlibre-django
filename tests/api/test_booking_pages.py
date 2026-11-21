@@ -96,7 +96,7 @@ def test_the_booking_form_rejects_a_post_without_its_csrf_token(world: Bookable)
 def test_a_visitor_books_in_three_steps_and_lands_on_a_confirmation_with_a_calendar_file(
     client: Client, world: Bookable
 ) -> None:
-    """Story réservation : détails, code, puis confirmation avec .ics et lien vers /portal/."""
+    """Story réservation : détails, code, confirmation avec .ics, puis l'accueil montre le RDV."""
     details = client.get(slot_url(world))
     assert details.status_code == 200
     assert 'aria-current="step"' in details.content.decode()
@@ -108,6 +108,9 @@ def test_a_visitor_books_in_three_steps_and_lands_on_a_confirmation_with_a_calen
     assert page.status_code == 200
     assert "Rendez-vous réservé" in body
     assert 'href="/portal/"' in body
+    home = client.get("/portal/").content.decode()
+    assert "lun. 23/11/2026 de 09:00 à 09:30, fuseau Europe/Paris" in home
+    assert "1 notification non lue." in home
     assert "Europe/Paris" in body
     assert client.cookies[COOKIE].value
     ics = client.get(f"{confirmation_url}.ics")
