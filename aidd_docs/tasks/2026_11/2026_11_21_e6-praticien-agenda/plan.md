@@ -1,6 +1,6 @@
 ---
 objective: "Le praticien connecté pilote son agenda du jour et de la semaine, fait avancer, annule, déplace et réserve ses RDV, tient ses notes, voit ses patients et les salles, sans jamais voir les RDV d'un autre praticien."
-status: in-progress
+status: done
 ---
 
 # Plan: E6 - Le praticien pilote sa journée et ses rendez-vous

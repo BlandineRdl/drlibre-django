@@ -52,15 +52,16 @@ Tranchées au plan E4 (`aidd_docs/tasks/2026_11/2026_11_21_e4-portail-patient-no
 - Quelles colonnes affiche la liste d'attente admin ?
 
 ## E6 Espace praticien
-- « Prochain créneau libre » : pour quel type et à partir de quand ?
-- Calendrier et frise des salles : navigation, et premier jour de la semaine ?
-- Les RDV annulés apparaissent-ils dans la liste du jour ?
-- Quels statuts occupent une salle dans la frise ?
-- « Dernière » et « prochaine visite » : quels statuts comptent ?
-- Le bandeau de déplacement change-t-il de semaine ?
-- Arrivée et absence sont-elles permises avant l'heure du RDV ?
-- Les notes d'un RDV terminé ou annulé restent-elles modifiables ?
-- Le motif d'annulation a-t-il une longueur maximale ?
+Tranchées au plan E6 (`aidd_docs/tasks/2026_11/2026_11_21_e6-praticien-agenda/plan.md`, Decisions).
+- « Prochain créneau libre » : pour quel type et à partir de quand ? → Tout type : le plus tôt des créneaux stockés du praticien, non retenus, à partir de `max(maintenant, début du jour affiché)` ; « — » sinon.
+- Calendrier et frise des salles : navigation, et premier jour de la semaine ? → Semaine du lundi, `?week=` précédente / courante / suivante ; Aujourd'hui et Salles en `?day=` ; une valeur inutilisable revient à aujourd'hui.
+- Les RDV annulés apparaissent-ils dans la liste du jour ? → Oui, annulés et absents, avec leur statut et sans action ; les annulés comptés à part.
+- Quels statuts occupent une salle dans la frise ? → Les RDV actifs : `BOOKED`, `CHECKED_IN`, `COMPLETED`.
+- « Dernière » et « prochaine visite » : quels statuts comptent ? → Dernière : `COMPLETED` le plus récent avant maintenant ; prochaine : `BOOKED` ou `CHECKED_IN` le plus proche après maintenant.
+- Le bandeau de déplacement change-t-il de semaine ? → Oui, `?week=` dans l'horizon de 90 jours, sans le délai patient de 120 min.
+- Arrivée et absence sont-elles permises avant l'heure du RDV ? → Oui, aucune règle d'heure.
+- Les notes d'un RDV terminé ou annulé restent-elles modifiables ? → Oui, dans tous les statuts.
+- Le motif d'annulation a-t-il une longueur maximale ? → 500 caractères, la limite E4.
 
 ## E7 Supervision admin
 - « Plus récents d'abord » : tri sur le début ou la création, et quelles colonnes ?
