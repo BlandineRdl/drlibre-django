@@ -1,6 +1,6 @@
 ---
 objective: "Un patient connecté ou un admin inscrit un patient en liste d'attente ; un RDV annulé est proposé à l'entrée la plus ancienne qui correspond, acceptée par le patient ou un admin en un RDV `BOOKED`, et un job planifié expire les entrées et libère les offres échues."
-status: in-progress
+status: implemented
 ---
 
 # Plan: E5 - Les créneaux libérés sont proposés aux patients en liste d'attente
