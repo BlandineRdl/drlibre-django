@@ -7,6 +7,7 @@ from drlibre.booking.application.ports.outbound import (
     SlotRefresh,
 )
 from drlibre.booking.application.use_cases.view_appointment import own_appointment
+from drlibre.booking.application.use_cases.waitlist_offers import WaitlistOffers
 from drlibre.booking.domain import booking_rules
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -25,6 +26,7 @@ class CancelAppointmentUseCase(CancelAppointment):
         locks: ScheduleLocks,
         slot_refresh: SlotRefresh,
         notices: BookingNotices,
+        offers: WaitlistOffers,
     ) -> None:
         self._clock = clock
         self._uow = uow
@@ -33,6 +35,7 @@ class CancelAppointmentUseCase(CancelAppointment):
         self._locks = locks
         self._slot_refresh = slot_refresh
         self._notices = notices
+        self._offers = offers
 
     def execute(self, *, appointment_id: Id, patient_id: Id, reason: str) -> Appointment:
         with self._uow:
@@ -62,5 +65,6 @@ class CancelAppointmentUseCase(CancelAppointment):
                     metadata={"clinician_id": cancelled.clinician_id},
                 )
             )
+            self._offers.offer_freed(cancelled)
             self._notices.cancelled(cancelled)
             return cancelled

@@ -69,6 +69,12 @@ class Appointments(Protocol):
         """BOOKED appointments starting after the first instant, up to the second, by start."""
         ...
 
+    def cancelled_of_type(
+        self, appointment_type_id: Id, *, after: datetime, earliest: datetime, latest: datetime
+    ) -> tuple[Appointment, ...]:
+        """CANCELLED appointments of the type starting after `after` inside the window, by start."""
+        ...
+
     def conflicting_resources(
         self,
         *,

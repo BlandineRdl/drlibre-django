@@ -124,6 +124,18 @@ class DjangoAppointments(Appointments):
         )
         return tuple(_appointment(row) for row in rows.order_by("start", "id"))
 
+    def cancelled_of_type(
+        self, appointment_type_id: Id, *, after: datetime, earliest: datetime, latest: datetime
+    ) -> tuple[Appointment, ...]:
+        rows = AppointmentRecord.objects.filter(
+            status=AppointmentStatus.CANCELLED.value,
+            appointment_type_id=appointment_type_id.value,
+            start__gt=after,
+            start__gte=earliest,
+            end__lte=latest,
+        )
+        return tuple(_appointment(row) for row in rows.order_by("start", "id"))
+
     def conflicting_resources(
         self,
         *,

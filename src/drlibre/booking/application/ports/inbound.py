@@ -17,6 +17,7 @@ from drlibre.shared_kernel.pagination import Page, PageRequest
 
 __all__ = [
     "MAX_CANCELLATION_REASON",
+    "AcceptWaitlistOffer",
     "AgendaEntry",
     "AgendaFilter",
     "Appointment",
@@ -28,11 +29,13 @@ __all__ = [
     "CancelAppointment",
     "CreateHold",
     "ExpireHolds",
+    "ExpireWaitlist",
     "HeldPeriod",
     "HoldCreated",
     "HoldSummary",
     "JoinWaitlist",
     "ListPatientAppointments",
+    "OfferCancelledSlot",
     "OpenHolds",
     "PatientAction",
     "PatientAppointments",
@@ -248,6 +251,24 @@ class JoinWaitlist(Protocol):
         patient_email: str | None,
     ) -> WaitlistEntry:
         """A WAITING entry for the actor, or for the emailed patient when an admin names one."""
+        ...
+
+
+class OfferCancelledSlot(Protocol):
+    def execute(self, *, actor_id: Id, entry_id: Id) -> WaitlistEntry:
+        """Admin only: offer a WAITING entry the first fitting cancelled slot; not_found if none."""
+        ...
+
+
+class AcceptWaitlistOffer(Protocol):
+    def execute(self, *, actor_id: Id, entry_id: Id) -> Appointment:
+        """Book an OFFERED entry for its patient or an admin; a taken slot puts it back WAITING."""
+        ...
+
+
+class ExpireWaitlist(Protocol):
+    def execute(self) -> int:
+        """Expire entries past their window, free offers whose slot started; returns how many."""
         ...
 
 

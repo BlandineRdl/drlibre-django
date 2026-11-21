@@ -68,6 +68,20 @@ class InMemoryAppointments(Appointments):
         )
         return tuple(sorted(found, key=lambda a: (a.start, str(a.id))))
 
+    def cancelled_of_type(
+        self, appointment_type_id: Id, *, after: datetime, earliest: datetime, latest: datetime
+    ) -> tuple[Appointment, ...]:
+        found = (
+            a
+            for a in self.rows
+            if a.status is AppointmentStatus.CANCELLED
+            and a.appointment_type_id == appointment_type_id
+            and a.start > after
+            and earliest <= a.start
+            and a.end <= latest
+        )
+        return tuple(sorted(found, key=lambda a: (a.start, str(a.id))))
+
     def conflicting_resources(
         self,
         *,

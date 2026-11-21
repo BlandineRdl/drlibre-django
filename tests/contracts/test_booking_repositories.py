@@ -315,3 +315,32 @@ def test_booked_appointments_starting_in_a_window_come_back_by_start(scene: Scen
     found = scene.appointments.booked_starting(NOW, at(24))
 
     assert [a.id for a in found if a.id in mine] == [sooner.id, later.id, edge.id]
+
+
+def test_cancelled_appointments_of_a_type_come_back_by_start_inside_the_window(
+    scene: Scene,
+) -> None:
+    """Story l'admin propose : seuls les RDV annulés à venir du type, dans la fenêtre, comptent."""
+    cancelled = AppointmentStatus.CANCELLED
+    later = appointment(scene, patient=Id(), start=at(30), status=cancelled)
+    sooner = appointment(scene, patient=Id(), start=at(26), status=cancelled, clinician=scene.other)
+    outside = (
+        appointment(scene, patient=Id(), start=at(-2), status=cancelled),
+        appointment(scene, patient=Id(), start=at(20), status=cancelled),
+        appointment(scene, patient=Id(), start=at(50), status=cancelled),
+        appointment(scene, patient=Id(), start=at(28)),
+        replace(appointment(scene, patient=Id(), start=at(32), status=cancelled), end=at(49)),
+    )
+    for made in (later, sooner, *outside):
+        scene.appointments.add(made)
+    mine = {made.id for made in (later, sooner, *outside)}
+
+    found = scene.appointments.cancelled_of_type(
+        scene.kind, after=NOW, earliest=at(24), latest=at(48)
+    )
+
+    assert [a.id for a in found if a.id in mine] == [sooner.id, later.id]
+    started = scene.appointments.cancelled_of_type(
+        scene.kind, after=at(27), earliest=NOW, latest=at(39)
+    )
+    assert [a.id for a in started if a.id in mine] == [later.id]

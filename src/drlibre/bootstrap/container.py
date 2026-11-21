@@ -13,6 +13,7 @@ from drlibre.booking.application.ports.inbound import (
     ExpireHolds,
     JoinWaitlist,
     ListPatientAppointments,
+    OfferCancelledSlot,
     OpenHolds,
     RequirePatient,
     RescheduleAppointment,
@@ -49,6 +50,7 @@ from drlibre.booking.application.use_cases.join_waitlist import JoinWaitlistUseC
 from drlibre.booking.application.use_cases.list_patient_appointments import (
     ListPatientAppointmentsUseCase,
 )
+from drlibre.booking.application.use_cases.offer_cancelled_slot import OfferCancelledSlotUseCase
 from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.application.use_cases.require_patient import RequirePatientUseCase
@@ -60,6 +62,7 @@ from drlibre.booking.application.use_cases.send_reminders import SendRemindersUs
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
+from drlibre.booking.application.use_cases.waitlist_offers import WaitlistOffers
 from drlibre.booking.infrastructure.booking_slot_refresh import BookingSlotRefresh
 from drlibre.booking.infrastructure.code_issuer import HmacCodeIssuer
 from drlibre.booking.infrastructure.directory import OrganisationBookingDirectory
@@ -426,6 +429,7 @@ class Container:
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
     join_waitlist: JoinWaitlist
+    offer_cancelled_slot: OfferCancelledSlot
     waitlist_queries: WaitlistQueries
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
@@ -674,6 +678,7 @@ def wire(a: Adapters) -> Container:
         reschedule_appointment=booking.reschedule_appointment,
         send_reminders=booking.send_reminders,
         join_waitlist=booking.join_waitlist,
+        offer_cancelled_slot=booking.offer_cancelled_slot,
         waitlist_queries=booking.waitlist_queries,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
@@ -729,6 +734,7 @@ class _BookingUseCases:
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
     join_waitlist: JoinWaitlist
+    offer_cancelled_slot: OfferCancelledSlot
     waitlist_queries: WaitlistQueries
 
 
@@ -748,6 +754,9 @@ def _wire_booking(
         patients=booking.patients,
         notices=booking.notices,
         holds=booking.holds,
+    )
+    offers = WaitlistOffers(
+        clock=a.clock, audit=a.audit, waitlist=booking.waitlist, notices=booking.notices
     )
     return _BookingUseCases(
         book_appointment=BookAppointmentUseCase(
@@ -810,6 +819,7 @@ def _wire_booking(
             locks=booking.locks,
             slot_refresh=booking.slot_refresh,
             notices=booking.notices,
+            offers=offers,
         ),
         reschedule_appointment=RescheduleAppointmentUseCase(
             clock=a.clock,
@@ -838,6 +848,15 @@ def _wire_booking(
             patients=booking.patients,
             staff=booking.staff,
             waitlist=booking.waitlist,
+        ),
+        offer_cancelled_slot=OfferCancelledSlotUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            staff=booking.staff,
+            waitlist=booking.waitlist,
+            appointments=booking.appointments,
+            free_slots=booking.free_slots,
+            offers=offers,
         ),
         waitlist_queries=booking.waitlist_queries,
     )
