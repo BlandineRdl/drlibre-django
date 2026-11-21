@@ -3,11 +3,11 @@ from datetime import timedelta
 import pytest
 
 from drlibre.search.application.ports.inbound import SearchCriteria
+from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
 from tests.integration.bookable import NOW, SLOT_START, bookable
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
 
-LEAD_TIME = timedelta(minutes=120)
 WINDOW = timedelta(days=31)
 
 
@@ -22,7 +22,7 @@ def test_the_slots_search_shows_are_those_booking_would_accept() -> None:
             start=SLOT_START,
             **world.visitor(),  # type: ignore[arg-type]
         )
-        start = NOW + LEAD_TIME
+        start = NOW + BOOKING_LEAD_TIME
 
         def accepted(clinician: object | None) -> list:
             return [

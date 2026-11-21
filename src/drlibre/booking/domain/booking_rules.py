@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 from enum import StrEnum
 
-LEAD_TIME = timedelta(minutes=120)
+from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
+
 CANCELLATION_WINDOW = timedelta(hours=24)
 MAX_OPEN_ONLINE = 3
 
@@ -24,7 +25,7 @@ def violations(
 ) -> tuple[BookingRule, ...]:
     """Spec 5.3 rules broken, in the spec's order; patient-only rules skipped for staff."""
     broken: list[BookingRule] = []
-    if for_patient and start < now + LEAD_TIME:
+    if for_patient and start < now + BOOKING_LEAD_TIME:
         broken.append(BookingRule.LEAD_TIME_TOO_SHORT)
     if for_patient and open_online_count >= MAX_OPEN_ONLINE:
         broken.append(BookingRule.TOO_MANY_OPEN_BOOKINGS)

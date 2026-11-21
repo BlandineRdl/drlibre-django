@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-LEAD_TIME = timedelta(minutes=120)
+from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
+
 HORIZON = timedelta(days=90)
 
 
@@ -16,7 +17,7 @@ class Horizon:
 
     @classmethod
     def at(cls, now: datetime) -> "Horizon":
-        return cls(now=now, start=now + LEAD_TIME, end=now + HORIZON)
+        return cls(now=now, start=now + BOOKING_LEAD_TIME, end=now + HORIZON)
 
     def local_days(self, time_zone: str) -> tuple[date, date]:
         zone = ZoneInfo(time_zone)
