@@ -167,6 +167,7 @@ def test_the_admin_books_a_type_not_bookable_online_through_the_wizard(
 
     assert "Inès Moreau" in found
     assert str(world.clinician) in typed
+    assert "Premier disponible" not in typed
     assert "Réserver à 10:00" in slots
     assert booked.status_code == 302
     stored = DjangoAppointments().get(Id.parse(booked["Location"].split("/")[3].split("?")[0]))
