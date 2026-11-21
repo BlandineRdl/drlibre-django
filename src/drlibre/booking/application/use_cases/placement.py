@@ -25,7 +25,7 @@ from drlibre.shared_kernel.unit_of_work import UnitOfWork
 
 
 class Placement:
-    """The spec 5.2 steps every patient booking path runs, stopping at the first failure."""
+    """The spec 5.2 steps every booking path runs, stopping at the first failure."""
 
     def __init__(
         self,
@@ -112,9 +112,13 @@ class Placement:
         appointment_type_id: Id,
         start: datetime,
         source: Source,
+        actor_id: Id,
+        for_patient: bool,
         ignoring_hold: Id | None = None,
         reason: str | None = None,
+        announce: bool = True,
     ) -> Appointment:
+        """Book for the patient on the actor's behalf; staff skip the patient-only rules."""
         with self._uow:
             self._locks.lock_clinician(clinician_id)
             self._locks.lock_patient(patient_id)
@@ -126,7 +130,12 @@ class Placement:
                 patient_id, clinician_id, start, start + duration, ignoring_hold=ignoring_hold
             )
             self.refuse_rule_violations(
-                patient_id, clinician_id, kind, start, ignoring_hold=ignoring_hold
+                patient_id,
+                clinician_id,
+                kind,
+                start,
+                ignoring_hold=ignoring_hold,
+                for_patient=for_patient,
             )
             appointment = Appointment.book(
                 patient_id=patient_id,
@@ -139,10 +148,12 @@ class Placement:
                 reason=reason,
             )
             self._appointments.add(appointment)
-            self._notices.booked(appointment)
-            self._audit.record(self._booked_entry(appointment))
+            if announce:
+                self._notices.booked(appointment)
+            self._audit.record(self._booked_entry(appointment, actor_id))
             self._slot_refresh.refresh(clinician_id)
-            self._notices.confirmed(appointment)
+            if announce:
+                self._notices.confirmed(appointment)
             return appointment
 
     def refuse_conflicts(
@@ -190,10 +201,11 @@ class Placement:
         start: datetime,
         *,
         ignoring_hold: Id | None,
+        for_patient: bool = True,
     ) -> None:
         now = self._clock.now()
         broken = booking_rules.violations(
-            for_patient=True,
+            for_patient=for_patient,
             start=start,
             now=now,
             type_online=kind.bookable_online,
@@ -234,7 +246,7 @@ class Placement:
                 return room_id
         raise DomainError(ErrorCode.NO_ROOM_AVAILABLE, "Aucune salle libre à cette heure.")
 
-    def _booked_entry(self, appointment: Appointment) -> AuditEntry:
+    def _booked_entry(self, appointment: Appointment, actor_id: Id) -> AuditEntry:
         metadata: dict[str, object] = {
             "clinician_id": appointment.clinician_id,
             "appointment_type_id": appointment.appointment_type_id,
@@ -246,7 +258,7 @@ class Placement:
         if domain is not None:
             metadata["email_domain"] = domain
         return AuditEntry.from_event(
-            actor=appointment.patient_id,
+            actor=actor_id,
             action="booking.appointment_booked",
             entity_type="appointment",
             entity_id=appointment.id,

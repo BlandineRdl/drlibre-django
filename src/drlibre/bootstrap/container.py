@@ -7,6 +7,7 @@ from drlibre.audit.infrastructure.audit_log import DjangoAuditLog
 from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
+    AcceptWaitlistOffer,
     BookAppointment,
     CancelAppointment,
     CreateHold,
@@ -42,6 +43,9 @@ from drlibre.booking.application.ports.outbound import (
     Waitlist,
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
+from drlibre.booking.application.use_cases.accept_waitlist_offer import (
+    AcceptWaitlistOfferUseCase,
+)
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
@@ -430,6 +434,7 @@ class Container:
     send_reminders: SendReminders
     join_waitlist: JoinWaitlist
     offer_cancelled_slot: OfferCancelledSlot
+    accept_waitlist_offer: AcceptWaitlistOffer
     waitlist_queries: WaitlistQueries
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
@@ -679,6 +684,7 @@ def wire(a: Adapters) -> Container:
         send_reminders=booking.send_reminders,
         join_waitlist=booking.join_waitlist,
         offer_cancelled_slot=booking.offer_cancelled_slot,
+        accept_waitlist_offer=booking.accept_waitlist_offer,
         waitlist_queries=booking.waitlist_queries,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
@@ -735,6 +741,7 @@ class _BookingUseCases:
     send_reminders: SendReminders
     join_waitlist: JoinWaitlist
     offer_cancelled_slot: OfferCancelledSlot
+    accept_waitlist_offer: AcceptWaitlistOffer
     waitlist_queries: WaitlistQueries
 
 
@@ -857,6 +864,18 @@ def _wire_booking(
             appointments=booking.appointments,
             free_slots=booking.free_slots,
             offers=offers,
+        ),
+        accept_waitlist_offer=AcceptWaitlistOfferUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            placement=placement,
+            appointments=booking.appointments,
+            locks=booking.locks,
+            patients=booking.patients,
+            staff=booking.staff,
+            waitlist=booking.waitlist,
+            notices=booking.notices,
         ),
         waitlist_queries=booking.waitlist_queries,
     )

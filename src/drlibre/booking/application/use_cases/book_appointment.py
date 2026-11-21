@@ -41,6 +41,8 @@ class BookAppointmentUseCase(BookAppointment):
                     appointment_type_id=appointment_type_id,
                     start=start,
                     source=Source.ONLINE,
+                    actor_id=patient_id,
+                    for_patient=True,
                 )
             kind = self._placement.bookable_type(appointment_type_id)
 
@@ -51,6 +53,8 @@ class BookAppointmentUseCase(BookAppointment):
                     appointment_type_id=appointment_type_id,
                     start=start,
                     source=Source.ROUND_ROBIN,
+                    actor_id=patient_id,
+                    for_patient=True,
                 )
                 self._ledger.record(chosen, self._clock.now())
                 return appointment

@@ -78,6 +78,7 @@ def cancelled_appointment(
 
 def attempt(world: FakeWorld, scene: Scene, call: Callable[[], object]) -> None:
     scene.waitlist_before = dict(world.waitlist.rows)
+    scene.rows_before = len(world.booking_appointments.rows)
     try:
         result = call()
         if isinstance(result, Appointment):
@@ -154,22 +155,17 @@ def holds_offer(world: FakeWorld, scene: Scene, email: str, start: str) -> None:
 
 
 @given(
-    parsers.parse(
-        '"{email}" is offered the cancelled appointment with "{name}" at "{start}",'
-        ' waiting until "{end}"'
+    parsers.re(
+        r'"(?P<email>[^"]+)" is offered the cancelled appointment with "(?P<name>[^"]+)"'
+        r' at "(?P<start>[^"]+)"(, waiting until "(?P<end>[^"]+)")?$'
     )
 )
-def offered_until(
-    world: FakeWorld, scene: Scene, email: str, name: str, start: str, end: str
+def offered(
+    world: FakeWorld, scene: Scene, email: str, name: str, start: str, end: str | None
 ) -> None:
     freed = cancelled_appointment(world, scene, name, start)
-    entry = wait(world, scene, email, "2026-11-19 00:00", end, "2026-11-01 08:00")
+    entry = wait(world, scene, email, "2026-11-19 00:00", end or "2026-11-30 00:00", "2026-11-01")
     set_entry(world, entry.offered(freed.id))
-
-
-@given(parsers.parse('"{email}" is offered the cancelled appointment with "{name}" at "{start}"'))
-def offered(world: FakeWorld, scene: Scene, email: str, name: str, start: str) -> None:
-    offered_until(world, scene, email, name, start, "2026-11-30 00:00")
 
 
 @when(parsers.parse('the admin offers a slot to the entry of "{email}"'))
@@ -181,6 +177,30 @@ def admin_offers(world: FakeWorld, scene: Scene, email: str) -> None:
         scene,
         lambda: world.app.offer_cancelled_slot.execute(actor_id=actor(scene), entry_id=entry.id),
     )
+
+
+def accept(world: FakeWorld, scene: Scene, by: Id, entry_id: Id) -> None:
+    attempt(
+        world,
+        scene,
+        lambda: world.app.accept_waitlist_offer.execute(actor_id=by, entry_id=entry_id),
+    )
+
+
+@when(parsers.parse('the patient accepts the offer of "{email}"'))
+def patient_accepts(world: FakeWorld, scene: Scene, email: str) -> None:
+    accept(world, scene, scene.patient, entry_of(world, scene, email).id)
+
+
+@when(parsers.parse('the admin accepts the offer of "{email}"'))
+@when(parsers.parse('the clinician accepts the offer of "{email}"'))
+def staff_accepts(world: FakeWorld, scene: Scene, email: str) -> None:
+    accept(world, scene, actor(scene), entry_of(world, scene, email).id)
+
+
+@when("the patient accepts an unknown entry")
+def accepts_unknown(world: FakeWorld, scene: Scene) -> None:
+    accept(world, scene, scene.patient, Id())
 
 
 @when(parsers.parse('another patient books "{name}" at "{start}"'))
@@ -231,6 +251,30 @@ def lowest_id_offered(world: FakeWorld, scene: Scene) -> None:
     first, second = sorted(world.waitlist.rows.values(), key=lambda e: e.id.value)
     assert first.offered_appointment_id == mine(scene).id
     assert second.status is WaitlistStatus.WAITING
+
+
+@then(
+    parsers.parse('the appointment of "{email}" is with "{name}" at "{start}" for the offered type')
+)
+def placed_as_offered(world: FakeWorld, scene: Scene, email: str, name: str, start: str) -> None:
+    appointment = booked(scene)
+    freed = scene.freed[start]
+    assert appointment.patient_id == person(scene, email)
+    assert (appointment.clinician_id, appointment.start) == (scene.clinicians[name], at(start))
+    assert appointment.appointment_type_id == freed.appointment_type_id
+    assert world.booking_appointments.get(appointment.id) == appointment
+
+
+@then(
+    parsers.re(
+        r'the entry of "(?P<email>[^"]+)" is now "(?P<status>[A-Z]+)"(?P<cleared> with no offer)?$'
+    )
+)
+def entry_now(world: FakeWorld, scene: Scene, email: str, status: str, cleared: str | None) -> None:
+    entry = entry_of(world, scene, email)
+    assert entry.status is WaitlistStatus(status)
+    if cleared:
+        assert entry.offered_appointment_id is None
 
 
 @then(parsers.parse('the entry of "{email}" is unchanged'))
@@ -302,6 +346,20 @@ def audited_ids_only(world: FakeWorld, by: Id | None, action: str) -> None:
             uuid.UUID(str(value))
         else:
             assert value in {*WaitlistStatus, "ONLINE", "STAFF"}, (key, value)
+
+
+@then(
+    parsers.parse(
+        'the audit holds "{action}" by the signed-in patient, with ids and the source only'
+    )
+)
+def audited_patient_source(world: FakeWorld, scene: Scene, action: str) -> None:
+    audited_ids_only(world, scene.patient, action)
+
+
+@then(parsers.parse('the audit holds "{action}" by the admin, with ids and the source only'))
+def audited_admin_source(world: FakeWorld, scene: Scene, action: str) -> None:
+    audited_ids_only(world, actor(scene), action)
 
 
 @then(parsers.parse('the audit holds "{action}" by nobody with ids only'))
