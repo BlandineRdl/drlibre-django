@@ -4,6 +4,7 @@ from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.bootstrap.container import Adapters, BookingAdapters, Container, wire
 from drlibre.identity.infrastructure.outbox_link_notices import OutboxLinkNotices
+from drlibre.notifications.application.use_cases.notify import NotifyUseCase
 from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
@@ -25,6 +26,7 @@ from tests.fakes.database_probe import InMemoryDatabaseProbe
 from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
+from tests.fakes.notifications import InMemoryNotifications
 from tests.fakes.organisation import (
     InMemoryAppointmentTypes,
     InMemoryClinicianProfiles,
@@ -106,8 +108,11 @@ class FakeWorld:
         self.booking_slot_refresh = RecordingSlotRefresh()
         self.schedule_locks = RecordingScheduleLocks()
         self.patients = InMemoryPatients(self.users)
+        self.notifications = InMemoryNotifications()
+        self.notify = NotifyUseCase(clock=self.clock, notifications=self.notifications)
         self.notices = OutboxBookingNotices(
             outbox=self.outbox,
+            notify=self.notify,
             directory=self.booking_directory,
             patients=self.patients,
             public_base_url="http://localhost:8000",
@@ -134,6 +139,7 @@ class FakeWorld:
             self.codes,
             self.outbox,
             self.ledger,
+            self.notifications,
         )
         self.app: Container = wire(self.adapters())
 
@@ -200,4 +206,6 @@ class FakeWorld:
             ),
             # Search is a read side tested on PostgreSQL: the real adapter, never reached by fakes.
             search_queries=SqlSearchQueries(),
+            notifications=self.notifications,
+            notify=self.notify,
         )

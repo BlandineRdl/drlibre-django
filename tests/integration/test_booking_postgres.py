@@ -10,6 +10,7 @@ from drlibre.booking.infrastructure.django.models import (
 )
 from drlibre.bootstrap.container import wire
 from drlibre.identity.infrastructure.django.models import UserRecord
+from drlibre.notifications.infrastructure.django.models import NotificationRecord
 from drlibre.scheduling.infrastructure.django.models import SlotModel
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -54,6 +55,10 @@ def test_a_correct_code_books_the_slot_and_takes_it_off_the_free_slots() -> None
         ).exists()
         assert SLOT_START not in free_starts(world.app(), world.scene, world.clinician)
         assert [m.subject for m in world.outbox.queued].count(CONFIRMATION) == 1
+        notified = NotificationRecord.objects.filter(appointment_id=appointment_id.value)
+        assert list(notified.values_list("title", "recipient_id")) == [
+            ("RDV réservé", booked.patient_id)
+        ]
 
 
 def test_the_new_patient_keeps_the_details_of_the_hold_and_the_proof_of_the_email() -> None:
@@ -107,6 +112,7 @@ def test_an_audit_failure_leaves_neither_appointment_nor_slot_change() -> None:
             )
 
         assert not AppointmentRecord.objects.exists()
+        assert not NotificationRecord.objects.exists()
         stored = SlotModel.objects.filter(clinician_id=world.clinician.value, start=SLOT_START)
         assert stored.exists()
 

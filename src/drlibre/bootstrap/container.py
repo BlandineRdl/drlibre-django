@@ -118,8 +118,23 @@ from drlibre.identity.infrastructure.repositories import (
 from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
-from drlibre.notifications.application.ports.outbound import Mailer
+from drlibre.notifications.application.ports.inbound import (
+    CountUnread,
+    ListNotifications,
+    MarkNotificationRead,
+    Notify,
+)
+from drlibre.notifications.application.ports.outbound import Mailer, Notifications
+from drlibre.notifications.application.use_cases.count_unread import CountUnreadUseCase
+from drlibre.notifications.application.use_cases.list_notifications import (
+    ListNotificationsUseCase,
+)
+from drlibre.notifications.application.use_cases.mark_notification_read import (
+    MarkNotificationReadUseCase,
+)
+from drlibre.notifications.application.use_cases.notify import NotifyUseCase
 from drlibre.notifications.infrastructure.celery_outbox import CeleryEmailOutbox
+from drlibre.notifications.infrastructure.repositories import DjangoNotifications
 from drlibre.notifications.infrastructure.smtp_mailer import SmtpMailer
 from drlibre.organisation.application.ports.inbound import (
     AttachClinicianProfile,
@@ -317,6 +332,9 @@ class Adapters:
     links: SignInLinks
     link_notices: LinkNotices
     search_queries: SearchQueries
+    notifications: Notifications
+    # Booking's notices write through it, so it is built with them.
+    notify: Notify
     # None wires organisation to scheduling's own RefreshSlots.
     slot_refresh: SlotRefresh | None = None
 
@@ -377,6 +395,9 @@ class Container:
     view_provider_page: ViewProviderPage
     view_hospital_page: ViewHospitalPage
     view_specialty_page: ViewSpecialtyPage
+    list_notifications: ListNotifications
+    mark_notification_read: MarkNotificationRead
+    count_unread: CountUnread
 
 
 def wire(a: Adapters) -> Container:
@@ -619,6 +640,11 @@ def wire(a: Adapters) -> Container:
         view_provider_page=ViewProviderPageUseCase(clock=clock, queries=a.search_queries),
         view_hospital_page=ViewHospitalPageUseCase(clock=clock, queries=a.search_queries),
         view_specialty_page=ViewSpecialtyPageUseCase(clock=clock, queries=a.search_queries),
+        list_notifications=ListNotificationsUseCase(notifications=a.notifications),
+        mark_notification_read=MarkNotificationReadUseCase(
+            clock=clock, uow=uow, audit=audit, notifications=a.notifications
+        ),
+        count_unread=CountUnreadUseCase(notifications=a.notifications),
     )
 
 
@@ -737,6 +763,9 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         clock=clock, directory=scheduling_directory, queries=slot_queries, holds=slot_holds
     )
     patients = IdentityPatients(user_queries)
+    # Notifications depend on nothing; booking's notices write through them.
+    notifications = DjangoNotifications()
+    notify = NotifyUseCase(clock=clock, notifications=notifications)
     booking_directory = OrganisationBookingDirectory(queries=reference_queries, staff=user_queries)
     return Adapters(
         clock=clock,
@@ -783,6 +812,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             patients=patients,
             notices=OutboxBookingNotices(
                 outbox=CeleryEmailOutbox(),
+                notify=notify,
                 directory=booking_directory,
                 patients=patients,
                 public_base_url=settings.PUBLIC_BASE_URL,
@@ -802,6 +832,8 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             outbox=CeleryEmailOutbox(), public_base_url=settings.PUBLIC_BASE_URL
         ),
         search_queries=SqlSearchQueries(),
+        notifications=notifications,
+        notify=notify,
     )
 
 

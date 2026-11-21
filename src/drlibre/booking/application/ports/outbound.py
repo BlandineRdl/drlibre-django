@@ -179,6 +179,22 @@ class BookingNotices(Protocol):
         """Queue the confirmation for the patient, sent once the unit of work commits."""
         ...
 
+    def booked(self, appointment: Appointment) -> None:
+        """Write the patient's « RDV réservé » notification in the unit of work; no email."""
+        ...
+
+    def rescheduled(self, appointment: Appointment) -> None:
+        """Write the patient's « RDV déplacé » notification and queue its email."""
+        ...
+
+    def cancelled(self, appointment: Appointment) -> None:
+        """Write the patient's « RDV annulé » notification and queue its email."""
+        ...
+
+    def reminded(self, appointment: Appointment) -> bool:
+        """Write the reminder and queue its email; False, doing nothing, when already reminded."""
+        ...
+
 
 class RoundRobinLedger(Protocol):
     def record(self, clinician_id: Id, at: datetime) -> None:

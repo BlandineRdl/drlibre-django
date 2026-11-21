@@ -66,6 +66,7 @@ def recorded(at: datetime, outbox: RecordingEmailOutbox, limiter: RedisRateLimit
     booking = adapters.booking
     notices = OutboxBookingNotices(
         outbox=outbox,
+        notify=adapters.notify,
         directory=booking.directory,
         patients=booking.patients,
         public_base_url="http://localhost:8000",

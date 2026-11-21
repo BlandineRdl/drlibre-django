@@ -139,6 +139,7 @@ class Placement:
                 reason=reason,
             )
             self._appointments.add(appointment)
+            self._notices.booked(appointment)
             self._audit.record(self._booked_entry(appointment))
             self._slot_refresh.refresh(clinician_id)
             self._notices.confirmed(appointment)
