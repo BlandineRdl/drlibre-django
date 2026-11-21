@@ -101,3 +101,16 @@ Feature: Un visiteur réserve un créneau en validant un code reçu par email
     Then the booking failed as "conflict" while the patient session stays open
     And the audit entry "booking.hold_released" has no actor and only the email domain
     And the audit entry "booking.hold_released" names the reason "refused"
+
+  Scenario: La page de confirmation montre le RDV, propose son fichier `.ics` et un lien vers les RDV du patient.
+    Given the public pages know the type and "A"
+    When the visitor sends their details for "A" at "2026-11-23T09:00:00Z" on the booking page
+    And the visitor enters the code "123456" on the code page
+    Then the confirmation page shows the appointment, its calendar file and the patient's appointments
+    And the appointment is "BOOKED" for "ONLINE"
+
+  Scenario: `POST /booking/holds` et `POST /booking/holds/{id}/verify` offrent le même parcours sans session.
+    When the visitor holds "A" at "2026-11-23T09:00:00Z" through the API
+    Then the API answers 201 with the hold and opens no session
+    When the visitor posts the code "123456" through the API
+    Then the API answers 200 with the appointment "BOOKED" and opens the session

@@ -118,3 +118,19 @@ Feature: Une réservation qui enfreint une règle est refusée avec son motif
     Given the appointment type needs no room
     When the patient books "A" at "2026-11-23 09:00"
     Then the appointment is "BOOKED" in no room
+
+  Scenario: Un créneau pris entre-temps échoue avec un message et la liste des créneaux à jour.
+    Given the public pages know the type and "A"
+    And "A" has a stored free slot at "2026-11-23 09:30"
+    And "A" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    When the patient confirms "A" at "2026-11-23T09:00:00Z" on the booking page
+    Then the page refuses with 409, a message and the free slot "2026-11-23T09:30:00Z"
+
+  Scenario: Avec un code correct mais un placement en échec, le compte est créé et la session ouverte, puis l'échec s'affiche avec les créneaux à jour.
+    Given the public pages know the type and "A"
+    And "A" has a stored free slot at "2026-11-23 09:30"
+    And the visitor sent their details for "A" at "2026-11-23T09:00:00Z" on the booking page
+    And "A" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    When the visitor enters the code "123456" on the code page
+    Then the page refuses with 409, a message and the free slot "2026-11-23T09:30:00Z"
+    And the patient account is created and its session cookie is set

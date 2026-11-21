@@ -98,7 +98,7 @@ Feature: Le visiteur filtre et trie les résultats
     Then the page says "Distance la plus courte"
     And the page says "à 0 km"
 
-  Scenario: Filtres et tri vivent dans l'adresse de la page, et les trois GET /search/providers, /search/hospitals, /search/specialties les acceptent.
+  Scenario: Filtres et tri vivent dans l'adresse de la page, et les trois `GET /search/providers`, `/search/hospitals`, `/search/specialties` les acceptent.
     When the visitor opens "/?q=dr&window=7d&moment=afternoon&sort=name-desc&size=10"
     Then the page links to "/?list=hospitals&q=dr&window=7d&moment=afternoon&sort=name-desc&size=10"
     When the visitor opens "/api/v1/search/providers?window=7d&moment=afternoon&sort=name-desc"

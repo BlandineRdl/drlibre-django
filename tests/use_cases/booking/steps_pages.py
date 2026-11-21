@@ -1,16 +1,23 @@
 """Steps of the pages and API through the fake wiring."""
 
+import dataclasses
+from typing import Any
+
 from django.test import Client
 from pytest_bdd import given, parsers, then, when
 
 from drlibre.identity.domain.user import Role
+from drlibre.scheduling.application.ports.outbound import AppointmentType
 from drlibre.shared_kernel.ids import Id
+from tests import builders_organisation as build
 from tests.builders_booking import (
     patient_user,
 )
+from tests.builders_web import fake_clinician
 from tests.fakes.booking import InMemoryAppointments
 from tests.fakes.world import FakeWorld
 from tests.use_cases.booking.support import (
+    COOKIE,
     TYPE_NAME,
     Scene,
     clinician_named,
@@ -18,6 +25,7 @@ from tests.use_cases.booking.support import (
     mine,
     open_session,
     page_text,
+    typed_patient,
 )
 
 
@@ -106,3 +114,118 @@ def api_refused_rules(scene: Scene, names: str) -> None:
 @then(parsers.parse('the API refusal names the field "{field}"'))
 def api_refused_field(scene: Scene, field: str) -> None:
     assert field in [item["field"] for item in scene.page.json()["details"]["fields"]]
+
+
+@given(parsers.parse('the public pages know the type and "{name}"'))
+def public_pages_know(world: FakeWorld, scene: Scene, name: str) -> None:
+    fake_clinician(
+        world,
+        user_id=Id(),
+        profile_id=scene.clinicians[name],
+        department_id=scene.department,
+        time_zone="Europe/Paris",
+        name=f"Dr {name}",
+    )
+    kind = build.appointment_type(scene.department)
+    world.appointment_types.save(dataclasses.replace(kind, id=scene.type))
+    world.scheduling_directory.types[scene.type] = AppointmentType(
+        scene.type, scene.department, 30, 0, active=True, time_zone="Europe/Paris"
+    )
+
+
+@when(parsers.parse('the patient confirms "{name}" at "{start}" on the booking page'))
+def confirms_on_page(world: FakeWorld, scene: Scene, web: Client, name: str, start: str) -> None:
+    open_session(world, web, scene.patient)
+    slot = {"type": str(scene.type), "clinician": str(scene.clinicians[name]), "start": start}
+    choice = web.get("/booking/new", slot)
+    assert choice.status_code == 200, choice.content
+    follow_to_confirmation(world, scene, web, web.post("/booking/new", slot))
+
+
+def follow_to_confirmation(world: FakeWorld, scene: Scene, web: Client, done: Any) -> None:
+    scene.page = done
+    if done.status_code == 302:
+        scene.appointment = world.booking_appointments.get(
+            Id.parse(done["Location"].split("/")[-1])
+        )
+        scene.page = web.get(done["Location"])
+
+
+@given(
+    parsers.parse('the visitor sent their details for "{name}" at "{start}" on the booking page')
+)
+@when(
+    parsers.parse('the visitor sends their details for "{name}" at "{start}" on the booking page')
+)
+def visitor_sends_details(
+    world: FakeWorld, scene: Scene, web: Client, name: str, start: str
+) -> None:
+    slot = {"type": str(scene.type), "clinician": str(scene.clinicians[name]), "start": start}
+    details = {**scene.form, "accepted_terms": "on"}
+    sent = web.post("/booking/new", {**slot, **details})
+    assert sent.status_code == 302, sent.content
+    scene.view = sent["Location"]
+
+
+@when(parsers.parse('the visitor enters the code "{code}" on the code page'))
+def visitor_enters_code_on_page(world: FakeWorld, scene: Scene, web: Client, code: str) -> None:
+    scene.rows_before = len(world.booking_appointments.rows)
+    follow_to_confirmation(world, scene, web, web.post(scene.view, {"code": code}))
+
+
+@then(parsers.parse('the page refuses with {status:d}, a message and the free slot "{start}"'))
+def page_refused_with_slots(scene: Scene, status: int, start: str) -> None:
+    assert scene.page.status_code == status, scene.page.content
+    body = page_text(scene)
+    assert 'role="alert"' in body
+    assert f"start={start}" in body
+
+
+@then("the patient account is created and its session cookie is set")
+def account_and_cookie(world: FakeWorld, scene: Scene) -> None:
+    assert typed_patient(world, scene).role is Role.PATIENT
+    assert scene.page.cookies[COOKIE].value
+    assert len(world.booking_appointments.rows) == scene.rows_before
+
+
+@when(parsers.parse('the visitor holds "{name}" at "{start}" through the API'))
+def visitor_holds_through_api(
+    world: FakeWorld, scene: Scene, web: Client, name: str, start: str
+) -> None:
+    form = scene.form
+    body = {"type": str(scene.type), "clinician": str(scene.clinicians[name]), "start": start}
+    scene.page = web.post(
+        "/api/v1/booking/holds", {**body, **form}, content_type="application/json"
+    )
+
+
+@then("the API answers 201 with the hold and opens no session")
+def api_hold(scene: Scene) -> None:
+    assert scene.page.status_code == 201, scene.page.content
+    assert set(scene.page.json()) == {"hold_id", "provider_id", "expires_at"}
+    assert COOKIE not in scene.page.cookies
+    scene.view = f"/api/v1/booking/holds/{scene.page.json()['hold_id']}/verify"
+
+
+@when(parsers.parse('the visitor posts the code "{code}" through the API'))
+def visitor_verifies_through_api(world: FakeWorld, scene: Scene, web: Client, code: str) -> None:
+    scene.page = web.post(scene.view, {"code": code}, content_type="application/json")
+
+
+@then(parsers.parse('the API answers 200 with the appointment "{status}" and opens the session'))
+def api_verified(scene: Scene, status: str) -> None:
+    assert scene.page.status_code == 200, scene.page.content
+    assert scene.page.json()["appointment"]["status"] == status
+    assert scene.page.cookies[COOKIE].value
+
+
+@then(
+    "the confirmation page shows the appointment, its calendar file and the patient's appointments"
+)
+def confirmation_page_shown(scene: Scene) -> None:
+    assert scene.page.status_code == 200, scene.page.content
+    body = page_text(scene)
+    assert scene.appointment is not None
+    assert "Rendez-vous réservé" in body
+    assert f'href="/booking/appointments/{scene.appointment.id}.ics"' in body
+    assert 'href="/portal/"' in body

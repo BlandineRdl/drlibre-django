@@ -32,43 +32,43 @@ Feature: Le patient se connecte par un lien reçu par email
       | un email de praticien          | an active CLINICIAN account "autre@example.org" |
       | un email d'utilisateur inactif | an inactive PATIENT account "autre@example.org" |
 
-  Scenario: Le lien vaut 15 minutes (encore valable à 14 minutes)
+  Scenario: Le lien vaut 15 minutes et sert une fois ; en demander un nouveau annule les précédents ; au plus 3 liens par heure et par email, et 20 demandes par heure et par adresse réseau (encore valable à 14 minutes)
     Given "lea@example.org" asked for a link
     When 14 minutes pass
     And the patient opens the link and presses "Continuer"
     Then the patient lands on "/portal/"
 
-  Scenario: Le lien vaut 15 minutes (refusé à 15 minutes)
+  Scenario: Le lien vaut 15 minutes et sert une fois ; en demander un nouveau annule les précédents ; au plus 3 liens par heure et par email, et 20 demandes par heure et par adresse réseau (refusé à 15 minutes)
     Given "lea@example.org" asked for a link
     When 15 minutes pass
     And the patient opens the link and presses "Continuer"
     Then no session was opened
 
-  Scenario: Le lien sert une fois
+  Scenario: Le lien vaut 15 minutes et sert une fois ; en demander un nouveau annule les précédents ; au plus 3 liens par heure et par email, et 20 demandes par heure et par adresse réseau (une fois)
     Given "lea@example.org" asked for a link
     And the patient opens the link and presses "Continuer"
     When the patient opens the link and presses "Continuer"
     Then only one session exists
 
-  Scenario: En demander un nouveau annule les précédents
+  Scenario: Le lien vaut 15 minutes et sert une fois ; en demander un nouveau annule les précédents ; au plus 3 liens par heure et par email, et 20 demandes par heure et par adresse réseau (nouveau lien)
     Given "lea@example.org" asked for a link
     And "lea@example.org" asked for a link
     When the patient opens the first link and presses "Continuer"
     Then no session was opened
 
-  Scenario: Au plus 3 liens par heure et par email
+  Scenario: Le lien vaut 15 minutes et sert une fois ; en demander un nouveau annule les précédents ; au plus 3 liens par heure et par email, et 20 demandes par heure et par adresse réseau (3 liens par email)
     Given "lea@example.org" asked for a link 3 times
     When "lea@example.org" asks for a link on the sign-in page
     Then 3 link emails were sent in all
     And the page says a link was sent if the address has a patient account
 
-  Scenario: Au plus 3 liens par heure et par email (de nouveau permis après une heure)
+  Scenario: Le lien vaut 15 minutes et sert une fois ; en demander un nouveau annule les précédents ; au plus 3 liens par heure et par email, et 20 demandes par heure et par adresse réseau (de nouveau permis après une heure)
     Given "lea@example.org" asked for a link 3 times
     And 61 minutes pass
     When "lea@example.org" asks for a link on the sign-in page
     Then 4 link emails were sent in all
 
-  Scenario: 20 demandes par heure et par adresse réseau
+  Scenario: Le lien vaut 15 minutes et sert une fois ; en demander un nouveau annule les précédents ; au plus 3 liens par heure et par email, et 20 demandes par heure et par adresse réseau (20 demandes par adresse réseau)
     Given 20 requests for distinct patients from the network "10.0.0.7"
     When "lea@example.org" asks for a link from the network "10.0.0.7"
     Then 20 link emails were sent in all
@@ -132,17 +132,17 @@ Feature: Le patient se connecte par un lien reçu par email
     When the patient opens the link and presses "Continuer"
     Then the audit holds one "identity.link_refused" entry with only the email domain
 
-  Scenario: `POST /auth/link` répond toujours de la même façon (adresse connue ou non)
+  Scenario: `POST /auth/link` répond toujours de la même façon ; `POST /auth/link/verify` échange le jeton contre la session (adresse connue ou non)
     When the API is asked for a link for "lea@example.org" and for "inconnu@example.org"
     Then both API answers are identical with status 202
 
-  Scenario: `POST /auth/link` répond toujours de la même façon (limite dépassée)
+  Scenario: `POST /auth/link` répond toujours de la même façon ; `POST /auth/link/verify` échange le jeton contre la session (limite dépassée)
     Given "lea@example.org" asked for a link 3 times
     When the API is asked for a link for "lea@example.org" and for "inconnu@example.org"
     Then both API answers are identical with status 202
     And 3 link emails were sent in all
 
-  Scenario: `POST /auth/link/verify` échange le jeton contre la session
+  Scenario: `POST /auth/link` répond toujours de la même façon ; `POST /auth/link/verify` échange le jeton contre la session (jeton échangé)
     Given "lea@example.org" asked for a link
     When the API verifies the link token
     Then the API answer is 200 with a 24 hour session cookie

@@ -29,14 +29,24 @@ Feature: Un patient connecté réserve sans ressaisir ses informations
     Then the booking is refused as "forbidden"
     And nothing was written
 
-  Scenario: Sans praticien nommé, il réserve le premier disponible
+  Scenario: `POST /appointments` réserve pour le patient connecté ; sans praticien nommé, il réserve le premier disponible (praticien nommé)
+    When the patient posts the booking at "2026-11-23T09:00:00Z" with "A"
+    Then the API answers 201 with an appointment with "A"
+    And the appointment is "BOOKED" for "ONLINE"
+
+  Scenario: `POST /appointments` réserve pour le patient connecté ; sans praticien nommé, il réserve le premier disponible (premier disponible)
     Given "A" was assigned at "2026-11-19 10:00"
-    When the patient books without naming a clinician at "2026-11-23 09:00"
+    When the patient posts the booking at "2026-11-23T09:00:00Z" without a clinician
     Then the appointment is "BOOKED" for "ROUND_ROBIN"
     And the appointment is with "B"
     And the last assignment of "B" is "2026-11-20 10:00"
 
-  Scenario: Le même email de confirmation suit la réservation
+  Scenario: La même page de confirmation et le même email de confirmation suivent la réservation (page de confirmation)
+    Given the public pages know the type and "A"
+    When the patient confirms "A" at "2026-11-23T09:00:00Z" on the booking page
+    Then the confirmation page shows the appointment, its calendar file and the patient's appointments
+
+  Scenario: La même page de confirmation et le même email de confirmation suivent la réservation (email de confirmation)
     When the patient books "A" at "2026-11-23 09:00"
     Then a confirmation was queued
 

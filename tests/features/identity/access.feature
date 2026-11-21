@@ -28,19 +28,19 @@ Feature: Chaque rôle n'accède qu'à son espace
       | liste des hôpitaux | /console/hospitals/ |
       | portail patient    | /portal/            |
 
-  Scenario: Un enregistrement absent donne not_found
+  Scenario: Un enregistrement absent donne `not_found` ; un enregistrement existant mais appartenant à un autre donne `forbidden` (absent)
     When "clinician@example.org" opens an absent record
     Then access is refused as "not_found"
 
-  Scenario: Un enregistrement existant mais appartenant à un autre donne forbidden
+  Scenario: Un enregistrement absent donne `not_found` ; un enregistrement existant mais appartenant à un autre donne `forbidden` (à un autre)
     When "clinician@example.org" opens a record owned by "other@example.org"
     Then access is refused as "forbidden"
 
-  Scenario: Un enregistrement existant mais appartenant à un autre donne forbidden (son propriétaire y accède)
+  Scenario: Un enregistrement absent donne `not_found` ; un enregistrement existant mais appartenant à un autre donne `forbidden` (son propriétaire y accède)
     When "clinician@example.org" opens a record owned by "clinician@example.org"
     Then the record is returned
 
-  Scenario: Un enregistrement existant mais appartenant à un autre donne forbidden (sauf pour l'admin, global)
+  Scenario: Un enregistrement absent donne `not_found` ; un enregistrement existant mais appartenant à un autre donne `forbidden` (sauf pour l'admin, global)
     When "admin@example.org" opens a record owned by "other@example.org"
     Then the record is returned
 

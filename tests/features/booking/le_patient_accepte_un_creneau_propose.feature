@@ -109,3 +109,33 @@ Feature: Le patient accepte un créneau proposé
     When the patient accepts an unknown entry
     Then the booking is refused as "not_found"
     And nothing was written
+
+  Scenario: `POST /waitlist/{id}/accept` applique les mêmes règles, sur les seules entrées du patient ; un praticien reçoit `forbidden`. (ses entrées)
+    Given "patient@example.org" is offered the cancelled appointment with "A" at "2026-11-23 09:00"
+    And "A" is free at "2026-11-23 09:00"
+    When the patient posts the acceptance of the offer of "patient@example.org"
+    Then the appointment is "BOOKED" for "ONLINE"
+    And the entry of "patient@example.org" is now "BOOKED"
+
+  Scenario: `POST /waitlist/{id}/accept` applique les mêmes règles, sur les seules entrées du patient ; un praticien reçoit `forbidden`. (entrée non proposée)
+    Given "patient@example.org" waits from "2026-11-22 00:00" to "2026-11-24 00:00" since "2026-11-01 08:00"
+    When the patient posts the acceptance of the offer of "patient@example.org"
+    Then the API refuses with 409 "invalid_transition"
+    And nothing was written
+
+  Scenario: `POST /waitlist/{id}/accept` applique les mêmes règles, sur les seules entrées du patient ; un praticien reçoit `forbidden`. (entrée d'un autre)
+    Given an active patient "lea@example.org"
+    And "lea@example.org" is offered the cancelled appointment with "A" at "2026-11-23 09:00"
+    And "A" is free at "2026-11-23 09:00"
+    When the patient posts the acceptance of the offer of "lea@example.org"
+    Then the API refuses with 403 "forbidden"
+    And the entry of "lea@example.org" is unchanged
+
+  Scenario: `POST /waitlist/{id}/accept` applique les mêmes règles, sur les seules entrées du patient ; un praticien reçoit `forbidden`. (praticien)
+    Given an active patient "lea@example.org"
+    And "lea@example.org" is offered the cancelled appointment with "A" at "2026-11-23 09:00"
+    And "A" is free at "2026-11-23 09:00"
+    And a signed-in clinician
+    When the clinician posts the acceptance of the offer of "lea@example.org"
+    Then the API refuses with 403 "forbidden"
+    And the entry of "lea@example.org" is unchanged
