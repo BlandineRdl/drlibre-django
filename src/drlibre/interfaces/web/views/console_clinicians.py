@@ -106,6 +106,11 @@ def list_clinicians(request: HttpRequest) -> HttpResponse:
     named = container().staff_lookup.named_like(search) if search else frozenset()
     page = q.clinician_profiles(page_request, named=named)
     rules = container().availability_queries.weekly_summary(frozenset(p.id for p in page.items))
+
+    def named(p: ClinicianProfile) -> str:
+        # The title is an honorific shared by many; the name tells the rows apart.
+        return names.get(p.user_id, p.title)
+
     columns = (
         Column("Praticien", lambda p: names.get(p.user_id, "Compte inactif")),
         Column("Titre", lambda p: p.title),
@@ -120,9 +125,9 @@ def list_clinicians(request: HttpRequest) -> HttpResponse:
         columns=columns,
         page=page,
         request=page_request,
-        label=lambda p: p.title,
+        label=named,
         done=request.GET.get("done"),
-        links=lambda p: (LinkView(f"{BASE}{p.id}/week", "Semaine", f"Calendrier de {p.title}"),),
+        links=lambda p: (LinkView(f"{BASE}{p.id}/week", "Semaine", f"Calendrier de {named(p)}"),),
     )
     context = {
         "view": view,
@@ -185,7 +190,12 @@ def delete_profile(request: HttpRequest, record_id: uuid.UUID) -> HttpResponse:
             error = refused
         else:
             return redirect(f"{BASE}?done=deleted")
-    confirm = confirm_view(label=profile.title, action=request.path, cancel_url=BASE, error=error)
+    confirm = confirm_view(
+        label=_names().get(profile.user_id, profile.title),
+        action=request.path,
+        cancel_url=BASE,
+        error=error,
+    )
     context = {"confirm": confirm, "section_nav": console_nav(request.path)}
     status = error.code.http_status if error else 200
     return render(request, "console/confirm_delete.html", context, status=status)
