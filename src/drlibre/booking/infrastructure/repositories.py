@@ -179,17 +179,24 @@ class DjangoVerificationCodes(VerificationCodes):
         )
 
     def for_hold(self, hold_id: Id) -> VerificationCode | None:
-        row = VerificationCodeRecord.objects.filter(hold_id=hold_id.value).first()
-        if row is None:
-            return None
-        return VerificationCode(
-            hold_id=Id(row.hold_id),
-            email=row.email,
-            purpose=CodePurpose(row.purpose),
-            code_hash=row.code_hash,
-            expires_at=row.expires_at,
-            attempts=row.attempts,
-        )
+        return _code(VerificationCodeRecord.objects.filter(hold_id=hold_id.value).first())
+
+    def for_hold_locked(self, hold_id: Id) -> VerificationCode | None:
+        rows = VerificationCodeRecord.objects.select_for_update().filter(hold_id=hold_id.value)
+        return _code(rows.first())
 
     def delete_for_hold(self, hold_id: Id) -> None:
         VerificationCodeRecord.objects.filter(hold_id=hold_id.value).delete()
+
+
+def _code(row: VerificationCodeRecord | None) -> VerificationCode | None:
+    if row is None:
+        return None
+    return VerificationCode(
+        hold_id=Id(row.hold_id),
+        email=row.email,
+        purpose=CodePurpose(row.purpose),
+        code_hash=row.code_hash,
+        expires_at=row.expires_at,
+        attempts=row.attempts,
+    )

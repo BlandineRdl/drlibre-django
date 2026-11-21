@@ -80,18 +80,20 @@ class VerifyHoldUseCase(VerifyHold):
         return hold
 
     def _check_code(self, hold: BookingHold, typed: str) -> None:
+        with self._uow:
+            matched = self._attempt(hold, typed)
+        if not matched:
+            raise invalid_field("code", WRONG_CODE)
+
+    def _attempt(self, hold: BookingHold, typed: str) -> bool:
         at = self._clock.now()
-        stored = self._codes.for_hold(hold.id)
+        stored = self._codes.for_hold_locked(hold.id)
         if stored is not None and stored.is_usable(at):
             if self._issuer.matches(typed, stored.code_hash):
-                return
-            with self._uow:
-                self._codes.put(stored.failed_once())
-                self._record_failure(hold, at)
-        else:
-            with self._uow:
-                self._record_failure(hold, at)
-        raise invalid_field("code", WRONG_CODE)
+                return True
+            self._codes.put(stored.failed_once())
+        self._record_failure(hold, at)
+        return False
 
     def _record_failure(self, hold: BookingHold, at: datetime) -> None:
         self._audit.record(

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from drlibre.booking.domain.booking_rules import MAX_OPEN_ONLINE
+from drlibre.booking.domain.verification_code import MAX_ATTEMPTS, VerificationCode
 from drlibre.booking.infrastructure.django.models import AppointmentRecord
 from drlibre.booking.infrastructure.repositories import (
     DjangoAppointments,
@@ -88,3 +89,38 @@ def test_two_verifications_of_one_patient_at_once_never_exceed_three_open_bookin
         assert AppointmentRecord.objects.filter(patient_id=patient.id.value).count() == (
             MAX_OPEN_ONLINE
         )
+
+
+class RacingCodes(DjangoVerificationCodes):
+    def __init__(self, race: Race) -> None:
+        self._race = race
+
+    def for_hold_locked(self, hold_id: Id) -> VerificationCode | None:
+        # Read before counting the failure, so without the code lock both lose one increment.
+        found = super().for_hold_locked(hold_id)
+        self._race.hold_first()
+        return found
+
+
+def test_two_wrong_codes_at_once_both_count_as_attempts() -> None:
+    """Story réservation : 5 essais de code au plus, même saisis en même temps."""
+    race = Race()
+    with bookable() as world:
+        hold_id, _ = hold_for(world, "visitor@example.org", world.clinician, SLOT_START)
+        stored = DjangoVerificationCodes().for_hold(hold_id)
+        assert stored is not None
+        DjangoVerificationCodes().put(dataclasses.replace(stored, attempts=MAX_ATTEMPTS - 2))
+        adapters = world.at(NOW)
+        racing = dataclasses.replace(adapters.booking, codes=RacingCodes(race))
+        app = wire(dataclasses.replace(adapters, booking=racing))
+
+        def verify() -> object:
+            return app.verify_hold.execute(hold_id=hold_id, code="000000", user_agent="test")
+
+        outcomes = race.run(verify, verify)
+
+        after = DjangoVerificationCodes().for_hold(hold_id)
+        assert race.second_was_blocked == [True]
+        assert outcomes == ["invalid_input", "invalid_input"]
+        assert after is not None
+        assert after.attempts == MAX_ATTEMPTS

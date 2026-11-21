@@ -239,6 +239,9 @@ class InMemoryVerificationCodes(VerificationCodes):
     def for_hold(self, hold_id: Id) -> VerificationCode | None:
         return self.rows.get(hold_id)
 
+    def for_hold_locked(self, hold_id: Id) -> VerificationCode | None:
+        return self.rows.get(hold_id)
+
     def delete_for_hold(self, hold_id: Id) -> None:
         self.rows.pop(hold_id, None)
 

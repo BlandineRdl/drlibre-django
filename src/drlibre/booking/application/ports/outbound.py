@@ -203,6 +203,10 @@ class VerificationCodes(Protocol):
         """The hold's code, or None."""
         ...
 
+    def for_hold_locked(self, hold_id: Id) -> VerificationCode | None:
+        """The hold's code, held against other writers until the caller's unit ends."""
+        ...
+
     def delete_for_hold(self, hold_id: Id) -> None:
         """Remove the hold's code; absent is a no-op."""
         ...

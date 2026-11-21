@@ -235,6 +235,7 @@ def test_a_code_is_replaced_per_hold_and_removed_with_it(scene: Scene) -> None:
     failed = first.failed_once()
     scene.codes.put(failed)
     assert scene.codes.for_hold(held.id) == failed
+    assert scene.codes.for_hold_locked(held.id) == failed
 
     second = VerificationCode.issue(hold_id=held.id, email=held.email, code_hash="b" * 64, at=NOW)
     scene.codes.put(second)
@@ -243,3 +244,4 @@ def test_a_code_is_replaced_per_hold_and_removed_with_it(scene: Scene) -> None:
     scene.codes.delete_for_hold(held.id)
     scene.codes.delete_for_hold(held.id)
     assert scene.codes.for_hold(held.id) is None
+    assert scene.codes.for_hold_locked(held.id) is None
