@@ -11,11 +11,11 @@ Feature: L'admin rattache un profil praticien
     And a room "R101" exists in department "CARD"
     And an active clinician "Ana Bel"
 
-  Scenario: Le profil porte un département, une spécialité, un titre, une bio, une salle par défaut et un poids, à 1 par défaut
+  Scenario: Le profil porte un département, une spécialité, un titre, une bio, une salle par défaut (salle active de ce département) et un poids d'au moins 1, à 1 par défaut (poids à 1 par défaut)
     When the admin attaches a profile to "Ana Bel" in department "CARD" with specialty "CARDIO" and default room "R101"
     Then the profile of "Ana Bel" is in department "CARD" with specialty "CARDIO", default room "R101" and weight 1
 
-  Scenario Outline: Le profil porte un département, une spécialité, un titre, une bio, une salle par défaut (salle active de ce département) et un poids d'au moins 1 (refus : <case>)
+  Scenario Outline: Le profil porte un département, une spécialité, un titre, une bio, une salle par défaut (salle active de ce département) et un poids d'au moins 1, à 1 par défaut (refus : <case>)
     Given a room "R201" exists in department "PEDIA"
     And an inactive room "R102" exists in department "CARD"
     When the admin attaches a profile to "Ana Bel" with <field> "<value>"
@@ -38,22 +38,22 @@ Feature: L'admin rattache un profil praticien
       | inactif          | an inactive clinician "Old Doc"                                                             | Old Doc |
       | déjà un profil   | "Ana Bel" has a profile in department "CARD" with specialty "CARDIO" and default room "R101" | Ana Bel |
 
-  Scenario: Un département qui a des praticiens ne peut pas être supprimé
+  Scenario: Un département qui a des praticiens ne peut pas être supprimé ; une spécialité portée par un praticien non plus (département)
     Given "Ana Bel" has a profile in department "CARD" with specialty "CARDIO" and default room "R101"
     When the admin deletes the department "CARD"
     Then the delete is refused listing clinician "Dr Ana Bel" and room "R101"
 
-  Scenario: Une spécialité portée par un praticien ne peut pas être supprimée
+  Scenario: Un département qui a des praticiens ne peut pas être supprimé ; une spécialité portée par un praticien non plus (spécialité)
     Given "Ana Bel" has a profile in department "CARD" with specialty "CARDIO" and default room "R101"
     When the admin deletes the specialty "CARDIO"
     Then the delete is refused listing clinician "Dr Ana Bel"
 
-  Scenario: Une salle qui est la salle par défaut d'un praticien ne peut pas être supprimée
+  Scenario: Une salle qui est la salle par défaut d'un praticien ne peut ni être supprimée, ni changer de département tant que des praticiens de l'ancien département l'utilisent (suppression)
     Given "Ana Bel" has a profile in department "CARD" with specialty "CARDIO" and default room "R101"
     When the admin deletes the room "R101"
     Then the delete is refused listing clinician "Dr Ana Bel"
 
-  Scenario: Une salle par défaut ne peut pas changer de département tant que des praticiens de l'ancien département l'utilisent
+  Scenario: Une salle qui est la salle par défaut d'un praticien ne peut ni être supprimée, ni changer de département tant que des praticiens de l'ancien département l'utilisent (changement de département)
     Given "Ana Bel" has a profile in department "CARD" with specialty "CARDIO" and default room "R101"
     When the admin moves the room "R101" to department "PEDIA"
     Then the move is refused listing clinician "Dr Ana Bel"

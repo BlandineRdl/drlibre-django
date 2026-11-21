@@ -19,7 +19,7 @@ Feature: Les absences et les RDV actifs retirent des créneaux
     When the slots of "A" are asked from "2026-11-23 09:20" to "2026-11-23 11:20"
     Then the slots start at "09:20, 09:30, 10:40, 10:50"
 
-  Scenario Outline: Un RDV CANCELLED ou NO_SHOW ne retire aucun créneau (<case>)
+  Scenario Outline: Un RDV `CANCELLED` ou `NO_SHOW` ne retire aucun créneau (<case>)
     Given "A" has a "<status>" appointment from "2026-11-23 10:00" to "2026-11-23 10:30"
     When the slots of "A" are asked from "2026-11-23 09:50" to "2026-11-23 10:50"
     Then the slots start at "09:50, 10:00, 10:10, 10:20"

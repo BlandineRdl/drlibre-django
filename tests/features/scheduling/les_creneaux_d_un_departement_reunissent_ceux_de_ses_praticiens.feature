@@ -11,7 +11,7 @@ Feature: Les créneaux d'un département réunissent ceux de ses praticiens
     And "A" has a rule on weekday 1 from "09:00" to "10:00" every 30 minutes
     And "B" has a rule on weekday 1 from "09:30" to "10:30" every 30 minutes
 
-  Scenario: Sans praticien nommé, GET /slots renvoie l'union des créneaux libres de chaque praticien actif du département du type, une seule entrée par début
+  Scenario: Sans praticien nommé, `GET /slots` renvoie l'union des créneaux libres de chaque praticien actif du département du type, une seule entrée par début
     When the department's slots are asked from "2026-11-23 00:00" to "2026-11-24 00:00"
     Then the slots start at "09:00, 09:30, 10:00"
 

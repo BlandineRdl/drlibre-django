@@ -73,7 +73,7 @@ Feature: Le visiteur consulte les pages publiques des praticiens, hôpitaux et s
     And the page says "Dr Bruno Petit"
     And the page never says "Dr Chloé Durand"
 
-  Scenario Outline: Ces pages s'ouvrent sans session et ne montrent aucune donnée non publique ; un enregistrement absent ou inactif donne not_found.
+  Scenario Outline: Ces pages s'ouvrent sans session et ne montrent aucune donnée non publique ; un enregistrement absent ou inactif donne `not_found`.
     Given the clinician "Dr Alice Martin" has the email "alice.martin@clinique.example", the phone "0611223344" and the birth date "1980-02-03"
     And the hospital "Hôpital Fermé" in "Paris" without coordinates
     And the department "Pôle fermé" of "Hôpital Fermé" offers "Consultation" of 20 minutes online
@@ -101,7 +101,7 @@ Feature: Le visiteur consulte les pages publiques des praticiens, hôpitaux et s
       | /hospitals/[hospital:Hôpital Fermé]       | 404    |
       | /specialties/[specialty:Fermée]           | 404    |
 
-  Scenario: GET /providers/{id}, GET /hospitals/{id}, GET /specialties/{id} et GET /slots répondent sans session.
+  Scenario: `GET /providers/{id}`, `GET /hospitals/{id}`, `GET /specialties/{id}` et `GET /slots` répondent sans session.
     When the visitor opens "/api/v1/providers/[id:Dr Alice Martin]?week=2026-11-23"
     Then the response status is 200
     And the week starts on "2026-11-23"

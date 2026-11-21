@@ -37,11 +37,11 @@ Feature: L'admin gère les comptes utilisateurs
     Then the user "ana.belle@example.org" is the PATIENT "Ana Belle", inactive
     And the audit holds "user.updated" changing "email,full_name,role,active"
 
-  Scenario: Un admin ne peut pas désactiver son propre compte
+  Scenario: Un admin ne peut ni désactiver son propre compte, ni changer son propre rôle (désactivation)
     When the admin edits their own account setting active "false"
     Then the write is refused as invalid on "active"
 
-  Scenario: Un admin ne peut pas changer son propre rôle
+  Scenario: Un admin ne peut ni désactiver son propre compte, ni changer son propre rôle (rôle)
     When the admin edits their own account setting role "CLINICIAN"
     Then the write is refused as invalid on "role"
 
@@ -58,11 +58,11 @@ Feature: L'admin gère les comptes utilisateurs
     When the admin edits "ana@example.org" setting active "false"
     Then the write is refused listing 1 appointment
 
-  Scenario: La suppression est refusée pour son propre compte ; le message invite à désactiver le compte
+  Scenario: La suppression est refusée pour son propre compte et pour un utilisateur qui est l'acteur d'entrées d'audit ; le message invite à désactiver le compte (son propre compte)
     When the admin deletes "admin@example.org"
     Then the write is refused as "forbidden" inviting to deactivate
 
-  Scenario: La suppression est refusée pour un utilisateur qui est l'acteur d'entrées d'audit ; le message invite à désactiver le compte
+  Scenario: La suppression est refusée pour son propre compte et pour un utilisateur qui est l'acteur d'entrées d'audit ; le message invite à désactiver le compte (acteur d'entrées d'audit)
     Given a CLINICIAN account "ana@example.org" that is signed in
     When the admin deletes "ana@example.org"
     Then the write is refused as "has_dependents" inviting to deactivate

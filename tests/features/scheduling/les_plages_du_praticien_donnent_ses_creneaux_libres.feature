@@ -8,12 +8,12 @@ Feature: Les plages du praticien donnent ses créneaux libres
     And an active clinician "A" in that department
     And an active appointment type of 30 minutes with a 10-minute buffer
 
-  Scenario: GET /slots prend un type, un praticien et une période ; sans session, il répond unauthenticated (type, praticien et période)
+  Scenario: `GET /slots` prend un type, un praticien et une période ; il répond sans session depuis E3 (spec §14, public **[new]**) (type, praticien et période)
     Given "A" has a rule on weekday 1 from "09:00" to "10:00" every 30 minutes
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-11-24 00:00"
     Then the slots start at "09:00, 09:30"
 
-  Scenario: GET /slots prend un type, un praticien et une période ; sans session, il répond (E3 ouvre cette route : 200 sans session)
+  Scenario: `GET /slots` prend un type, un praticien et une période ; il répond sans session depuis E3 (spec §14, public **[new]**) (sans session)
     When the slots of "A" are asked through the API without a session
     Then the API answers 200 "slots"
 
@@ -45,17 +45,17 @@ Feature: Les plages du praticien donnent ses créneaux libres
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-11-24 00:00"
     Then the slots start at "09:00, 09:30, 10:00, 10:30"
 
-  Scenario: Une période de plus de 31 jours est refusée en invalid_input
+  Scenario: Une période de plus de 31 jours est refusée en `invalid_input`
     Given "A" has a rule on weekday 1 from "09:00" to "10:00" every 30 minutes
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-12-25 00:00"
     Then the request is refused as "invalid_input"
 
-  Scenario: Une période de plus de 31 jours est refusée en invalid_input (31 jours acceptés)
+  Scenario: Une période de plus de 31 jours est refusée en `invalid_input` (31 jours acceptés)
     Given "A" has a rule on weekday 1 from "09:00" to "10:00" every 30 minutes
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-12-24 00:00"
     Then 10 slots are returned
 
-  Scenario: Une période de plus de 31 jours est refusée en invalid_input (31 jours locaux à travers le retour à l'heure d'hiver)
+  Scenario: Une période de plus de 31 jours est refusée en `invalid_input` (31 jours locaux à travers le retour à l'heure d'hiver)
     Given today is "2026-10-01"
     And "A" has a rule on weekday 1 from "09:00" to "10:00" every 30 minutes
     When the slots of "A" are asked from "2026-10-05 00:00" to "2026-11-05 00:00"

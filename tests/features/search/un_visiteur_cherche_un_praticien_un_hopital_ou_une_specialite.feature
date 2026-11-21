@@ -33,7 +33,7 @@ Feature: Un visiteur cherche un praticien, un hôpital ou une spécialité
     And the page links to "/?list=hospitals&q=nord"
     And the page links to "/?list=specialties&q=nord"
 
-  Scenario: Un praticien montre nom complet, titre, spécialité, hôpital, département et ville.
+  Scenario: Un praticien montre nom complet, titre, spécialité, hôpital, département et ville ; un hôpital, nom, adresse, ville, spécialités proposées et nombre de praticiens réservables ; une spécialité, nom, nombre de praticiens et nombre d'hôpitaux (praticien)
     When the visitor opens "/api/v1/search/providers"
     Then "Dr Alice Martin" shows "full_name" equal to "Dr Alice Martin"
     And "Dr Alice Martin" shows "title" equal to "Rhumatologue"
@@ -42,14 +42,14 @@ Feature: Un visiteur cherche un praticien, un hôpital ou une spécialité
     And "Dr Alice Martin" shows "department" equal to "Pôle cœur"
     And "Dr Alice Martin" shows "city" equal to "Lille"
 
-  Scenario: Un hôpital montre nom, adresse, ville, spécialités proposées et nombre de praticiens réservables.
+  Scenario: Un praticien montre nom complet, titre, spécialité, hôpital, département et ville ; un hôpital, nom, adresse, ville, spécialités proposées et nombre de praticiens réservables ; une spécialité, nom, nombre de praticiens et nombre d'hôpitaux (hôpital)
     When the visitor opens "/api/v1/search/hospitals"
     Then "Hôpital Nord" shows "street" equal to "1 rue de la Paix"
     And "Hôpital Nord" shows "city" equal to "Lille"
     And "Hôpital Nord" shows "specialties" equal to "Rhumatologie"
     And "Hôpital Nord" shows "providers" equal to "1"
 
-  Scenario: Une spécialité montre nom, nombre de praticiens et nombre d'hôpitaux.
+  Scenario: Un praticien montre nom complet, titre, spécialité, hôpital, département et ville ; un hôpital, nom, adresse, ville, spécialités proposées et nombre de praticiens réservables ; une spécialité, nom, nombre de praticiens et nombre d'hôpitaux (spécialité)
     When the visitor opens "/api/v1/search/specialties"
     Then "Rhumatologie" shows "providers" equal to "1"
     And "Rhumatologie" shows "hospitals" equal to "1"
@@ -118,7 +118,7 @@ Feature: Un visiteur cherche un praticien, un hôpital ou une spécialité
     And the page says "1 à 20 sur 26 praticiens · page 1 sur 2"
     And the page never says "Distance la plus courte"
 
-  Scenario: GET /search/providers, GET /search/hospitals et GET /search/specialties servent les mêmes résultats sans session.
+  Scenario: `GET /search/providers`, `GET /search/hospitals` et `GET /search/specialties` servent les mêmes résultats sans session.
     When the visitor opens "/?q=alice"
     Then the page says "Dr Alice Martin"
     When the visitor opens "/api/v1/search/providers?q=alice"

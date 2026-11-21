@@ -8,6 +8,7 @@ from datetime import timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from django.test import Client
 from pytest_bdd import given, parsers, then, when
 
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
@@ -17,7 +18,7 @@ from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import existing_appointment, patient_user
 from tests.fakes.world import FakeWorld
 from tests.use_cases.booking.steps_waitlist import actor
-from tests.use_cases.booking.support import VISIT_REASON, Scene, at, booked, mine
+from tests.use_cases.booking.support import VISIT_REASON, Scene, at, booked, mine, open_session
 
 ME = "patient@example.org"
 WINDOW = r'from "(?P<start>[^"]+)" to "(?P<end>[^"]+)"'
@@ -386,3 +387,50 @@ def audited_status(world: FakeWorld, action: str, status: str) -> None:
     (entry,) = [e for e in world.audit.entries if e.action == action]
     assert (entry.actor, entry.entity_type) == (None, "waitlist_entry")
     assert dict(entry.metadata) == {"status": status}
+
+
+def caller_of(scene: Scene, who: str) -> Id | None:
+    return {"patient": scene.patient, "visitor": None}.get(who, scene.actor)
+
+
+def post_api(
+    world: FakeWorld, scene: Scene, web: Client, caller: Id | None, url: str, body: dict[str, str]
+) -> Any:
+    scene.waitlist_before = dict(world.waitlist.rows)
+    scene.rows_before = len(world.booking_appointments.rows)
+    if caller is not None:
+        open_session(world, web, caller)
+    return web.post(f"/api/v1{url}", body, content_type="application/json")
+
+
+@when(
+    parsers.re(rf"the (?P<who>patient|visitor|clinician|admin) posts the waitlist join {WINDOW}$")
+)
+@when(parsers.re(rf'the (?P<who>admin) posts the waitlist join of "(?P<email>[^"]+)" {WINDOW}$'))
+def posts_join(
+    world: FakeWorld, scene: Scene, web: Client, who: str, start: str, end: str, email: str = ""
+) -> None:
+    body = {"appointment_type_id": str(scene.type), "from_date": start, "to_date": end}
+    if email:
+        body["patient_email"] = email
+    scene.page = post_api(world, scene, web, caller_of(scene, who), "/waitlist", body)
+
+
+@then(parsers.parse('the API answers 201 with a "{status}" entry for "{email}"'))
+def api_entry(scene: Scene, status: str, email: str) -> None:
+    assert scene.page.status_code == 201, scene.page.content
+    body = scene.page.json()
+    assert (body["patient"], body["status"]) == (str(person(scene, email).value), status)
+
+
+@when(
+    parsers.re(
+        r"the (?P<who>patient|clinician|admin) posts the acceptance"
+        r' of the offer of "(?P<email>[^"]+)"$'
+    )
+)
+def posts_accept(world: FakeWorld, scene: Scene, web: Client, who: str, email: str) -> None:
+    url = f"/waitlist/{entry_of(world, scene, email).id}/accept"
+    scene.page = post_api(world, scene, web, caller_of(scene, who), url, {})
+    if scene.page.status_code == 201:
+        scene.appointment = world.booking_appointments.get(Id.parse(scene.page.json()["id"]))

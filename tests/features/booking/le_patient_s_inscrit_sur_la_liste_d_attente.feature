@@ -73,3 +73,23 @@ Feature: Le patient s'inscrit sur la liste d'attente
     When the clinician joins the waitlist from "2026-11-23" to "2026-11-27"
     Then the join is refused as "forbidden"
     And nothing was written to the waitlist
+
+  Scenario: `POST /waitlist` applique les mêmes règles ; sans session, `unauthenticated` ; un praticien reçoit `forbidden`. (patient connecté)
+    When the patient posts the waitlist join from "2026-11-23" to "2026-11-27"
+    Then the API answers 201 with a "WAITING" entry for "patient@example.org"
+
+  Scenario: `POST /waitlist` applique les mêmes règles ; sans session, `unauthenticated` ; un praticien reçoit `forbidden`. (fenêtre inversée)
+    When the patient posts the waitlist join from "2026-11-27" to "2026-11-23"
+    Then the API refuses with 400 "invalid_input"
+    And nothing was written to the waitlist
+
+  Scenario: `POST /waitlist` applique les mêmes règles ; sans session, `unauthenticated` ; un praticien reçoit `forbidden`. (sans session)
+    When the visitor posts the waitlist join from "2026-11-23" to "2026-11-27"
+    Then the API refuses with 401 "unauthenticated"
+    And nothing was written to the waitlist
+
+  Scenario: `POST /waitlist` applique les mêmes règles ; sans session, `unauthenticated` ; un praticien reçoit `forbidden`. (praticien)
+    Given a signed-in clinician
+    When the clinician posts the waitlist join from "2026-11-23" to "2026-11-27"
+    Then the API refuses with 403 "forbidden"
+    And nothing was written to the waitlist

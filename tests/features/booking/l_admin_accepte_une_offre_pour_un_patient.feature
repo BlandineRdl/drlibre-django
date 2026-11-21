@@ -64,3 +64,11 @@ Feature: L'admin accepte une offre pour un patient
     And "A" is free at "2026-11-23 09:00"
     When the admin accepts the offer of "patient@example.org"
     Then the audit holds "booking.waitlist_accepted" by the admin, with ids and the source only
+
+  Scenario: `POST /waitlist/{id}/accept` applique les mêmes règles pour l'admin. (offre acceptée)
+    Given "patient@example.org" is offered the cancelled appointment with "A" at "2026-11-23 09:00"
+    And "A" is free at "2026-11-23 09:00"
+    When the admin posts the acceptance of the offer of "patient@example.org"
+    Then the appointment is "BOOKED" for "STAFF"
+    And the appointment of "patient@example.org" is with "A" at "2026-11-23 09:00" for the offered type
+    And the entry of "patient@example.org" is now "BOOKED"

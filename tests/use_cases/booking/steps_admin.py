@@ -146,16 +146,19 @@ def admin_posts_booking(
     world: FakeWorld, scene: Scene, web: Client, start: str, clinician: str | None
 ) -> None:
     scene.rows_before = len(world.booking_appointments.rows)
-    body: dict[str, str] = {"type": str(scene.type), "start": start, "patient": str(scene.patient)}
+    body: dict[str, str] = {"type": str(scene.type), "start": start}
+    if scene.actor is not None:
+        body["patient"] = str(scene.patient)
     if clinician:
         body["clinician"] = str(scene.clinicians[clinician])
-    open_session(world, web, actor(scene))
+    open_session(world, web, scene.actor or scene.patient)
     scene.page = web.post("/api/v1/appointments", body, content_type="application/json")
     if scene.page.status_code == 201:
         scene.appointment = world.booking_appointments.get(Id.parse(scene.page.json()["id"]))
 
 
 @when(parsers.parse('the admin posts the booking of the patient at "{start}" with "{name}"'))
+@when(parsers.parse('the patient posts the booking at "{start}" with "{name}"'))
 def admin_posts_booking_with(
     world: FakeWorld, scene: Scene, web: Client, start: str, name: str
 ) -> None:
@@ -163,6 +166,7 @@ def admin_posts_booking_with(
 
 
 @when(parsers.parse('the admin posts the booking of the patient at "{start}" without a clinician'))
+@when(parsers.parse('the patient posts the booking at "{start}" without a clinician'))
 def admin_posts_booking_without(world: FakeWorld, scene: Scene, web: Client, start: str) -> None:
     admin_posts_booking(world, scene, web, start, None)
 

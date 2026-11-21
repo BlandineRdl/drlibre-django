@@ -37,3 +37,12 @@ Feature: L'admin inscrit un patient sur la liste d'attente
   Scenario: L'inscription laisse une entrée d'audit sans donnée personnelle.
     When the admin adds "lea@example.org" to the waitlist with "A" from "2026-11-23" to "2026-11-27"
     Then the audit holds "booking.waitlist_joined" by the admin with ids only
+
+  Scenario: `POST /waitlist` permet à l'admin de nommer le patient. (patient nommé)
+    When the admin posts the waitlist join of "lea@example.org" from "2026-11-23" to "2026-11-27"
+    Then the API answers 201 with a "WAITING" entry for "lea@example.org"
+
+  Scenario: `POST /waitlist` permet à l'admin de nommer le patient. (patient inconnu)
+    When the admin posts the waitlist join of "nobody@example.org" from "2026-11-23" to "2026-11-27"
+    Then the API refuses with 404 "not_found"
+    And nothing was written to the waitlist
