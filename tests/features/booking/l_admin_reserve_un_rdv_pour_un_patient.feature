@@ -67,6 +67,7 @@ Feature: L'admin réserve un RDV pour un patient
 
   Scenario: Règle §5.2 : une salle nommée est vérifiée avant les conflits et les règles de réservation
     Given an inactive room "R3" in that department
+    And "A" has an active appointment from "2026-11-20 13:00" to "2026-11-20 13:30"
     When the admin books the patient at "2026-11-20 13:00" with "A" in room "R3"
     Then the booking is refused as "not_found"
     And nothing was written
