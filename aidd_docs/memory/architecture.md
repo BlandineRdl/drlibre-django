@@ -3,16 +3,18 @@
 - Python and Django: the project showcases a Django back end.
 - Django Ninja serves the application API and the FHIR API, Pydantic native.
 - PostgreSQL holds all data; Redis serves cache, rate limiting and the Celery broker.
-- Celery with beat runs reminders, expiries and the daily slot horizon (00:15 local, `CELERY_TIMEZONE`); Django's built-in tasks lack a production worker and scheduler.
+- Celery with beat runs emails, hold expiry (every 60 s), reminders and the daily slot horizon (00:15 local, `CELERY_TIMEZONE`); Django's built-in tasks lack a production worker and scheduler.
 - Django templates with HTMX and Pico.css; the front stays minimal.
 - Libraries: Pydantic validates every boundary; structlog writes JSON logs; pydantic-settings loads config; no freezegun, no factory_boy, no mock library.
 - Pinned versions and why: `aidd_docs/INSTALL.md`.
 
 ## Config
 - Environment variables come from a `.env` file read by pydantic-settings; a new variable is declared in the settings class and the committed example file.
+- `PUBLIC_BASE_URL` (default `http://localhost:8000`) builds the absolute links in emails; `NETWORK_HOURLY_LIMIT` (default 20) caps holds, codes and link requests per `REMOTE_ADDR` and kind, raise it for load runs.
 
 ## Decisions
 - Hexagonal architecture per bounded context, so the domain stays pure Python and testable without Django.
+- `booking` owns appointments, holds, codes, booking rules, round robin and the placement shared by every booking path; `search` is a read side whose SQL adapter reads the organisation, scheduling and booking tables directly.
 - Light CQRS: commands go through the domain, search, slots and reporting read through SQL query ports to hold p95 under 200 ms.
 - FHIR R4 is a facade with hand-written Pydantic schemas, because the fhir.resources library dropped R4.
 - One composition root wires ports to adapters, so web, API, FHIR and Celery run the same use cases.
@@ -42,7 +44,11 @@
 - Django stores session keys raw; the session store must keep only a hash.
 - Own session cookie `drlibre_session` (HttpOnly, SameSite=Lax, Secure with `HTTPS_ONLY`); `django.contrib.sessions` and `django.contrib.auth` stay uninstalled, Django's hashers work without them.
 - `SameOriginMiddleware` refuses unsafe methods from another origin, API included; CSRF stays on for web forms.
-- Organisation reads rules using a room through scheduling's `RoomUsage` port; appointments, not modelled yet, are read through null adapters that E3 replaces (`NoAppointmentsYet` for scheduling's `ActiveAppointments`, empty appointment dependents in `SchedulingScheduleDependents`); dependents are checked inside the unit of work of the delete.
+- Holds never touch `scheduling_slot`: `FindFreeSlots` and the search SQL drop a slot overlapping an open hold (`expires_at > now`), so an expired hold frees it without a job; a booking rebuilds the clinician's slots in its unit of work.
+- Appointments reach other contexts through ports backed by booking: scheduling's `ClinicianAppointments` (`BookingClinicianAppointments`), identity's `UpcomingAppointments`, organisation's `ScheduleDependents` (`SchedulingScheduleDependents`) with `RoomUsage`; the null adapters are gone; dependents are checked inside the unit of work of the delete.
+- Wiring order in `real_adapters()`: booking queries, then scheduling adapters reading them, then booking use cases using scheduling's ports (`SlotAvailability`, `RefreshSlots`) and organisation's `RecordRoundRobinAssignment`.
+- Emails are queued on commit by `CeleryEmailOutbox` (`send_task`, redacted reprs keep codes and link tokens out of worker logs; the request log keeps `path` only).
+- Rate-limit keys use `settings.RATE_LIMIT_PREFIX`; a code is stored as HMAC-SHA256 keyed by `SECRET_KEY`, a sign-in link token as sha256.
 - Web views catch `invalid_input`, `has_dependents` and `forbidden` to re-render their form or delete confirmation; other refusals become error pages through `DomainErrorPagesMiddleware` (rule 6-domain-errors).
 - Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 

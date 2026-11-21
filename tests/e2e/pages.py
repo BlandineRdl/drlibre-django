@@ -1,5 +1,12 @@
+import json
+import os
+import re
+import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
+import redis
 from playwright.sync_api import Page
 
 AXE = Path(__file__).parent / "vendor" / "axe-4.14.1.min.js"
@@ -25,10 +32,49 @@ def check_accessible(page: Page) -> None:
 
 def sign_in(page: Page, base_url: str, email: str, password: str = DEMO_PASSWORD) -> None:
     page.goto(f"{base_url}/sign-in")
-    page.get_by_label("Email").fill(email)
+    page.locator("#field-email").fill(email)
     page.get_by_label("Mot de passe", exact=True).fill(password)
     page.get_by_role("button", name="Se connecter").click()
 
 
 def save(page: Page) -> None:
     page.get_by_role("button", name="Enregistrer").click()
+
+
+MAILPIT = os.environ.get("E2E_MAILPIT_URL", "http://localhost:8025")
+REDIS_URL = os.environ.get("E2E_REDIS_URL", "redis://localhost:6379/0")
+
+
+def reset_rate_limits() -> None:
+    """Every host client shares one address behind Docker, so flush the compose rate limits."""
+    client = redis.Redis.from_url(REDIS_URL)
+    for key in client.scan_iter("drlibre:rate:*"):
+        client.delete(key)
+
+
+def _mail_text(to: str, wait: float = 15) -> str:
+    """The body of the newest email sent to this address, waiting for the worker to send it."""
+    query = urllib.parse.urlencode({"query": f"to:{to}"})
+    deadline = time.monotonic() + wait
+    while time.monotonic() < deadline:
+        with urllib.request.urlopen(f"{MAILPIT}/api/v1/search?{query}", timeout=5) as found:  # noqa: S310  # nosec B310
+            messages = json.load(found)["messages"]
+        if messages:
+            with urllib.request.urlopen(  # noqa: S310  # nosec B310
+                f"{MAILPIT}/api/v1/message/{messages[0]['ID']}", timeout=5
+            ) as message:
+                return json.load(message)["Text"]
+        time.sleep(0.3)
+    raise AssertionError(f"no email for {to} in Mailpit")
+
+
+def read_code(to: str) -> str:
+    match = re.search(r"\b(\d{6})\b", _mail_text(to))
+    assert match, "no 6-digit code in the email"
+    return match.group(1)
+
+
+def read_link(to: str) -> str:
+    match = re.search(r"https?://\S+/sign-in/link\?token=\S+", _mail_text(to))
+    assert match, "no sign-in link in the email"
+    return match.group(0)

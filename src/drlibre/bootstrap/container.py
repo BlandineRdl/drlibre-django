@@ -251,8 +251,6 @@ from drlibre.shared_kernel.rate_limit import RateLimiter
 from drlibre.shared_kernel.system_clock import SystemClock
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
 
-RATE_LIMIT_PREFIX = "drlibre:rate"
-
 
 @dataclass(frozen=True, slots=True)
 class BookingAdapters:
@@ -778,7 +776,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             holds=booking_holds,
             codes=DjangoVerificationCodes(),
             issuer=HmacCodeIssuer(key=settings.SECRET_KEY),
-            limiter=RedisRateLimiter(prefix=RATE_LIMIT_PREFIX),
+            limiter=RedisRateLimiter(prefix=settings.RATE_LIMIT_PREFIX),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),

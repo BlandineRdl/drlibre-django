@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Seed de charge, Locust, parcours end-to-end, documentation

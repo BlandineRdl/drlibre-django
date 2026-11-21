@@ -1,6 +1,6 @@
 ---
 objective: "Un visiteur cherche, choisit un créneau libre et le réserve en validant un code email ; il devient patient sans mot de passe avec une session de 24 h, et la Success Evidence de l'Epic E3 est démontrée."
-status: pending
+status: done
 ---
 
 # Plan: E3 - Un visiteur trouve et réserve un créneau sans compte

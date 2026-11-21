@@ -11,17 +11,18 @@ Tranchées au plan E2 (`aidd_docs/tasks/2026_11/2026_11_20_e2-disponibilites-cre
 - Que montrent le résumé hebdomadaire et le calendrier admin, et le calendrier se navigue-t-il ? → Résumé : jour et plages HH:MM–HH:MM par praticien. Calendrier : grille 07:00–19:00 par 30 minutes avec plages et absences, liens semaine précédente, cette semaine, suivante.
 
 ## E3 Recherche et réservation sans compte
-- La disponibilité et les règles de §5.3 sont-elles vérifiées dès la réservation provisoire, ou au code seulement ?
-- Une deuxième réservation provisoire pour le même email est-elle refusée ou remplace-t-elle la première ?
-- Un renvoi de code annule-t-il le précédent, remet-il les 5 essais à zéro, prolonge-t-il la réservation provisoire ?
-- Après 5 essais manqués, la réservation provisoire est-elle libérée ?
-- Le refus générique (email du personnel ou inactif) arrive-t-il à la réservation provisoire ou au code, et un code est-il envoyé ?
-- Code correct mais placement en échec : la réservation provisoire est-elle supprimée ?
-- Quelle réponse au dépassement d'une limite de débit (aucun code ni 429 au §4) ?
-- Où vont les hôpitaux sans coordonnées dans le tri par distance ?
-- Les créneaux à 12:00 et 17:00 pile sont-ils « après-midi » ou « soir » ?
-- En « premier disponible », le visiteur voit-il le praticien choisi avant de saisir le code ?
-- Page praticien : quelle semaine par défaut, navigation au-delà de 90 jours ? Page hôpital : pour quel type calculer les prochains créneaux ?
+Tranchées au plan E3 (`aidd_docs/tasks/2026_11/2026_11_21_e3-reservation-sans-compte/plan.md`, Decisions).
+- La disponibilité et les règles de §5.3 sont-elles vérifiées dès la réservation provisoire, ou au code seulement ? → Dès la provisoire : créneau, délai, type réservable en ligne, disponibilité ; les contrôles liés au patient seulement au code, puis tout le placement rejoué.
+- Une deuxième réservation provisoire pour le même email est-elle refusée ou remplace-t-elle la première ? → Elle remplace la première, libérée avec son code.
+- Un renvoi de code annule-t-il le précédent, remet-il les 5 essais à zéro, prolonge-t-il la réservation provisoire ? → Il annule le précédent, donne un code neuf de 10 minutes avec 5 essais, ne prolonge pas la réservation.
+- Après 5 essais manqués, la réservation provisoire est-elle libérée ? → Non : le code est mort, la réservation reste jusqu'à son expiration, un nouveau code peut être demandé.
+- Le refus générique (email du personnel ou inactif) arrive-t-il à la réservation provisoire ou au code, et un code est-il envoyé ? → Au code : même flux et même email, puis un seul `forbidden` générique, réservation libérée, aucun compte créé.
+- Code correct mais placement en échec : la réservation provisoire est-elle supprimée ? → Oui : compte créé, session ouverte, réservation retirée, échec affiché avec les créneaux rafraîchis.
+- Quelle réponse au dépassement d'une limite de débit (aucun code ni 429 au §4) ? → `rule_violation` de règle `too_many_requests` ; une demande de lien au-delà de sa limite renvoie la réponse habituelle sans rien envoyer.
+- Où vont les hôpitaux sans coordonnées dans le tri par distance ? → Après ceux qui en ont, puis par nom, puis par id.
+- Les créneaux à 12:00 et 17:00 pile sont-ils « après-midi » ou « soir » ? → Intervalles semi-ouverts dans le fuseau de l'hôpital : matin [00:00, 12:00), après-midi [12:00, 17:00), soir [17:00, 24:00).
+- En « premier disponible », le visiteur voit-il le praticien choisi avant de saisir le code ? → Oui : la page du code nomme le praticien choisi à la création de la réservation.
+- Page praticien : quelle semaine par défaut, navigation au-delà de 90 jours ? → Semaine courante dans le fuseau de l'hôpital, `?week=`, navigation limitée à l'horizon de 90 jours. Page hôpital : prochains créneaux du plus court type en ligne actif de chaque département.
 
 ## E4 Portail patient et notifications
 - Le patient peut-il annuler un RDV `CHECKED_IN` ?

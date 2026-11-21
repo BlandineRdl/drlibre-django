@@ -120,6 +120,8 @@ DATABASES = {
 
 PUBLIC_BASE_URL = env.public_base_url
 NETWORK_HOURLY_LIMIT = env.network_hourly_limit
+# Prefix of the Redis rate-limit keys; tests swap it for their own.
+RATE_LIMIT_PREFIX = "drlibre:rate"
 REDIS_URL = str(env.redis_url)
 CELERY_BROKER_URL = REDIS_URL
 CELERY_TIMEZONE = env.default_time_zone
