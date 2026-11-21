@@ -254,7 +254,9 @@ def audit_unavailable(world: FakeWorld, outcome: Outcome) -> None:
 
 @when(parsers.parse('the admin deletes the room "{name}"'))
 def admin_deletes_room(world: FakeWorld, outcome: Outcome, name: str) -> None:
-    usage = SchedulingScheduleDependents(usage=world.availability_queries)
+    usage = SchedulingScheduleDependents(
+        usage=world.availability_queries, appointments=world.booking_queries
+    )
     app = wire(dataclasses.replace(world.adapters(), schedule=usage))
     room_id = outcome.rooms[name]
     attempt(outcome, lambda: app.delete_room.execute(actor=None, record_id=room_id))

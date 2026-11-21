@@ -2,13 +2,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from drlibre.booking.domain.appointment import Appointment
+from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
+from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
 __all__ = [
     "Appointment",
+    "AppointmentQueries",
+    "AppointmentStatus",
     "BookAppointment",
+    "BookedPeriod",
     "CreateHold",
     "ExpireHolds",
     "HeldPeriod",
@@ -119,4 +123,41 @@ class OpenHolds(Protocol):
         self, *, clinician_ids: tuple[Id, ...], start: datetime, end: datetime, at: datetime
     ) -> tuple[HeldPeriod, ...]:
         """Periods held by open holds on these clinicians overlapping the range."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class BookedPeriod:
+    start: datetime
+    end: datetime
+    status: AppointmentStatus
+
+
+class AppointmentQueries(Protocol):
+    def periods_of(
+        self, clinician_id: Id, *, start: datetime, end: datetime
+    ) -> tuple[BookedPeriod, ...]:
+        """The clinician's appointments overlapping the range, whatever their status."""
+        ...
+
+    def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
+        """Appointments of the type, labelled by their start, never a person."""
+        ...
+
+    def dependents_of_room(self, room_id: Id) -> tuple[Dependent, ...]:
+        """Appointments held in the room, labelled by their start, never a person."""
+        ...
+
+    def dependents_of_clinician(self, clinician_id: Id) -> tuple[Dependent, ...]:
+        """Appointments of the clinician profile, labelled by their start, never a person."""
+        ...
+
+    def active_upcoming_for_clinician_user(
+        self, user_id: Id, *, after: datetime
+    ) -> tuple[Dependent, ...]:
+        """Active appointments starting after the instant of the clinician holding this user."""
+        ...
+
+    def any_for_user(self, user_id: Id) -> tuple[Dependent, ...]:
+        """Appointments where the user is the patient, or the clinician through their profile."""
         ...

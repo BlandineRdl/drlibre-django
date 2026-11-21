@@ -1,5 +1,7 @@
-from datetime import datetime
+from collections.abc import Callable
+from datetime import datetime, timedelta
 
+from drlibre.booking.application.ports.inbound import AppointmentQueries, BookedPeriod
 from drlibre.booking.application.ports.outbound import (
     Appointments,
     BookableClinician,
@@ -21,6 +23,7 @@ from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
 from drlibre.identity.domain.user import Role
 from drlibre.shared_kernel.clock import Clock
+from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
 from tests.fakes.users import InMemoryUsers
 
@@ -93,16 +96,23 @@ class InMemoryFreeSlots(FreeSlots):
 
     def __init__(self, holds: "InMemoryHolds", clock: Clock) -> None:
         self.free: set[tuple[Id, Id, datetime]] = set()
+        self.durations: dict[Id, timedelta] = {}
+        self.buffers: dict[Id, timedelta] = {}
         self.holds = holds
         self.clock = clock
 
-    def _held(self, clinician_id: Id, start: datetime, ignoring: Id | None) -> bool:
+    def _held(
+        self, clinician_id: Id, appointment_type_id: Id, start: datetime, ignoring: Id | None
+    ) -> bool:
         now = self.clock.now()
+        end = start + self.durations.get(appointment_type_id, timedelta(minutes=30))
+        buffer = self.buffers.get(appointment_type_id, timedelta())
         return any(
             h.clinician_id == clinician_id
             and h.id != ignoring
             and h.is_open(now)
-            and h.start <= start < h.end
+            and h.start < end
+            and start < h.end + buffer
             for h in self.holds.rows.values()
         )
 
@@ -115,13 +125,15 @@ class InMemoryFreeSlots(FreeSlots):
         ignoring_hold: Id | None,
     ) -> bool:
         listed = (clinician_id, appointment_type_id, start) in self.free
-        return listed and not self._held(clinician_id, start, ignoring_hold)
+        return listed and not self._held(clinician_id, appointment_type_id, start, ignoring_hold)
 
     def candidates_at(self, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
         return tuple(
             c
             for c, t, s in self.free
-            if t == appointment_type_id and s == start and not self._held(c, start, None)
+            if t == appointment_type_id
+            and s == start
+            and not self._held(c, appointment_type_id, start, None)
         )
 
 
@@ -239,3 +251,47 @@ class FixedCodeIssuer(CodeIssuer):
 
     def matches(self, code: str, code_hash: str) -> bool:
         return code == code_hash
+
+
+class InMemoryAppointmentQueries(AppointmentQueries):
+    """Reads the in-memory appointments; `clinician_users` maps a profile to its user."""
+
+    def __init__(self, appointments: InMemoryAppointments) -> None:
+        self.appointments = appointments
+        self.clinician_users: dict[Id, Id] = {}
+
+    def periods_of(
+        self, clinician_id: Id, *, start: datetime, end: datetime
+    ) -> tuple[BookedPeriod, ...]:
+        return tuple(
+            BookedPeriod(a.start, a.end, a.status)
+            for a in self.appointments.rows
+            if a.clinician_id == clinician_id and a.start < end and start < a.end
+        )
+
+    def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
+        return self._of(lambda a: a.appointment_type_id == appointment_type_id)
+
+    def dependents_of_room(self, room_id: Id) -> tuple[Dependent, ...]:
+        return self._of(lambda a: a.room_id == room_id)
+
+    def dependents_of_clinician(self, clinician_id: Id) -> tuple[Dependent, ...]:
+        return self._of(lambda a: a.clinician_id == clinician_id)
+
+    def active_upcoming_for_clinician_user(
+        self, user_id: Id, *, after: datetime
+    ) -> tuple[Dependent, ...]:
+        return self._of(
+            lambda a: (
+                self.clinician_users.get(a.clinician_id) == user_id and a.active and a.start > after
+            )
+        )
+
+    def any_for_user(self, user_id: Id) -> tuple[Dependent, ...]:
+        return self._of(
+            lambda a: a.patient_id == user_id or self.clinician_users.get(a.clinician_id) == user_id
+        )
+
+    def _of(self, keep: Callable[[Appointment], bool]) -> tuple[Dependent, ...]:
+        found = sorted((a for a in self.appointments.rows if keep(a)), key=lambda a: a.start)
+        return tuple(Dependent("appointment", a.id, "Rendez-vous") for a in found)

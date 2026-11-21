@@ -12,6 +12,9 @@ class UserRecord(models.Model):
     password_hash = models.CharField(max_length=256, null=True)  # noqa: DJ001
     must_change_password = models.BooleanField(default=False)
     last_login_at = models.DateTimeField(null=True)
+    phone = models.CharField(max_length=30, null=True)  # noqa: DJ001
+    birth_date = models.DateField(null=True)
+    email_verified_at = models.DateTimeField(null=True)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
 

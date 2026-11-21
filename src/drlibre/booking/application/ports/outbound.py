@@ -135,6 +135,10 @@ class Patients(Protocol):
 
 
 class BookingNotices(Protocol):
+    def code_sent(self, *, email: str, code: str) -> None:
+        """Queue the verification code email, sent once the unit of work commits."""
+        ...
+
     def confirmed(self, appointment: Appointment) -> None:
         """Queue the confirmation for the patient, sent once the unit of work commits."""
         ...

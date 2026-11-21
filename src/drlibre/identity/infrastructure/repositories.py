@@ -17,6 +17,9 @@ def to_user(record: UserRecord) -> User:
         last_login_at=record.last_login_at,
         created_at=record.created_at,
         updated_at=record.updated_at,
+        phone=record.phone,
+        birth_date=record.birth_date,
+        email_verified_at=record.email_verified_at,
     )
 
 
@@ -40,6 +43,9 @@ class DjangoUsers(Users):
                 "password_hash": user.password_hash,
                 "must_change_password": user.must_change_password,
                 "last_login_at": user.last_login_at,
+                "phone": user.phone,
+                "birth_date": user.birth_date,
+                "email_verified_at": user.email_verified_at,
                 "created_at": user.created_at,
                 "updated_at": user.updated_at,
             },

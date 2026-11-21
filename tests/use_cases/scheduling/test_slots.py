@@ -63,7 +63,10 @@ def refresh(world: FakeWorld, clinician_id: Id) -> None:
 
 def ask(world: FakeWorld, outcome: Outcome, clinician_id: Id | None, start: str, end: str) -> None:
     use_case = FindFreeSlotsUseCase(
-        clock=world.clock, directory=world.scheduling_directory, queries=world.slots
+        clock=world.clock,
+        directory=world.scheduling_directory,
+        queries=world.slots,
+        holds=world.slot_holds,
     )
     try:
         outcome.slots = use_case.execute(

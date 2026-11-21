@@ -7,6 +7,7 @@ from tests.fakes.audit_log import InMemoryAuditLog
 from tests.fakes.booking import (
     FixedBookingDirectory,
     FixedCodeIssuer,
+    InMemoryAppointmentQueries,
     InMemoryAppointments,
     InMemoryFreeSlots,
     InMemoryHolds,
@@ -39,6 +40,7 @@ from tests.fakes.scheduling import (
     InMemoryAvailabilityQueries,
     InMemoryAvailabilityRules,
     InMemoryClinicianAppointments,
+    InMemorySlotHolds,
     InMemorySlotStore,
     InMemoryTimeOffs,
 )
@@ -82,11 +84,13 @@ class FakeWorld:
         self.time_offs = InMemoryTimeOffs()
         self.clinician_appointments = InMemoryClinicianAppointments()
         self.slots = InMemorySlotStore()
+        self.slot_holds = InMemorySlotHolds()
         self.slot_refresh = InMemorySlotRefresh()
         self.availability_queries = InMemoryAvailabilityQueries(
             rules=self.availability_rules, time_offs=self.time_offs
         )
         self.booking_appointments = InMemoryAppointments()
+        self.booking_queries = InMemoryAppointmentQueries(self.booking_appointments)
         self.booking_directory = FixedBookingDirectory()
         self.holds = InMemoryHolds()
         self.codes = InMemoryVerificationCodes()
@@ -166,6 +170,7 @@ class FakeWorld:
             clinician_appointments=self.clinician_appointments,
             slot_store=self.slots,
             slot_queries=self.slots,
+            slot_holds=self.slot_holds,
             availability_queries=self.availability_queries,
             slot_refresh=self.slot_refresh,
             booking=BookingAdapters(
@@ -181,6 +186,5 @@ class FakeWorld:
                 codes=self.codes,
                 issuer=self.issuer,
                 limiter=self.limiter,
-                outbox=self.outbox,
             ),
         )

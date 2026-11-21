@@ -1,6 +1,6 @@
-from drlibre.booking.application.emails import confirmation_email
 from drlibre.booking.application.ports.outbound import BookingDirectory, BookingNotices, Patients
 from drlibre.booking.domain.appointment import Appointment
+from drlibre.booking.infrastructure.emails import code_email, confirmation_email
 from drlibre.notifications.application.ports.outbound import EmailOutbox
 
 
@@ -19,6 +19,9 @@ class OutboxBookingNotices(BookingNotices):
         self._directory = directory
         self._patients = patients
         self._sign_in_url = f"{public_base_url.rstrip('/')}/sign-in"
+
+    def code_sent(self, *, email: str, code: str) -> None:
+        self._outbox.queue(code_email(to=email, code=code))
 
     def confirmed(self, appointment: Appointment) -> None:
         email = self._patients.email_of(appointment.patient_id)

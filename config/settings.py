@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # True once served behind TLS; localhost stays plain HTTP.
     https_only: bool = False
+    # Absolute links in emails, where no request exists to build them from.
+    public_base_url: str = "http://localhost:8000"
+    # Hourly cap per network address and kind of request; raised for load tests.
+    network_hourly_limit: int = Field(default=20, ge=1)
 
 
 env = Settings()
@@ -36,6 +40,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     "drlibre.audit.infrastructure.django",
+    "drlibre.booking.infrastructure.django",
     "drlibre.identity.infrastructure.django",
     "drlibre.organisation.infrastructure.django",
     "drlibre.scheduling.infrastructure.django",
@@ -113,6 +118,8 @@ DATABASES = {
     }
 }
 
+PUBLIC_BASE_URL = env.public_base_url
+NETWORK_HOURLY_LIMIT = env.network_hourly_limit
 REDIS_URL = str(env.redis_url)
 CELERY_BROKER_URL = REDIS_URL
 CELERY_TIMEZONE = env.default_time_zone

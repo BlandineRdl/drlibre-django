@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from drlibre.booking.infrastructure.queries import DjangoBookingQueries
 from drlibre.organisation.application.ports.outbound import (
     AppointmentTypes,
     Departments,
@@ -63,7 +64,9 @@ def stores(request: pytest.FixtureRequest) -> Stores:
         DjangoDepartments(),
         DjangoRooms(),
         DjangoAppointmentTypes(),
-        SchedulingScheduleDependents(usage=DjangoAvailabilityQueries()),
+        SchedulingScheduleDependents(
+            usage=DjangoAvailabilityQueries(), appointments=DjangoBookingQueries()
+        ),
     )
 
 

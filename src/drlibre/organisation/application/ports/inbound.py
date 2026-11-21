@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
 
 from drlibre.organisation.domain.appointment_type import AppointmentType
@@ -26,6 +27,7 @@ __all__ = [
     "EditClinicianProfile",
     "Hospital",
     "Option",
+    "RecordRoundRobinAssignment",
     "ReferenceQueries",
     "Room",
     "SaveAppointmentType",
@@ -95,6 +97,12 @@ class EditClinicianProfile(Protocol):
 class DeleteClinicianProfile(Protocol):
     def execute(self, *, actor: Id | None, profile_id: Id) -> None:
         """Delete a profile; not_found, or has_dependents while it has appointments."""
+        ...
+
+
+class RecordRoundRobinAssignment(Protocol):
+    def execute(self, *, clinician_id: Id, at: datetime) -> None:
+        """Set the profile's last round robin assignment in the caller's unit; unknown: no-op."""
         ...
 
 

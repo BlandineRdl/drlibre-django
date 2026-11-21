@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Persistance PostgreSQL, limites Redis, emails et expiration Celery, null adapters remplacés

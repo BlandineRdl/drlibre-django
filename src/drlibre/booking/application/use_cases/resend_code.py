@@ -1,9 +1,12 @@
-from drlibre.booking.application.emails import code_email
 from drlibre.booking.application.ports.inbound import ResendCode
-from drlibre.booking.application.ports.outbound import CodeIssuer, Holds, VerificationCodes
+from drlibre.booking.application.ports.outbound import (
+    BookingNotices,
+    CodeIssuer,
+    Holds,
+    VerificationCodes,
+)
 from drlibre.booking.application.use_cases.create_hold import refuse_over_limit
 from drlibre.booking.domain.verification_code import VerificationCode
-from drlibre.notifications.application.ports.outbound import EmailOutbox
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -23,7 +26,7 @@ class ResendCodeUseCase(ResendCode):
         codes: VerificationCodes,
         issuer: CodeIssuer,
         limiter: RateLimiter,
-        outbox: EmailOutbox,
+        notices: BookingNotices,
         network_hourly_limit: int,
     ) -> None:
         self._clock = clock
@@ -32,7 +35,7 @@ class ResendCodeUseCase(ResendCode):
         self._codes = codes
         self._issuer = issuer
         self._limiter = limiter
-        self._outbox = outbox
+        self._notices = notices
         self._network_limit = network_hourly_limit
 
     def execute(self, *, hold_id: Id, network: str) -> None:
@@ -55,4 +58,4 @@ class ResendCodeUseCase(ResendCode):
                     hold_id=hold.id, email=hold.email, code_hash=issued.code_hash, at=at
                 )
             )
-            self._outbox.queue(code_email(to=hold.email, code=issued.code))
+            self._notices.code_sent(email=hold.email, code=issued.code)

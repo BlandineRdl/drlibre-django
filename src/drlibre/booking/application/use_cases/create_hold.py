@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
-from drlibre.booking.application.emails import code_email
 from drlibre.booking.application.ports.inbound import CreateHold, HoldCreated
 from drlibre.booking.application.ports.outbound import (
+    BookingNotices,
     CodeIssuer,
     Holds,
     ScheduleLocks,
@@ -14,7 +14,6 @@ from drlibre.booking.domain.appointment import Source
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
 from drlibre.booking.domain.visitor_details import VisitorDetails
-from drlibre.notifications.application.ports.outbound import EmailOutbox
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -50,7 +49,7 @@ class CreateHoldUseCase(CreateHold):
         issuer: CodeIssuer,
         locks: ScheduleLocks,
         limiter: RateLimiter,
-        outbox: EmailOutbox,
+        notices: BookingNotices,
         network_hourly_limit: int,
     ) -> None:
         self._clock = clock
@@ -62,7 +61,7 @@ class CreateHoldUseCase(CreateHold):
         self._issuer = issuer
         self._locks = locks
         self._limiter = limiter
-        self._outbox = outbox
+        self._notices = notices
         self._network_limit = network_hourly_limit
 
     def execute(
@@ -125,7 +124,7 @@ class CreateHoldUseCase(CreateHold):
                     hold_id=hold.id, email=details.email, code_hash=issued.code_hash, at=at
                 )
             )
-            self._outbox.queue(code_email(to=details.email, code=issued.code))
+            self._notices.code_sent(email=details.email, code=issued.code)
             self._audit.record(self._created_entry(hold, at))
         return HoldCreated(hold.id, hold.clinician_id, hold.expires_at)
 

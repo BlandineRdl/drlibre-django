@@ -105,28 +105,33 @@ containers = ["drlibre.audit", "drlibre.booking", "drlibre.health", "drlibre.ide
 layers = ["infrastructure", "application", "(domain)"]
 
 [[tool.importlinter.contracts]]
-name = "Identity's core never imports organisation"
+name = "Identity's core never imports notifications or organisation"
 type = "forbidden"
 source_modules = ["drlibre.identity.domain", "drlibre.identity.application"]
-forbidden_modules = ["drlibre.organisation"]
+forbidden_modules = ["drlibre.booking", "drlibre.notifications", "drlibre.organisation"]
 
 [[tool.importlinter.contracts]]
 name = "Organisation's core reaches identity and scheduling only through its own ports"
 type = "forbidden"
 source_modules = ["drlibre.organisation.domain", "drlibre.organisation.application"]
-forbidden_modules = ["drlibre.identity", "drlibre.scheduling"]
+forbidden_modules = ["drlibre.booking", "drlibre.identity", "drlibre.scheduling"]
 
 [[tool.importlinter.contracts]]
 name = "Scheduling's core reaches identity and organisation only through its own ports"
 type = "forbidden"
 source_modules = ["drlibre.scheduling.domain", "drlibre.scheduling.application"]
-forbidden_modules = ["drlibre.identity", "drlibre.organisation"]
+forbidden_modules = ["drlibre.booking", "drlibre.identity", "drlibre.organisation"]
 
 [[tool.importlinter.contracts]]
-name = "Booking's core reaches identity, organisation and scheduling only through its own ports"
+name = "Booking's core reaches identity, notifications, organisation and scheduling only through its own ports"
 type = "forbidden"
 source_modules = ["drlibre.booking.domain", "drlibre.booking.application"]
-forbidden_modules = ["drlibre.identity", "drlibre.organisation", "drlibre.scheduling"]
+forbidden_modules = [
+    "drlibre.identity",
+    "drlibre.notifications",
+    "drlibre.organisation",
+    "drlibre.scheduling",
+]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"

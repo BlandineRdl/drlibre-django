@@ -21,6 +21,7 @@ __all__ = [
     "RoomUsage",
     "SaveAvailabilityRule",
     "Slot",
+    "SlotAvailability",
     "TimeOff",
 ]
 
@@ -30,6 +31,23 @@ class FindFreeSlots(Protocol):
         self, *, appointment_type_id: Id, clinician_id: Id | None, start: datetime, end: datetime
     ) -> tuple[Slot, ...]:
         """Sorted free slots; invalid_input over 31 days, not_found for a bad type or clinician."""
+        ...
+
+
+class SlotAvailability(Protocol):
+    def is_free(
+        self,
+        *,
+        clinician_id: Id,
+        appointment_type_id: Id,
+        start: datetime,
+        ignoring_hold: Id | None,
+    ) -> bool:
+        """Whether the start is a free, unheld slot of the active clinician for the active type."""
+        ...
+
+    def free_clinicians(self, *, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
+        """Active clinicians of the type's department with a free slot at the start."""
         ...
 
 

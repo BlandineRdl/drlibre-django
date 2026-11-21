@@ -1,9 +1,16 @@
+import dataclasses
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 from drlibre.booking.application.ports.outbound import BookableClinician, BookableType, Venue
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.identity.domain.user import Email, Role, User
+from drlibre.organisation.domain.clinician_profile import ClinicianProfile
+from drlibre.organisation.infrastructure.repositories import DjangoAppointmentTypes, DjangoRooms
 from drlibre.shared_kernel.ids import Id
+from tests import builders_organisation as build
+from tests.builders import stored_user
+from tests.builders_scheduling import stored_department, stored_profile
 
 
 def bookable_type(
@@ -94,3 +101,28 @@ def patient_user(
         phone="0600000000",
         birth_date=date(1980, 1, 1),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class StoredScene:
+    """A saved department with two clinician profiles, one appointment type and one room."""
+
+    department: Id
+    clinicians: tuple[ClinicianProfile, ClinicianProfile]
+    kind: Id
+    room: Id
+
+
+def stored_scene(*, buffer_minutes: int = 0, duration_minutes: int = 30) -> StoredScene:
+    department = stored_department()
+    kind = build.appointment_type(department.id)
+    kind = dataclasses.replace(
+        kind, buffer_minutes=buffer_minutes, duration_minutes=duration_minutes, bookable_online=True
+    )
+    DjangoAppointmentTypes().save(kind)
+    room = build.room(department.id)
+    DjangoRooms().save(room)
+    users = stored_user(Role.CLINICIAN, password=None), stored_user(Role.CLINICIAN, password=None)
+    first = stored_profile(department, user_id=users[0].id)
+    second = stored_profile(department, user_id=users[1].id)
+    return StoredScene(department.id, (first, second), kind.id, room.id)
