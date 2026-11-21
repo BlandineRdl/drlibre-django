@@ -17,7 +17,9 @@ class InMemoryUnitOfWork(UnitOfWork):
         self.stores.extend(stores)
 
     def __enter__(self) -> None:
-        self._snapshots.append([copy.deepcopy(vars(store)) for store in self.stores])
+        # A store referring to another guarded store keeps that reference, not a copy.
+        shared = {id(store): store for store in self.stores}
+        self._snapshots.append([copy.deepcopy(vars(s), dict(shared)) for s in self.stores])
 
     def __exit__(
         self,

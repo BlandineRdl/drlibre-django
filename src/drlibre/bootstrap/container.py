@@ -35,6 +35,7 @@ from drlibre.booking.application.ports.outbound import (
     RoundRobinLedger,
     ScheduleLocks,
     VerificationCodes,
+    Waitlist,
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
@@ -71,6 +72,7 @@ from drlibre.booking.infrastructure.repositories import (
     DjangoAppointments,
     DjangoHolds,
     DjangoVerificationCodes,
+    DjangoWaitlist,
 )
 from drlibre.booking.infrastructure.round_robin_ledger import OrganisationRoundRobinLedger
 from drlibre.booking.infrastructure.schedule_locks import DjangoScheduleLocks
@@ -312,6 +314,7 @@ class BookingAdapters:
     issuer: CodeIssuer
     limiter: RateLimiter
     agenda: PatientAgenda
+    waitlist: Waitlist
     network_hourly_limit: int = 20
 
 
@@ -922,6 +925,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             issuer=HmacCodeIssuer(key=settings.SECRET_KEY),
             limiter=RedisRateLimiter(prefix=settings.RATE_LIMIT_PREFIX),
             agenda=SqlPatientAgenda(),
+            waitlist=DjangoWaitlist(),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),

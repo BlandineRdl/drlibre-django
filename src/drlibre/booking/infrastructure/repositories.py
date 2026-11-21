@@ -6,15 +6,23 @@ from typing import Any
 from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
 
-from drlibre.booking.application.ports.outbound import Appointments, Holds, VerificationCodes
+from drlibre.booking.application.ports.outbound import (
+    Appointments,
+    ExpiringEntry,
+    Holds,
+    VerificationCodes,
+    Waitlist,
+)
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import CodePurpose, VerificationCode
 from drlibre.booking.domain.visitor_details import VisitorDetails
+from drlibre.booking.domain.waitlist import WaitlistEntry, WaitlistStatus
 from drlibre.booking.infrastructure.django.models import (
     AppointmentRecord,
     BookingHoldRecord,
     VerificationCodeRecord,
+    WaitlistEntryRecord,
 )
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -271,3 +279,117 @@ def _code(row: VerificationCodeRecord | None) -> VerificationCode | None:
         expires_at=row.expires_at,
         attempts=row.attempts,
     )
+
+
+def _entry(row: WaitlistEntryRecord) -> WaitlistEntry:
+    return WaitlistEntry(
+        id=Id(row.id),
+        patient_id=Id(row.patient_id),
+        appointment_type_id=Id(row.appointment_type_id),
+        clinician_id=Id(row.clinician_id) if row.clinician_id else None,
+        earliest=row.earliest,
+        latest=row.latest,
+        status=WaitlistStatus(row.status),
+        created_at=row.created_at,
+        offered_appointment_id=(
+            Id(row.offered_appointment_id) if row.offered_appointment_id else None
+        ),
+    )
+
+
+def _entry_fields(entry: WaitlistEntry) -> dict[str, Any]:
+    offered = entry.offered_appointment_id
+    return {
+        "patient_id": entry.patient_id.value,
+        "appointment_type_id": entry.appointment_type_id.value,
+        "clinician_id": entry.clinician_id.value if entry.clinician_id else None,
+        "earliest": entry.earliest,
+        "latest": entry.latest,
+        "status": entry.status.value,
+        "created_at": entry.created_at,
+        "offered_appointment_id": offered.value if offered else None,
+    }
+
+
+@contextmanager
+def _taken_offer_is_conflict() -> Generator[None]:
+    """Turn a second open offer of one appointment into a conflict."""
+    try:
+        with transaction.atomic():
+            yield
+    except IntegrityError as error:
+        name = getattr(getattr(error.__cause__, "diag", None), "constraint_name", None)
+        if name != "waitlist_one_offer_per_appointment":
+            raise
+        raise DomainError(
+            ErrorCode.CONFLICT,
+            "Ce créneau est déjà proposé à une autre entrée.",
+            {"resources": ["waitlist_entry"]},
+        ) from error
+
+
+class DjangoWaitlist(Waitlist):
+    def add(self, entry: WaitlistEntry) -> None:
+        with _taken_offer_is_conflict():
+            WaitlistEntryRecord.objects.create(id=entry.id.value, **_entry_fields(entry))
+
+    def save(self, entry: WaitlistEntry) -> None:
+        with _taken_offer_is_conflict():
+            updated = WaitlistEntryRecord.objects.filter(id=entry.id.value).update(
+                **_entry_fields(entry)
+            )
+        if not updated:
+            raise DomainError(ErrorCode.NOT_FOUND, "Entrée d'attente introuvable.")
+
+    def get(self, entry_id: Id) -> WaitlistEntry | None:
+        row = WaitlistEntryRecord.objects.filter(id=entry_id.value).first()
+        return _entry(row) if row else None
+
+    def get_locked(self, entry_id: Id) -> WaitlistEntry | None:
+        row = WaitlistEntryRecord.objects.select_for_update().filter(id=entry_id.value).first()
+        return _entry(row) if row else None
+
+    def candidates_locked(
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding_patient: Id,
+    ) -> tuple[WaitlistEntry, ...]:
+        rows = (
+            WaitlistEntryRecord.objects.select_for_update()
+            .filter(
+                Q(clinician_id__isnull=True) | Q(clinician_id=clinician_id.value),
+                status=WaitlistStatus.WAITING.value,
+                appointment_type_id=appointment_type_id.value,
+                earliest__lte=start,
+                latest__gte=end,
+            )
+            .exclude(patient_id=excluding_patient.value)
+            .order_by("id")
+        )
+        return tuple(_entry(row) for row in rows)
+
+    def holds_offer(self, appointment_id: Id) -> bool:
+        return WaitlistEntryRecord.objects.filter(
+            status=WaitlistStatus.OFFERED.value, offered_appointment_id=appointment_id.value
+        ).exists()
+
+    def expiring_locked(self, now: datetime) -> tuple[ExpiringEntry, ...]:
+        rows = (
+            WaitlistEntryRecord.objects.select_for_update(of=("self",))
+            .select_related("offered_appointment")
+            .filter(
+                Q(status=WaitlistStatus.WAITING.value, latest__lte=now)
+                | Q(status=WaitlistStatus.OFFERED.value, offered_appointment__start__lte=now)
+            )
+            .order_by("id")
+        )
+        return tuple(
+            ExpiringEntry(
+                _entry(row), row.offered_appointment.start if row.offered_appointment else None
+            )
+            for row in rows
+        )

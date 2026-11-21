@@ -6,6 +6,7 @@ from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
 from drlibre.booking.domain.booking_rules import PatientAction
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
+from drlibre.booking.domain.waitlist import WaitlistEntry
 from drlibre.shared_kernel.ids import Id
 
 
@@ -17,6 +18,7 @@ class BookableType:
     needs_room: bool
     bookable_online: bool
     active: bool
+    time_zone: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,4 +325,50 @@ class AgendaEntry:
 class PatientAgenda(Protocol):
     def entries(self, patient_id: Id, agenda_filter: AgendaFilter) -> tuple[AgendaEntry, ...]:
         """The patient's appointments matching the filter, by start, actions left empty."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ExpiringEntry:
+    """A waitlist entry due for expiry, with the start of its offered appointment if any."""
+
+    entry: WaitlistEntry
+    offered_start: datetime | None
+
+
+class Waitlist(Protocol):
+    def add(self, entry: WaitlistEntry) -> None:
+        """Store the new entry."""
+        ...
+
+    def save(self, entry: WaitlistEntry) -> None:
+        """Replace the stored entry; not_found when absent, conflict when its offer is taken."""
+        ...
+
+    def get(self, entry_id: Id) -> WaitlistEntry | None:
+        """The entry, whatever its status, or None."""
+        ...
+
+    def get_locked(self, entry_id: Id) -> WaitlistEntry | None:
+        """The entry, held against other writers until the caller's unit ends, or None."""
+        ...
+
+    def candidates_locked(
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding_patient: Id,
+    ) -> tuple[WaitlistEntry, ...]:
+        """WAITING entries the slot matches, other patients only, locked as a set, by id."""
+        ...
+
+    def holds_offer(self, appointment_id: Id) -> bool:
+        """Whether an OFFERED entry holds the appointment."""
+        ...
+
+    def expiring_locked(self, now: datetime) -> tuple[ExpiringEntry, ...]:
+        """Locked WAITING entries past latest, OFFERED ones whose offer starts by now; by id."""
         ...
