@@ -53,12 +53,19 @@ class Me:
     time_zone: str
 
 
-def current_me(request: HttpRequest) -> Me:
+def _me(request: HttpRequest) -> Me | None:
     user_id = current_identity(request).user_id
     profile = container().reference_queries.clinician_profile_of(user_id)
     if profile is None:
-        raise DomainError(ErrorCode.FORBIDDEN, "Réservé aux praticiens ayant un profil.")
+        return None
     return Me(user_id, profile.id, profile.department_id, hospital_time_zone(profile.department_id))
+
+
+def current_me(request: HttpRequest) -> Me:
+    me = _me(request)
+    if me is None:
+        raise DomainError(ErrorCode.FORBIDDEN, "Réservé aux praticiens ayant un profil.")
+    return me
 
 
 def owned[T: (AvailabilityRule, TimeOff)](found: T | None, me: Me) -> T:
@@ -105,12 +112,11 @@ def _own_appointment(view: AppointmentView) -> Callable[[HttpRequest, UUID], Htt
 @require_GET
 @require_role(Role.CLINICIAN)
 def today(request: HttpRequest) -> HttpResponse:
-    user_id = current_identity(request).user_id
-    if container().reference_queries.clinician_profile_of(user_id) is None:
+    me = _me(request)
+    if me is None:
         # The landing page of a clinician account still waiting for its profile.
         context = {"title": "Mon espace praticien", "intro": NO_PROFILE}
         return render(request, "areas/home.html", context)
-    me = current_me(request)
     day = container().clinician_day.execute(
         actor_id=me.user_id, day=day_param(request.GET.get("day"))
     )
@@ -243,6 +249,8 @@ def notes(request: HttpRequest, me: Me, appointment_id: Id) -> HttpResponse:
 def cancel(request: HttpRequest, me: Me, appointment_id: Id) -> HttpResponse:
     file = _file(me, appointment_id)
     if request.method == "GET":
+        if ClinicianAction.CANCEL not in file.entry.actions:
+            return redirect(appointment_url(appointment_id))
         return _private_page(request, "workspace/cancel.html", me, cancel_page(file, {}))
     values = {"reason": request.POST.get("reason", "")}
     try:

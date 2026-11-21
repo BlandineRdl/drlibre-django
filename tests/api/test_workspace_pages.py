@@ -199,6 +199,16 @@ def test_cancelling_needs_a_reason_then_records_it_and_grows_the_history(
     assert f'action="{workspace.base}/cancel"' not in file
 
 
+def test_the_cancel_form_of_an_appointment_no_longer_cancellable_leads_back_to_it(
+    workspace: Workspace,
+) -> None:
+    """Story annule : depuis un statut définitif, la fiche ne propose plus l'annulation."""
+    workspace.client.post(f"{workspace.base}/cancel", {"reason": "Praticien absent"})
+    again = workspace.client.get(f"{workspace.base}/cancel")
+
+    assert (again.status_code, again["Location"]) == (302, workspace.base)
+
+
 def test_rescheduling_from_the_strip_moves_it_and_a_busy_start_is_refused_inline(
     workspace: Workspace,
 ) -> None:

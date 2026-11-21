@@ -22,6 +22,7 @@ from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
+from drlibre.shared_kernel.validation import invalid_field
 
 
 class Placement:
@@ -213,7 +214,9 @@ class Placement:
             now=now,
             type_online=kind.bookable_online,
             open_online_count=(
-                0 if patient_id is None else self._appointments.open_online_count(patient_id, now)
+                self._appointments.open_online_count(patient_id, now)
+                if for_patient and patient_id is not None
+                else 0
             ),
             is_free_slot=self._free_slots.is_free(
                 clinician_id, kind.id, start, ignoring_hold=ignoring_hold
@@ -251,6 +254,8 @@ class Placement:
 
     def named_room(self, kind: BookableType, room_id: Id, start: datetime, end: datetime) -> Id:
         """The named active room of the type's department; not_found, else conflict when taken."""
+        if not kind.needs_room:
+            raise invalid_field("room", "Ce type de rendez-vous ne prend pas de salle.")
         self._locks.lock_rooms(kind.department_id)
         if room_id not in self._directory.rooms(kind.department_id):
             raise DomainError(ErrorCode.NOT_FOUND, "Salle introuvable.")

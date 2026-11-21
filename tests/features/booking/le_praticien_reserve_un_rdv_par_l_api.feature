@@ -80,6 +80,13 @@ Feature: Le praticien réserve un RDV par l'API
     Then the booking is refused as "not_found"
     And nothing was written
 
+  Scenario: Une salle nommée doit être active ; sans salle nommée, un type qui en exige une reçoit la salle par défaut si libre, sinon la première salle libre du département, sinon `no_room_available`. (salle nommée pour un type sans salle)
+    Given the appointment type needs no room
+    When the clinician books the patient at "2026-11-20 10:30" in room "R2"
+    Then the booking is refused as "invalid_input"
+    And the refusal names the field "room"
+    And nothing was written
+
   Scenario: Une salle nommée doit être active ; sans salle nommée, un type qui en exige une reçoit la salle par défaut si libre, sinon la première salle libre du département, sinon `no_room_available`. (salle nommée libre)
     When the clinician books the patient at "2026-11-20 10:30" in room "R2"
     Then the appointment is "BOOKED" in room "R2"
