@@ -54,19 +54,21 @@ from drlibre.booking.application.use_cases.book_appointment import BookAppointme
 from drlibre.booking.application.use_cases.book_for_patient import BookForPatientUseCase
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.check_in_appointment import CheckInAppointmentUseCase
-from drlibre.booking.application.use_cases.clinician_reads import (
+from drlibre.booking.application.use_cases.clinician_appointment import (
     ClinicianAppointmentUseCase,
-    ClinicianDayUseCase,
-    ClinicianPatientsUseCase,
-    ClinicianWeekUseCase,
-    DepartmentRoomsDayUseCase,
-    ListClinicianAppointmentsUseCase,
 )
+from drlibre.booking.application.use_cases.clinician_day import ClinicianDayUseCase
+from drlibre.booking.application.use_cases.clinician_patients import ClinicianPatientsUseCase
+from drlibre.booking.application.use_cases.clinician_week import ClinicianWeekUseCase
 from drlibre.booking.application.use_cases.complete_appointment import (
     CompleteAppointmentUseCase,
 )
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
+from drlibre.booking.application.use_cases.department_rooms_day import DepartmentRoomsDayUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.list_clinician_appointments import (
+    ListClinicianAppointmentsUseCase,
+)
 from drlibre.booking.application.use_cases.list_patient_appointments import (
     ListPatientAppointmentsUseCase,
 )
