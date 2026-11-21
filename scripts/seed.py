@@ -77,6 +77,14 @@ ROOMS = (
         "equipment": "ECG, Tensiomètre",
     },
     {
+        "code": "HNORD-C102",
+        "name": "Consultation 102",
+        "department": "HNORD-CARD",
+        "floor": "1",
+        "capacity": "1",
+        "equipment": "Tensiomètre",
+    },
+    {
         "code": "HNORD-P201",
         "name": "Consultation 201",
         "department": "HNORD-PEDIA",
@@ -120,12 +128,16 @@ TYPES = (
     },
 )
 ADMIN_EMAIL = "admin@drlibre.localhost"
+CLINICIAN_EMAIL = "clinicien@drlibre.localhost"
+# A second clinician of the same department, so journeys see another clinician's rows.
+SECOND_CLINICIAN_EMAIL = "clinicien2@drlibre.localhost"
 VISITOR_EMAIL = "visiteur@drlibre.localhost"
 # The honorific is the profile's title (spec §3.1); seeds before it put it in the name too.
 LEGACY_CLINICIAN_NAME = "Dr Claire Martin"
 USERS = (
     ("ADMIN", "Alice Admin", ADMIN_EMAIL),
-    ("CLINICIAN", "Claire Martin", "clinicien@drlibre.localhost"),
+    ("CLINICIAN", "Claire Martin", CLINICIAN_EMAIL),
+    ("CLINICIAN", "Hugo Bernard", SECOND_CLINICIAN_EMAIL),
     ("PATIENT", "Paul Patient", "patient@drlibre.localhost"),
 )
 
@@ -223,17 +235,29 @@ def _rename_legacy(app: Container, user_id: Id, name: str) -> None:
     )
 
 
+# Email, default room and bio of each demo clinician of HNORD-CARD.
+CLINICIANS = (
+    (CLINICIAN_EMAIL, "HNORD-C101", "Cardiologue, consultations adultes."),
+    (SECOND_CLINICIAN_EMAIL, "HNORD-C102", "Cardiologue, suivi des insuffisants cardiaques."),
+)
+
+
 def seed_clinician_profile(app: Container) -> None:
-    clinician = _user_id(app, "clinicien@drlibre.localhost")
+    for email, room, bio in CLINICIANS:
+        _seed_clinician_profile(app, email, room, bio)
+
+
+def _seed_clinician_profile(app: Container, email: str, room: str, bio: str) -> None:
+    clinician = _user_id(app, email)
     q = app.reference_queries
     if clinician is None:
         return
     fields = {
         "department_id": str(_by_code(q.departments, "HNORD-CARD")),
         "specialty_id": str(_by_code(q.specialties, "CARDIO")),
-        "default_room_id": str(_by_code(q.rooms, "HNORD-C101")),
+        "default_room_id": str(_by_code(q.rooms, room)),
         "title": "Dr",
-        "bio": "Cardiologue, consultations adultes.",
+        "bio": bio,
     }
     profile = q.clinician_profile_of(clinician)
     if profile is not None:
@@ -256,7 +280,12 @@ DEMO_RULES = tuple(
 
 
 def seed_availability(app: Container) -> None:
-    clinician = _user_id(app, "clinicien@drlibre.localhost")
+    for email, _, _ in CLINICIANS:
+        _seed_availability(app, email)
+
+
+def _seed_availability(app: Container, email: str) -> None:
+    clinician = _user_id(app, email)
     profile = app.reference_queries.clinician_profile_of(clinician) if clinician else None
     if clinician is None or profile is None:
         return
@@ -298,7 +327,7 @@ def _next_working_day(now: datetime) -> datetime:
 
 def seed_demo_appointments(app: Container) -> None:
     """A few BOOKED appointments of the passwordless patient on the demo clinician's next day."""
-    clinician = _user_id(app, "clinicien@drlibre.localhost")
+    clinician = _user_id(app, CLINICIAN_EMAIL)
     patient = _user_id(app, VISITOR_EMAIL)
     q = app.reference_queries
     profile = q.clinician_profile_of(clinician) if clinician else None

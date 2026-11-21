@@ -46,6 +46,23 @@ def test_the_demo_seed_can_run_again_without_duplicating_rows() -> None:
     assert set(seeded.values_list("actor_id", flat=True)) == {admin.id}
 
 
+def test_the_second_demo_clinician_shares_the_demo_department_once_even_after_a_reseed() -> None:
+    """Epic E6: a second clinician of HNORD-CARD with its own room and rules, seeded once."""
+    seed.main()
+    seed.main()
+
+    users = UserRecord.objects.filter(email=seed.SECOND_CLINICIAN_EMAIL)
+    (user,) = users
+    profiles = ClinicianProfileRecord.objects.filter(user_id=user.id)
+    (profile,) = profiles
+    demo = UserRecord.objects.get(email=seed.CLINICIAN_EMAIL)
+    first = ClinicianProfileRecord.objects.get(user_id=demo.id)
+    assert (user.role, profile.department_id) == ("CLINICIAN", first.department_id)
+    assert profile.default_room_id != first.default_room_id
+    rules = container().availability_queries.rules_of(Id(profile.id))
+    assert len(rules) == len(seed.DEMO_RULES)
+
+
 def test_the_demo_clinician_has_free_slots_after_the_seed() -> None:
     """Epic E2: the seeded weekly rules give the demo clinician bookable slots."""
     seed.main()

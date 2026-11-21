@@ -1,4 +1,3 @@
-import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -7,12 +6,10 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from tests.e2e.pages import (
-    DEMO_PASSWORD,
     check_accessible,
     clear_mail,
     read_link,
     read_mail,
-    save,
     sign_in,
 )
 
@@ -20,6 +17,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.integration]
 
 PARIS = ZoneInfo("Europe/Paris")
 CLINICIAN = "clinicien@drlibre.localhost"
+OTHER_CLINICIAN = "clinicien2@drlibre.localhost"
 PATIENT = "visiteur@drlibre.localhost"
 PATIENT_NAME = "Victor Visiteur"
 NOTES = "Tension 12/8, revoir dans un mois"
@@ -54,17 +52,28 @@ def _free_starts(page: Page, base_url: str, *, kind: str, clinician: str, day: d
 def _free_day(page: Page, base_url: str, *, kind: str, clinician: str) -> date:
     """The first weekday from three weeks ahead with room for three appointments."""
     # Three weeks ahead keeps clear of the seeded day and of the patient journeys' weeks.
+    # Each run leaves a COMPLETED appointment, so a later run moves on once a day fills up.
     day = date.today() + timedelta(days=21 - date.today().weekday())
     while len(_free_starts(page, base_url, kind=kind, clinician=clinician, day=day)) < 6:
         day += timedelta(days=3 if day.weekday() == 4 else 1)
     return day
 
 
-def _book(page: Page, base_url: str, *, kind: str, clinician: str, patient: str, day: date) -> str:
-    """Books the patient on the first free slot of the day through the clinician API."""
+def _book(
+    page: Page,
+    base_url: str,
+    *,
+    kind: str,
+    clinician: str,
+    patient: str,
+    day: date,
+    last: bool = False,
+) -> str:
+    """Books the patient on the first, or last, free slot of the day through the clinician API."""
     starts = _free_starts(page, base_url, kind=kind, clinician=clinician, day=day)
+    start = starts[-1 if last else 0]
     booked = _api(
-        page, base_url, "/appointments", {"type": kind, "start": starts[0], "patient": patient}
+        page, base_url, "/appointments", {"type": kind, "start": start, "patient": patient}
     )
     assert booked.status == 201, booked.text()
     return booked.json()["id"]
@@ -85,37 +94,6 @@ def _row_action(page: Page, label: str, row: str) -> None:
     page.get_by_role("button", name=f"{label} : {row}").click()
 
 
-def _other_clinician(browser: Browser, base_url: str) -> Page:
-    """A second clinician account with its profile, signed in with its chosen password."""
-    run = uuid.uuid4().hex[:6].upper()
-    email = f"e2e.{run.lower()}@example.org"
-    admin = browser.new_context(bypass_csp=True, locale="fr-FR").new_page()
-    sign_in(admin, base_url, "admin@drlibre.localhost")
-    admin.goto(f"{base_url}/console/users/new")
-    admin.get_by_label("Nom complet").fill(f"Dr Autre {run}")
-    admin.get_by_label("Email").fill(email)
-    admin.get_by_label("Rôle").select_option(label="Praticien")
-    admin.get_by_label("Mot de passe temporaire").fill("temporary-pass-1")
-    save(admin)
-    expect(admin.get_by_role("status")).to_be_visible()
-    admin.goto(f"{base_url}/console/clinicians/new")
-    admin.get_by_label("Praticien", exact=True).select_option(label=f"Dr Autre {run}")
-    admin.get_by_label("Département").select_option(label="Pédiatrie (HNORD-PEDIA) · Hôpital Nord")
-    admin.get_by_label("Spécialité").select_option(label="Pédiatrie (PEDIA)")
-    admin.get_by_label("Titre").fill("Dr")
-    save(admin)
-    expect(admin.get_by_role("status")).to_be_visible()
-    admin.context.close()
-
-    other = browser.new_context(bypass_csp=True, locale="fr-FR").new_page()
-    sign_in(other, base_url, email, "temporary-pass-1")
-    other.get_by_label("Mot de passe actuel").fill("temporary-pass-1")
-    other.get_by_label("Nouveau mot de passe").fill(DEMO_PASSWORD)
-    other.get_by_role("button", name="Enregistrer").click()
-    expect(other).to_have_url(f"{base_url}/workspace/")
-    return other
-
-
 def test_le_praticien_fait_avancer_annule_et_note_ses_rdv_sans_voir_ceux_d_un_autre(
     browser: Browser, base_url: str
 ) -> None:
@@ -127,6 +105,8 @@ def test_le_praticien_fait_avancer_annule_et_note_ses_rdv_sans_voir_ceux_d_un_au
     kind = _id_in_link(admin, "Modifier Consultation de cardiologie")
     admin.goto(f"{base_url}/console/clinicians/?search=Martin")
     clinician = _id_in_link(admin, "Calendrier de Claire Martin")
+    admin.goto(f"{base_url}/console/clinicians/?search=Bernard")
+    other_clinician = _id_in_link(admin, "Calendrier de Hugo Bernard")
     admin.context.close()
 
     page = browser.new_context(bypass_csp=True, locale="fr-FR").new_page()
@@ -139,6 +119,14 @@ def test_le_praticien_fait_avancer_annule_et_note_ses_rdv_sans_voir_ceux_d_un_au
         _book(page, base_url, kind=kind, clinician=clinician, patient=patient, day=day)
         for _ in range(3)
     ]
+
+    other = browser.new_context(bypass_csp=True, locale="fr-FR").new_page()
+    sign_in(other, base_url, OTHER_CLINICIAN)
+    # Booked before the cancel, so « RDV annulé » stays the patient's newest notification.
+    # The last slot keeps clear of the patient's morning appointments with the demo clinician.
+    _book(
+        other, base_url, kind=kind, clinician=other_clinician, patient=patient, day=day, last=True
+    )
 
     page.goto(f"{base_url}/workspace/?day={day}")
     check_accessible(page)
@@ -185,8 +173,9 @@ def test_le_praticien_fait_avancer_annule_et_note_ses_rdv_sans_voir_ceux_d_un_au
     for path in (f"calendar?week={day}", "patients", f"rooms?day={day}"):
         page.goto(f"{base_url}/workspace/{path}")
         check_accessible(page)
+    # The other clinician's appointment shows in the shared rooms without its patient.
+    expect(page.locator("tbody td.busy").filter(has_text="Occupied").first).to_be_visible()
 
-    other = _other_clinician(browser, base_url)
     response = other.goto(f"{base_url}/workspace/appointments/{ids[0]}")
     assert response is not None
     assert response.status == 403

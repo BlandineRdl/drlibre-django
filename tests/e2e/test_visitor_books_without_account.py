@@ -1,3 +1,4 @@
+import re
 import uuid
 
 import pytest
@@ -66,5 +67,6 @@ def test_visitor_picks_the_first_available_provider_of_a_specialty(
 
     expect(page.get_by_role("heading", name="Rendez-vous réservé")).to_be_visible()
     check_accessible(page)
-    expect(page.locator("article").first).to_contain_text("Claire Martin")
+    # Round robin may pick either demo clinician of the department.
+    expect(page.locator("article").first).to_contain_text(re.compile("Claire Martin|Hugo Bernard"))
     expect(page.get_by_text("Premier praticien disponible")).to_have_count(0)
