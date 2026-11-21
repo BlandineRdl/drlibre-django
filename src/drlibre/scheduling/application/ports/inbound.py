@@ -16,6 +16,7 @@ __all__ = [
     "DeleteTimeOff",
     "ExtendSlotHorizon",
     "FindFreeSlots",
+    "NextBookableSlots",
     "RecordTimeOff",
     "RefreshSlots",
     "RoomUsage",
@@ -31,6 +32,15 @@ class FindFreeSlots(Protocol):
         self, *, appointment_type_id: Id, clinician_id: Id | None, start: datetime, end: datetime
     ) -> tuple[Slot, ...]:
         """Sorted free slots; invalid_input over 31 days, not_found for a bad type or clinician."""
+        ...
+
+
+class NextBookableSlots(Protocol):
+    def execute(self, *, appointment_type_id: Id, clinician_id: Id | None) -> tuple[Slot, ...]:
+        """Sorted free slots a patient can still book, from the booking lead time on.
+
+        Empty when the type or clinician is unknown; a clinician of None means the whole department.
+        """
         ...
 
 

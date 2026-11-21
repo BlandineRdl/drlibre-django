@@ -194,6 +194,7 @@ from drlibre.scheduling.application.ports.inbound import (
     DeleteTimeOff,
     ExtendSlotHorizon,
     FindFreeSlots,
+    NextBookableSlots,
     RecordTimeOff,
     SaveAvailabilityRule,
 )
@@ -212,6 +213,7 @@ from drlibre.scheduling.application.use_cases.delete_availability_rule import (
 from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
 from drlibre.scheduling.application.use_cases.extend_slot_horizon import ExtendSlotHorizonUseCase
 from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
+from drlibre.scheduling.application.use_cases.next_bookable_slots import NextBookableSlotsUseCase
 from drlibre.scheduling.application.use_cases.record_time_off import RecordTimeOffUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.application.use_cases.save_availability_rule import (
@@ -351,6 +353,7 @@ class Container:
     availability_queries: AvailabilityQueries
     extend_slot_horizon: ExtendSlotHorizon
     find_free_slots: FindFreeSlots
+    next_bookable_slots: NextBookableSlots
     book_appointment: BookAppointment
     require_patient: RequirePatient
     create_hold: CreateHold
@@ -377,6 +380,9 @@ class Container:
 def wire(a: Adapters) -> Container:
     clock, uow, audit = a.clock, a.uow, a.audit
     directory = a.scheduling_directory
+    find_free_slots = FindFreeSlotsUseCase(
+        clock=clock, directory=directory, queries=a.slot_queries, holds=a.slot_holds
+    )
     refresh = RefreshSlotsUseCase(
         clock=clock,
         directory=directory,
@@ -570,9 +576,8 @@ def wire(a: Adapters) -> Container:
         extend_slot_horizon=ExtendSlotHorizonUseCase(
             uow=uow, rules=a.availability_rules, refresh=refresh
         ),
-        find_free_slots=FindFreeSlotsUseCase(
-            clock=clock, directory=directory, queries=a.slot_queries, holds=a.slot_holds
-        ),
+        find_free_slots=find_free_slots,
+        next_bookable_slots=NextBookableSlotsUseCase(clock=clock, find_free_slots=find_free_slots),
         book_appointment=booking.book_appointment,
         require_patient=booking.require_patient,
         create_hold=booking.create_hold,

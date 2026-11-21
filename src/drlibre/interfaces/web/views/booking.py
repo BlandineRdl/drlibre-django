@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import UUID
 
 from django.http import HttpRequest, HttpResponse
@@ -20,12 +20,9 @@ from drlibre.interfaces.web.presenters.booking import (
     refused_page,
 )
 from drlibre.interfaces.web.presenters.calendar_file import calendar_file
-from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 
-# The booking lead time (spec 7.1): earlier slots are never offered again.
-REFRESH_DAYS = 14
 RESENT = "Un nouveau code vient d'être envoyé."
 GONE = "Cette réservation provisoire a expiré. Choisissez un nouveau créneau."
 _INLINE = frozenset(
@@ -102,16 +99,9 @@ def _refused(
     current_step: int,
     status: int,
 ) -> HttpResponse:
-    at = container().clock.now()
-    try:
-        found = container().find_free_slots.execute(
-            appointment_type_id=type_id,
-            clinician_id=clinician_id,
-            start=at + BOOKING_LEAD_TIME,
-            end=at + BOOKING_LEAD_TIME + timedelta(days=REFRESH_DAYS),
-        )
-    except DomainError:
-        found = ()
+    found = container().next_bookable_slots.execute(
+        appointment_type_id=type_id, clinician_id=clinician_id
+    )
     slots = refreshed_slots(
         found,
         type_id=type_id,
