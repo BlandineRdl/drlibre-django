@@ -6,6 +6,7 @@ from drlibre.organisation.application.ports.outbound import (
     ClinicianProfiles,
     Departments,
     Rooms,
+    SlotRefresh,
     Specialties,
     StaffDirectory,
 )
@@ -24,6 +25,7 @@ class AttachClinicianProfileUseCase(AttachClinicianProfile):
         clock: Clock,
         uow: UnitOfWork,
         audit: AuditLog,
+        slots: SlotRefresh,
         profiles: ClinicianProfiles,
         staff: StaffDirectory,
         departments: Departments,
@@ -33,6 +35,7 @@ class AttachClinicianProfileUseCase(AttachClinicianProfile):
         self._clock = clock
         self._uow = uow
         self._audit = audit
+        self._slots = slots
         self._profiles = profiles
         self._staff = staff
         self._departments = departments
@@ -52,6 +55,7 @@ class AttachClinicianProfileUseCase(AttachClinicianProfile):
         )
         with self._uow:
             self._profiles.save(profile)
+            self._slots.refresh((profile.id,))
             self._audit.record(
                 AuditEntry.from_event(
                     actor=actor,

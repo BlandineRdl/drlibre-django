@@ -97,6 +97,12 @@ class ClinicianProfiles(Protocol):
         ...
 
 
+class SlotRefresh(Protocol):
+    def refresh(self, profile_ids: tuple[Id, ...]) -> None:
+        """Rebuild the profiles' stored slots in the caller's unit; a deleted profile keeps none."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class Clinician:
     user_id: Id

@@ -15,9 +15,18 @@ from tests.fakes.organisation import (
     InMemoryReferenceQueries,
     InMemoryRooms,
     InMemoryScheduleDependents,
+    InMemorySlotRefresh,
     InMemorySpecialties,
 )
 from tests.fakes.password_hasher import InMemoryPasswordHasher
+from tests.fakes.scheduling import (
+    FixedSchedulingDirectory,
+    InMemoryAvailabilityQueries,
+    InMemoryAvailabilityRules,
+    InMemoryClinicianAppointments,
+    InMemorySlotStore,
+    InMemoryTimeOffs,
+)
 from tests.fakes.sessions import InMemorySessions
 from tests.fakes.staff_directory import InMemoryStaffDirectory
 from tests.fakes.staff_profiles import InMemoryStaffProfiles
@@ -53,6 +62,15 @@ class FakeWorld:
         self.user_queries = InMemoryUserQueries(self.users)
         self.staff = InMemoryStaffDirectory()
         self.staff_profiles = InMemoryStaffProfiles()
+        self.scheduling_directory = FixedSchedulingDirectory()
+        self.availability_rules = InMemoryAvailabilityRules()
+        self.time_offs = InMemoryTimeOffs()
+        self.clinician_appointments = InMemoryClinicianAppointments()
+        self.slots = InMemorySlotStore()
+        self.slot_refresh = InMemorySlotRefresh()
+        self.availability_queries = InMemoryAvailabilityQueries(
+            rules=self.availability_rules, time_offs=self.time_offs
+        )
         self.uow = InMemoryUnitOfWork(
             self.audit,
             self.users,
@@ -63,6 +81,10 @@ class FakeWorld:
             self.rooms,
             self.appointment_types,
             self.profiles,
+            self.availability_rules,
+            self.time_offs,
+            self.slots,
+            self.slot_refresh,
         )
         self.app: Container = wire(self.adapters())
 
@@ -99,4 +121,12 @@ class FakeWorld:
             profiles=self.profiles,
             staff=self.staff,
             staff_profiles=self.staff_profiles,
+            scheduling_directory=self.scheduling_directory,
+            availability_rules=self.availability_rules,
+            time_offs=self.time_offs,
+            clinician_appointments=self.clinician_appointments,
+            slot_store=self.slots,
+            slot_queries=self.slots,
+            availability_queries=self.availability_queries,
+            slot_refresh=self.slot_refresh,
         )

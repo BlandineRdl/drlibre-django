@@ -2,7 +2,11 @@ import pytest
 
 from drlibre.organisation.infrastructure.django.models import HospitalRecord
 from drlibre.organisation.infrastructure.queries import DjangoReferenceQueries
-from drlibre.organisation.infrastructure.repositories import DjangoDepartments, DjangoHospitals
+from drlibre.organisation.infrastructure.repositories import (
+    DjangoDepartments,
+    DjangoHospitals,
+    DjangoRooms,
+)
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.pagination import PageRequest
 from tests import builders_organisation as build
@@ -82,3 +86,21 @@ def test_the_repository_itself_refuses_a_protected_delete_and_lists_the_child() 
             }
         ]
     }
+
+
+def test_a_department_lists_its_own_rooms_by_name_active_or_not() -> None:
+    """Story plages : la salle d'une plage est une salle de mon département."""
+    hospital = build.hospital()
+    DjangoHospitals().save(hospital)
+    mine, other = build.department(hospital.id), build.department(hospital.id)
+    DjangoDepartments().save(mine)
+    DjangoDepartments().save(other)
+    second = build.room(mine.id, name="Salle 2", active=False)
+    first = build.room(mine.id, name="Salle 1")
+    for room in (second, first, build.room(other.id)):
+        DjangoRooms().save(room)
+
+    rooms = DjangoReferenceQueries().department_rooms(mine.id)
+
+    assert [r.id for r in rooms] == [first.id, second.id]
+    assert [r.active for r in rooms] == [True, False]

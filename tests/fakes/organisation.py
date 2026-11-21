@@ -8,6 +8,7 @@ from drlibre.organisation.application.ports.outbound import (
     Hospitals,
     Rooms,
     ScheduleDependents,
+    SlotRefresh,
     Specialties,
 )
 from drlibre.organisation.domain.appointment_type import AppointmentType
@@ -184,6 +185,15 @@ class InMemoryReferenceQueries(ReferenceQueries):
     def profiled_user_ids(self) -> frozenset[Id]:
         return frozenset(p.user_id for p in self.profiles.rows.values())
 
+    def department_clinician_profiles(self, department_id: Id) -> tuple[ClinicianProfile, ...]:
+        return self.profiles.matching(department_id=department_id)
+
+    def department_appointment_types(self, department_id: Id) -> tuple[AppointmentType, ...]:
+        return self.stores[4].where(department_id=department_id)
+
+    def department_rooms(self, department_id: Id) -> tuple[Room, ...]:
+        return self.stores[3].where(department_id=department_id)
+
 
 class InMemoryClinicianProfiles(ClinicianProfiles):
     def __init__(self) -> None:
@@ -219,3 +229,11 @@ class InMemoryClinicianProfiles(ClinicianProfiles):
             if all(getattr(p, k) == v for k, v in wanted.items() if v is not None)
         ]
         return tuple(sorted(found, key=lambda p: p.title))
+
+
+class InMemorySlotRefresh(SlotRefresh):
+    def __init__(self) -> None:
+        self.refreshed: list[Id] = []
+
+    def refresh(self, profile_ids: tuple[Id, ...]) -> None:
+        self.refreshed.extend(profile_ids)

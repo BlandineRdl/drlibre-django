@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Mes plages{% endblock %}
+{% block content %}
+<div class="actions">
+  <h1>Mes plages</h1>
+  <a href="/workspace/availability/new" role="button">Ajouter une plage</a>
+</div>
+<p>Fuseau : {{ view.time_zone }}. Les heures sont saisies et affichées en heure locale de votre hôpital.</p>
+{% if view.status %}<p role="status">{{ view.status }}</p>{% endif %}
+{% if view.rows %}
+<div class="overflow-auto">
+  <table>
+    <caption>Mes plages hebdomadaires, heure locale ({{ view.time_zone }})</caption>
+    <thead><tr><th scope="col">Jour</th><th scope="col">Horaire</th><th scope="col">Pas</th><th scope="col">Salle</th><th scope="col">Actions</th></tr></thead>
+    <tbody>
+    {% for row in view.rows %}
+      <tr>
+        <th scope="row">{{ row.day }}</th><td>{{ row.hours }}</td><td>{{ row.step }}</td><td>{{ row.room }}</td>
+        <td class="actions">
+          <a href="{{ row.edit_url }}" aria-label="Modifier la plage {{ row.label }}">Modifier</a>
+          <a href="{{ row.delete_url }}" aria-label="Supprimer la plage {{ row.label }}">Supprimer</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>Aucune plage pour l'instant.</p>
+{% endif %}
+{% endblock %}

@@ -1,6 +1,10 @@
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.organisation.application.ports.inbound import DeleteClinicianProfile
-from drlibre.organisation.application.ports.outbound import ClinicianProfiles, ScheduleDependents
+from drlibre.organisation.application.ports.outbound import (
+    ClinicianProfiles,
+    ScheduleDependents,
+    SlotRefresh,
+)
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.dependents import Dependents
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -15,12 +19,14 @@ class DeleteClinicianProfileUseCase(DeleteClinicianProfile):
         clock: Clock,
         uow: UnitOfWork,
         audit: AuditLog,
+        slots: SlotRefresh,
         profiles: ClinicianProfiles,
         schedule: ScheduleDependents,
     ) -> None:
         self._clock = clock
         self._uow = uow
         self._audit = audit
+        self._slots = slots
         self._profiles = profiles
         self._schedule = schedule
 
@@ -34,6 +40,7 @@ class DeleteClinicianProfileUseCase(DeleteClinicianProfile):
                 "Ce praticien a des rendez-vous."
             )
             self._profiles.delete(profile.id)
+            self._slots.refresh((profile.id,))
             self._audit.record(
                 AuditEntry.from_event(
                     actor=actor,

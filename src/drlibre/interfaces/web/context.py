@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.http import HttpRequest
 
+from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import identity_of
 
 
@@ -11,5 +12,6 @@ def shell(request: HttpRequest) -> dict[str, object]:
         "shell": {
             "signed_in": identity is not None,
             "can_change_password": identity is not None and identity.has_password,
+            "is_clinician": identity is not None and identity.role is Role.CLINICIAN,
         },
     }
