@@ -6,6 +6,7 @@ from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
 from drlibre.booking.domain.booking_rules import ClinicianAction, PatientAction
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
+from drlibre.booking.domain.waitlist import WaitlistEntry
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
 
@@ -18,6 +19,7 @@ class BookableType:
     needs_room: bool
     bookable_online: bool
     active: bool
+    time_zone: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +68,12 @@ class Appointments(Protocol):
 
     def booked_starting(self, after: datetime, until: datetime) -> tuple[Appointment, ...]:
         """BOOKED appointments starting after the first instant, up to the second, by start."""
+        ...
+
+    def cancelled_of_type(
+        self, appointment_type_id: Id, *, after: datetime, earliest: datetime, latest: datetime
+    ) -> tuple[Appointment, ...]:
+        """CANCELLED appointments of the type starting after `after` inside the window, by start."""
         ...
 
     def conflicting_resources(
@@ -180,6 +188,16 @@ class Patients(Protocol):
         """The patient's email, or None when the id is not a patient."""
         ...
 
+    def active_patient_by_email(self, email: str) -> Id | None:
+        """The active patient of the email, any case, or None."""
+        ...
+
+
+class Staff(Protocol):
+    def is_admin(self, user_id: Id) -> bool:
+        """Whether the id is an active admin."""
+        ...
+
 
 class BookingNotices(Protocol):
     def code_sent(self, *, email: str, code: str) -> None:
@@ -208,6 +226,14 @@ class BookingNotices(Protocol):
 
     def already_reminded(self, appointment_ids: frozenset[Id]) -> frozenset[Id]:
         """Those of the appointments whose reminder is already written."""
+        ...
+
+    def waitlist_offered(self, entry: WaitlistEntry, start: datetime, clinician_id: Id) -> None:
+        """Write « Créneau proposé », linking no appointment, and queue its email."""
+        ...
+
+    def waitlist_booked(self, appointment: Appointment) -> None:
+        """Write the « Créneau réservé » notification and queue its email."""
         ...
 
 
@@ -424,4 +450,50 @@ class HistoryEntry:
 class AppointmentHistory(Protocol):
     def entries_of(self, appointment_id: Id) -> tuple[HistoryEntry, ...]:
         """The appointment's audit entries, oldest first; empty when there is none."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ExpiringEntry:
+    """A waitlist entry due for expiry, with the start of its offered appointment if any."""
+
+    entry: WaitlistEntry
+    offered_start: datetime | None
+
+
+class Waitlist(Protocol):
+    def add(self, entry: WaitlistEntry) -> None:
+        """Store the new entry."""
+        ...
+
+    def save(self, entry: WaitlistEntry) -> None:
+        """Replace the stored entry; not_found when absent, conflict when its offer is taken."""
+        ...
+
+    def get(self, entry_id: Id) -> WaitlistEntry | None:
+        """The entry, whatever its status, or None."""
+        ...
+
+    def get_locked(self, entry_id: Id) -> WaitlistEntry | None:
+        """The entry, held against other writers until the caller's unit ends, or None."""
+        ...
+
+    def candidates_locked(
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding_patient: Id,
+    ) -> tuple[WaitlistEntry, ...]:
+        """WAITING entries the slot matches, other patients only, locked as a set, by id."""
+        ...
+
+    def holds_offer(self, appointment_id: Id) -> bool:
+        """Whether an OFFERED entry holds the appointment."""
+        ...
+
+    def expiring_locked(self, now: datetime) -> tuple[ExpiringEntry, ...]:
+        """Locked WAITING entries past latest, OFFERED ones whose offer starts by now; by id."""
         ...

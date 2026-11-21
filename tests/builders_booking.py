@@ -20,6 +20,7 @@ def bookable_type(
     bookable_online: bool = True,
     active: bool = True,
     duration_minutes: int = 30,
+    time_zone: str = "Europe/Paris",
 ) -> BookableType:
     return BookableType(
         id=Id(),
@@ -28,6 +29,7 @@ def bookable_type(
         needs_room=needs_room,
         bookable_online=bookable_online,
         active=active,
+        time_zone=time_zone,
     )
 
 

@@ -18,7 +18,7 @@ status: done
 │   ├── application/use_cases/{check_in_appointment,complete_appointment,mark_no_show,write_clinical_notes}.py ✅
 │   ├── infrastructure/directory.py                              ✏️  `clinician_of_user` via `ReferenceQueries.clinician_profile_of`
 │   ├── infrastructure/repositories.py                           ✏️  map `clinical_notes`
-│   └── infrastructure/django/{models.py,migrations/0003_appointment_clinical_notes.py} ✏️✅
+│   └── infrastructure/django/{models.py,migrations/0004_appointment_clinical_notes.py} ✏️✅
 ├── src/drlibre/bootstrap/container.py                           ✏️  wire the four use cases
 └── tests/
     ├── fakes/booking.py                                         ✏️  `FixedBookingDirectory.clinician_of_user`, notes kept by `InMemoryAppointments`

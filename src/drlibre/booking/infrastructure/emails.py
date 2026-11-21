@@ -34,3 +34,5 @@ CONFIRMED = ("Confirmation de votre rendez-vous", "Votre rendez-vous est confirm
 RESCHEDULED = ("Votre rendez-vous est déplacé", "Votre rendez-vous a été déplacé.")
 CANCELLED = ("Votre rendez-vous est annulé", "Votre rendez-vous a été annulé.")
 REMINDER = ("Rappel de votre rendez-vous", "Rappel : votre rendez-vous approche.")
+WAITLIST_OFFERED = ("Un créneau vous est proposé", "Un créneau libéré vous est proposé.")
+WAITLIST_BOOKED = ("Votre créneau est réservé", "Le créneau proposé est réservé pour vous.")

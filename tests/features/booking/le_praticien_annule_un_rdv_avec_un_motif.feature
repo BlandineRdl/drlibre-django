@@ -61,6 +61,21 @@ Feature: Le praticien annule un RDV avec un motif
     And the notification names neither the patient nor the reason
     And one email "Votre rendez-vous est annulé" names the time, hospital and provider, without the reason, linking only to the sign-in page
 
+  Scenario: L'annulation lance l'offre automatique de la liste d'attente sur le créneau libéré.
+    Given an active patient "lea@example.org"
+    And "lea@example.org" waits from "2026-11-20 00:00" to "2026-11-21 00:00" since "2026-11-01 08:00"
+    When the clinician cancels it giving the reason "Urgence au bloc"
+    Then the entry of "lea@example.org" is offered the appointment the patient cancelled
+    And "lea@example.org" has one "Créneau proposé" notification at "20/11/2026 à 13:00", linking no appointment
+
+  Scenario: L'annulation lance l'offre automatique de la liste d'attente sur le créneau libéré. (pas au patient du RDV annulé)
+    Given an active patient "lea@example.org"
+    And "patient@example.org" waits from "2026-11-20 00:00" to "2026-11-21 00:00" since "2026-11-01 08:00"
+    And "lea@example.org" waits from "2026-11-20 00:00" to "2026-11-21 00:00" since "2026-11-02 08:00"
+    When the clinician cancels it giving the reason "Urgence au bloc"
+    Then the entry of "lea@example.org" is offered the appointment the patient cancelled
+    And the entry of "patient@example.org" is unchanged
+
   Scenario: Sur le RDV d'un autre praticien, l'annulation est refusée avec `forbidden`.
     Given the signed-in clinician is "B"
     When the clinician cancels it giving the reason "Urgence au bloc"

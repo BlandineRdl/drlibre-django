@@ -113,13 +113,14 @@ class Placement:
         appointment_type_id: Id,
         start: datetime,
         source: Source,
+        actor_id: Id,
+        for_patient: bool,
         ignoring_hold: Id | None = None,
         reason: str | None = None,
-        for_patient: bool = True,
-        actor: Id | None = None,
         room_id: Id | None = None,
+        announce: bool = True,
     ) -> Appointment:
-        """Book once every step passes; staff skip patient rules and may name a room."""
+        """Book for the patient on the actor's behalf; staff skip patient rules, may name a room."""
         with self._uow:
             self._locks.lock_clinician(clinician_id)
             self._locks.lock_patient(patient_id)
@@ -154,10 +155,12 @@ class Placement:
                 reason=reason,
             )
             self._appointments.add(appointment)
-            self._notices.booked(appointment)
-            self._audit.record(self._booked_entry(appointment, actor or patient_id))
+            if announce:
+                self._notices.booked(appointment)
+            self._audit.record(self._booked_entry(appointment, actor_id))
             self._slot_refresh.refresh(clinician_id)
-            self._notices.confirmed(appointment)
+            if announce:
+                self._notices.confirmed(appointment)
             return appointment
 
     def refuse_conflicts(
@@ -267,7 +270,7 @@ class Placement:
             )
         return room_id
 
-    def _booked_entry(self, appointment: Appointment, actor: Id) -> AuditEntry:
+    def _booked_entry(self, appointment: Appointment, actor_id: Id) -> AuditEntry:
         metadata: dict[str, object] = {
             "clinician_id": appointment.clinician_id,
             "appointment_type_id": appointment.appointment_type_id,
@@ -279,7 +282,7 @@ class Placement:
         if domain is not None:
             metadata["email_domain"] = domain
         return AuditEntry.from_event(
-            actor=actor,
+            actor=actor_id,
             action="booking.appointment_booked",
             entity_type="appointment",
             entity_id=appointment.id,

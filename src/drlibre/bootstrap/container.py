@@ -7,6 +7,7 @@ from drlibre.audit.infrastructure.audit_log import DjangoAuditLog
 from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
+    AcceptWaitlistOffer,
     BookAppointment,
     BookAppointmentAsCaller,
     CancelAppointment,
@@ -19,9 +20,12 @@ from drlibre.booking.application.ports.inbound import (
     CreateHold,
     DepartmentRoomsDay,
     ExpireHolds,
+    ExpireWaitlist,
+    JoinWaitlist,
     ListAppointmentsAsCaller,
     ListPatientAppointments,
     MarkNoShow,
+    OfferCancelledSlot,
     OpenHolds,
     RequirePatient,
     RescheduleAppointment,
@@ -30,6 +34,7 @@ from drlibre.booking.application.ports.inbound import (
     VerifyHold,
     ViewAppointment,
     ViewHold,
+    WaitlistQueries,
     WriteClinicalNotes,
 )
 from drlibre.booking.application.ports.outbound import (
@@ -44,12 +49,17 @@ from drlibre.booking.application.ports.outbound import (
     Patients,
     RoundRobinLedger,
     ScheduleLocks,
+    Staff,
     VerificationCodes,
+    Waitlist,
 )
 from drlibre.booking.application.ports.outbound import (
     Appointments as BookingAppointments,
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
+from drlibre.booking.application.use_cases.accept_waitlist_offer import (
+    AcceptWaitlistOfferUseCase,
+)
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
 from drlibre.booking.application.use_cases.book_appointment_as_caller import (
     BookAppointmentAsCallerUseCase,
@@ -69,6 +79,8 @@ from drlibre.booking.application.use_cases.complete_appointment import (
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.department_rooms_day import DepartmentRoomsDayUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.expire_waitlist import ExpireWaitlistUseCase
+from drlibre.booking.application.use_cases.join_waitlist import JoinWaitlistUseCase
 from drlibre.booking.application.use_cases.list_appointments_as_caller import (
     ListAppointmentsAsCallerUseCase,
 )
@@ -79,6 +91,7 @@ from drlibre.booking.application.use_cases.list_patient_appointments import (
     ListPatientAppointmentsUseCase,
 )
 from drlibre.booking.application.use_cases.mark_no_show import MarkNoShowUseCase
+from drlibre.booking.application.use_cases.offer_cancelled_slot import OfferCancelledSlotUseCase
 from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.application.use_cases.require_patient import RequirePatientUseCase
@@ -91,6 +104,7 @@ from drlibre.booking.application.use_cases.status_change import StatusChange
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
+from drlibre.booking.application.use_cases.waitlist_offers import WaitlistOffers
 from drlibre.booking.application.use_cases.write_clinical_notes import WriteClinicalNotesUseCase
 from drlibre.booking.infrastructure.audit_history import AuditAppointmentHistory
 from drlibre.booking.infrastructure.booking_slot_refresh import BookingSlotRefresh
@@ -102,6 +116,7 @@ from drlibre.booking.infrastructure.identity_patients import (
     IdentityPatientAccounts,
     IdentityPatientSessions,
 )
+from drlibre.booking.infrastructure.identity_staff import IdentityStaff
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.booking.infrastructure.patient_agenda import SqlPatientAgenda
 from drlibre.booking.infrastructure.patients import IdentityPatients
@@ -110,9 +125,11 @@ from drlibre.booking.infrastructure.repositories import (
     DjangoAppointments,
     DjangoHolds,
     DjangoVerificationCodes,
+    DjangoWaitlist,
 )
 from drlibre.booking.infrastructure.round_robin_ledger import OrganisationRoundRobinLedger
 from drlibre.booking.infrastructure.schedule_locks import DjangoScheduleLocks
+from drlibre.booking.infrastructure.waitlist_queries import SqlWaitlistQueries
 from drlibre.health.application.ports.inbound import CheckHealth
 from drlibre.health.application.ports.outbound import DatabaseProbe
 from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
@@ -353,6 +370,9 @@ class BookingAdapters:
     agenda: PatientAgenda
     clinician_agenda: ClinicianAgenda
     history: AppointmentHistory
+    waitlist: Waitlist
+    waitlist_queries: WaitlistQueries
+    staff: Staff
     network_hourly_limit: int = 20
 
 
@@ -466,6 +486,11 @@ class Container:
     clinician_patients: ClinicianPatients
     department_rooms_day: DepartmentRoomsDay
     list_appointments_as_caller: ListAppointmentsAsCaller
+    join_waitlist: JoinWaitlist
+    offer_cancelled_slot: OfferCancelledSlot
+    accept_waitlist_offer: AcceptWaitlistOffer
+    expire_waitlist: ExpireWaitlist
+    waitlist_queries: WaitlistQueries
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -723,6 +748,11 @@ def wire(a: Adapters) -> Container:
         clinician_patients=booking.clinician_patients,
         department_rooms_day=booking.department_rooms_day,
         list_appointments_as_caller=booking.list_appointments_as_caller,
+        join_waitlist=booking.join_waitlist,
+        offer_cancelled_slot=booking.offer_cancelled_slot,
+        accept_waitlist_offer=booking.accept_waitlist_offer,
+        expire_waitlist=booking.expire_waitlist,
+        waitlist_queries=booking.waitlist_queries,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -787,6 +817,11 @@ class _BookingUseCases:
     clinician_patients: ClinicianPatients
     department_rooms_day: DepartmentRoomsDay
     list_appointments_as_caller: ListAppointmentsAsCaller
+    join_waitlist: JoinWaitlist
+    offer_cancelled_slot: OfferCancelledSlot
+    accept_waitlist_offer: AcceptWaitlistOffer
+    expire_waitlist: ExpireWaitlist
+    waitlist_queries: WaitlistQueries
 
 
 def _wire_booking(
@@ -820,6 +855,9 @@ def _wire_booking(
     )
     list_patient_appointments = ListPatientAppointmentsUseCase(
         clock=a.clock, patients=booking.patients, agenda=booking.agenda
+    )
+    offers = WaitlistOffers(
+        clock=a.clock, audit=a.audit, waitlist=booking.waitlist, notices=booking.notices
     )
     return _BookingUseCases(
         book_appointment=book_appointment,
@@ -876,6 +914,7 @@ def _wire_booking(
             locks=booking.locks,
             slot_refresh=booking.slot_refresh,
             notices=booking.notices,
+            offers=offers,
         ),
         reschedule_appointment=RescheduleAppointmentUseCase(
             clock=a.clock,
@@ -940,6 +979,40 @@ def _wire_booking(
             ),
             list_patient_appointments=list_patient_appointments,
         ),
+        join_waitlist=JoinWaitlistUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            placement=placement,
+            patients=booking.patients,
+            staff=booking.staff,
+            waitlist=booking.waitlist,
+        ),
+        offer_cancelled_slot=OfferCancelledSlotUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            staff=booking.staff,
+            waitlist=booking.waitlist,
+            appointments=booking.appointments,
+            free_slots=booking.free_slots,
+            offers=offers,
+        ),
+        accept_waitlist_offer=AcceptWaitlistOfferUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            placement=placement,
+            appointments=booking.appointments,
+            locks=booking.locks,
+            patients=booking.patients,
+            staff=booking.staff,
+            waitlist=booking.waitlist,
+            notices=booking.notices,
+        ),
+        expire_waitlist=ExpireWaitlistUseCase(
+            clock=a.clock, uow=a.uow, audit=a.audit, waitlist=booking.waitlist
+        ),
+        waitlist_queries=booking.waitlist_queries,
     )
 
 
@@ -1051,6 +1124,9 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             agenda=SqlPatientAgenda(),
             clinician_agenda=SqlClinicianAgenda(),
             history=AuditAppointmentHistory(DjangoAuditQueries()),
+            waitlist=DjangoWaitlist(),
+            waitlist_queries=SqlWaitlistQueries(),
+            staff=IdentityStaff(user_queries),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),

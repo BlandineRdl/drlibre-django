@@ -18,7 +18,9 @@ class OrganisationBookingDirectory(BookingDirectory):
 
     def appointment_type(self, appointment_type_id: Id) -> BookableType | None:
         kind = self._queries.appointment_type(appointment_type_id)
-        if kind is None:
+        department = self._queries.department(kind.department_id) if kind else None
+        hospital = self._queries.hospital(department.hospital_id) if department else None
+        if kind is None or hospital is None:
             return None
         return BookableType(
             id=kind.id,
@@ -27,6 +29,7 @@ class OrganisationBookingDirectory(BookingDirectory):
             needs_room=kind.needs_room,
             bookable_online=kind.bookable_online,
             active=kind.active,
+            time_zone=hospital.time_zone,
         )
 
     def clinician(self, clinician_id: Id) -> BookableClinician | None:

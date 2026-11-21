@@ -5,11 +5,16 @@ import pytest
 
 from drlibre.booking.application.ports.inbound import AppointmentQueries
 from drlibre.booking.domain.appointment import AppointmentStatus
+from drlibre.booking.domain.waitlist import WaitlistEntry
 from drlibre.booking.infrastructure.queries import DjangoBookingQueries
-from drlibre.booking.infrastructure.repositories import DjangoAppointments
+from drlibre.booking.infrastructure.repositories import DjangoAppointments, DjangoWaitlist
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import existing_appointment, stored_scene
-from tests.fakes.booking import InMemoryAppointmentQueries, InMemoryAppointments
+from tests.fakes.booking import (
+    InMemoryAppointmentQueries,
+    InMemoryAppointments,
+    InMemoryWaitlist,
+)
 
 REAL = [pytest.mark.integration, pytest.mark.django_db]
 NOW = datetime(2026, 11, 20, 10, tzinfo=UTC)
@@ -19,6 +24,7 @@ NOW = datetime(2026, 11, 20, 10, tzinfo=UTC)
 class Scene:
     queries: AppointmentQueries
     store: DjangoAppointments | InMemoryAppointments
+    waitlist: DjangoWaitlist | InMemoryWaitlist
     clinician: Id
     clinician_user: Id
     kind: Id
@@ -31,15 +37,17 @@ class Scene:
 def scene(request: pytest.FixtureRequest) -> Scene:
     if request.param == "fake":
         store = InMemoryAppointments()
-        queries = InMemoryAppointmentQueries(store)
+        waitlist = InMemoryWaitlist(store)
+        queries = InMemoryAppointmentQueries(store, waitlist)
         clinician, user = Id(), Id()
         queries.clinician_users[clinician] = user
-        return Scene(queries, store, clinician, user, Id(), Id())
+        return Scene(queries, store, waitlist, clinician, user, Id(), Id())
     stored = stored_scene()
     profile = stored.clinicians[0]
     return Scene(
         DjangoBookingQueries(),
         DjangoAppointments(),
+        DjangoWaitlist(),
         profile.id,
         profile.user_id,
         stored.kind,
@@ -80,6 +88,32 @@ def test_appointments_of_a_type_a_room_or_a_clinician_block_their_deletion(scene
         assert [(d.kind, d.id) for d in found] == [("appointment", first), ("appointment", second)]
     assert scene.queries.dependents_of_type(Id()) == ()
     assert scene.queries.dependents_of_clinician(Id()) == ()
+
+
+def test_waitlist_entries_of_a_type_a_clinician_or_a_patient_block_their_deletion(
+    scene: Scene,
+) -> None:
+    """Story suppression : un type de RDV qui a des entrées d'attente ne peut pas être supprimé."""
+    patient = Id()
+    appointment = book(scene, NOW + timedelta(days=1), patient=patient)
+    entry = WaitlistEntry.join(
+        patient_id=patient,
+        appointment_type_id=scene.kind,
+        clinician_id=scene.clinician,
+        earliest=NOW,
+        latest=NOW + timedelta(days=7),
+        at=NOW,
+    )
+    scene.waitlist.add(entry)
+    expected = [("appointment", appointment), ("waitlist_entry", entry.id)]
+
+    for found in (
+        scene.queries.dependents_of_type(scene.kind),
+        scene.queries.dependents_of_clinician(scene.clinician),
+        scene.queries.any_for_user(patient),
+    ):
+        assert [(d.kind, d.id) for d in found] == expected
+    assert scene.queries.dependents_of_type(scene.kind)[1].label == "Attente du 20/11/2026"
 
 
 def test_a_clinician_user_is_blocked_by_active_upcoming_appointments_only(scene: Scene) -> None:

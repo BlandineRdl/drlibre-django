@@ -240,6 +240,29 @@ def test_each_notification_is_dated_in_its_appointment_hospital_zone() -> None:
     ]
 
 
+def test_waitlist_notifications_show_with_their_kind_and_no_appointment() -> None:
+    """Story « un créneau annulé est proposé » : « Créneau proposé » ne porte que l'heure."""
+    at = datetime(2026, 11, 20, 9, tzinfo=UTC)
+    offered, booked = (
+        Notification.for_event(
+            event=event,
+            recipient_id=Id(),
+            appointment_id=None,
+            start=START,
+            zone_name="Europe/Paris",
+            at=at,
+        )
+        for event in (AppointmentEvent.WAITLIST_OFFERED, AppointmentEvent.WAITLIST_BOOKED)
+    )
+
+    view = notifications_page(Page((offered, booked), total=2, number=1), "Europe/Paris")
+
+    assert [(i.title, i.kind) for i in view.items] == [
+        ("Créneau proposé", "Liste d'attente"),
+        ("Créneau réservé", "Liste d'attente"),
+    ]
+
+
 def test_the_profile_shows_the_password_link_only_to_a_password_holder() -> None:
     """Story « profil » : changement de mot de passe pour qui en a un, caché sinon."""
     user = patient_user(Id())

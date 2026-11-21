@@ -39,6 +39,6 @@ class BookForPatientUseCase(BookForPatient):
                 start=start,
                 source=Source.STAFF,
                 for_patient=False,
-                actor=actor_id,
+                actor_id=actor_id,
                 room_id=room_id,
             )

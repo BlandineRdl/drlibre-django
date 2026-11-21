@@ -27,11 +27,11 @@ class Notify(Protocol):
         *,
         event: AppointmentEvent,
         recipient_id: Id,
-        appointment_id: Id,
+        appointment_id: Id | None,
         start: datetime,
         zone_name: str,
     ) -> bool:
-        """Write the notification in the caller's unit of work; False for a second reminder."""
+        """Write the notification, appointment optional, in the unit of work; False if reminded."""
         ...
 
 

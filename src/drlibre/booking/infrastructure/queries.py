@@ -7,7 +7,7 @@ from drlibre.booking.application.ports.inbound import (
     AppointmentStatus,
     BookedPeriod,
 )
-from drlibre.booking.infrastructure.django.models import AppointmentRecord
+from drlibre.booking.infrastructure.django.models import AppointmentRecord, WaitlistEntryRecord
 from drlibre.booking.infrastructure.repositories import active_appointments
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
@@ -18,6 +18,14 @@ def _dependents(rows: QuerySet[AppointmentRecord]) -> tuple[Dependent, ...]:
     return tuple(
         Dependent("appointment", Id(row_id), f"Rendez-vous du {start:%d/%m/%Y %H:%M} UTC")
         for row_id, start in ordered
+    )
+
+
+def _waiting(rows: QuerySet[WaitlistEntryRecord]) -> tuple[Dependent, ...]:
+    ordered = rows.order_by("created_at", "id").values_list("id", "created_at")
+    return tuple(
+        Dependent("waitlist_entry", Id(row_id), f"Attente du {created:%d/%m/%Y}")
+        for row_id, created in ordered
     )
 
 
@@ -38,13 +46,17 @@ class DjangoBookingQueries(AppointmentQueries):
     def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
         return _dependents(
             AppointmentRecord.objects.filter(appointment_type_id=appointment_type_id.value)
+        ) + _waiting(
+            WaitlistEntryRecord.objects.filter(appointment_type_id=appointment_type_id.value)
         )
 
     def dependents_of_room(self, room_id: Id) -> tuple[Dependent, ...]:
         return _dependents(AppointmentRecord.objects.filter(room_id=room_id.value))
 
     def dependents_of_clinician(self, clinician_id: Id) -> tuple[Dependent, ...]:
-        return _dependents(AppointmentRecord.objects.filter(clinician_id=clinician_id.value))
+        return _dependents(
+            AppointmentRecord.objects.filter(clinician_id=clinician_id.value)
+        ) + _waiting(WaitlistEntryRecord.objects.filter(clinician_id=clinician_id.value))
 
     def active_upcoming_for_clinician_user(
         self, user_id: Id, *, after: datetime
@@ -56,4 +68,6 @@ class DjangoBookingQueries(AppointmentQueries):
         rows = AppointmentRecord.objects.filter(
             Q(patient_id=user_id.value) | Q(clinician__user_id=user_id.value)
         )
-        return _dependents(rows)
+        return _dependents(rows) + _waiting(
+            WaitlistEntryRecord.objects.filter(patient_id=user_id.value)
+        )

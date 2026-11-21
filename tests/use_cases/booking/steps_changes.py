@@ -28,6 +28,7 @@ from tests.use_cases.booking.support import (
 
 
 def change(world: FakeWorld, scene: Scene, call: Callable[[], Appointment]) -> None:
+    scene.waitlist_before = dict(world.waitlist.rows)
     try:
         scene.appointment = call()
     except DomainError as error:

@@ -62,6 +62,8 @@ class VerifyHoldUseCase(VerifyHold):
                     appointment_type_id=hold.appointment_type_id,
                     start=hold.start,
                     source=hold.source,
+                    actor_id=patient_id,
+                    for_patient=True,
                     ignoring_hold=hold.id,
                     reason=hold.details.reason,
                 )

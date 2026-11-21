@@ -17,6 +17,7 @@ _SECTIONS = (
     ("/console/appointment-types/", "Types de RDV"),
     ("/console/users/", "Utilisateurs"),
     ("/console/clinicians/", "Praticiens"),
+    ("/console/waitlist/", "Liste d'attente"),
 )
 
 

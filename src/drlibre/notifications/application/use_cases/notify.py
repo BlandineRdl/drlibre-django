@@ -17,7 +17,7 @@ class NotifyUseCase(Notify):
         *,
         event: AppointmentEvent,
         recipient_id: Id,
-        appointment_id: Id,
+        appointment_id: Id | None,
         start: datetime,
         zone_name: str,
     ) -> bool:

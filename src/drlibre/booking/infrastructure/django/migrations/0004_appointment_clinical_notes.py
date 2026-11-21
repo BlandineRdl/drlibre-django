@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("booking", "0002_appointment_guards"),
+        ("booking", "0003_waitlist"),
     ]
 
     operations = [
