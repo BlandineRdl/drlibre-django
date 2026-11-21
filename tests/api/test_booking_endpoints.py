@@ -1,11 +1,14 @@
 import json
 from collections.abc import Iterator
+from datetime import timedelta
 from typing import Any
 
 import pytest
 from django.conf import settings
 from django.test import Client
 
+from drlibre.booking.domain.appointment import Appointment, Source
+from drlibre.booking.infrastructure.repositories import DjangoAppointments
 from drlibre.bootstrap.container import use_container
 from drlibre.identity.domain.user import Role
 from tests.builders import stored_session, stored_user
@@ -57,8 +60,34 @@ def test_an_anonymous_visitor_holds_then_verifies_without_any_session_before_the
 
     assert verified.status_code == 200
     assert verified.json()["appointment"]["start"].startswith("2026-11-23T08:00")
-    assert verified.json()["failure"] is None
     assert COOKIE in verified.cookies
+
+
+def test_a_correct_code_with_a_failed_placement_answers_the_error_and_still_opens_the_session(
+    client: Client, world: Bookable
+) -> None:
+    """Story placement en échec : le code est correct, échec au statut du code, session ouverte."""
+    held = post(client, "/api/v1/booking/holds", hold_body(world))
+    DjangoAppointments().add(
+        Appointment.book(
+            patient_id=stored_user(Role.PATIENT).id,
+            clinician_id=world.clinician,
+            appointment_type_id=world.scene.kind,
+            room_id=None,
+            start=SLOT_START,
+            duration=timedelta(minutes=30),
+            source=Source.STAFF,
+        )
+    )
+
+    response = post(
+        client, f"/api/v1/booking/holds/{held.json()['hold_id']}/verify", {"code": world.code()}
+    )
+
+    assert response.status_code == 409
+    assert set(response.json()) == {"code", "message", "details"}
+    assert response.json()["code"] == "conflict"
+    assert COOKIE in response.cookies
 
 
 def test_a_wrong_code_is_refused_as_invalid_on_the_code_field(

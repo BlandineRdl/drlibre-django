@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from ninja import Router, Schema, Status
 from pydantic import AwareDatetime, ConfigDict
 
@@ -59,15 +59,8 @@ class AppointmentOut(Schema):
         )
 
 
-class FailureOut(Schema):
-    code: str
-    message: str
-    details: dict[str, object]
-
-
 class VerifiedOut(Schema):
-    appointment: AppointmentOut | None
-    failure: FailureOut | None
+    appointment: AppointmentOut
 
 
 @router.post("/booking/holds", response={201: HoldOut}, auth=None)
@@ -92,23 +85,26 @@ def create_hold(request: HttpRequest, payload: HoldIn) -> Status[HoldOut]:
     return Status(201, out)
 
 
-@router.post("/booking/holds/{hold_id}/verify", response=VerifiedOut, auth=None)
+@router.post("/booking/holds/{hold_id}/verify", response={200: VerifiedOut}, auth=None)
 def verify_hold(
     request: HttpRequest, hold_id: UUID, payload: VerifyIn, response: HttpResponse
-) -> VerifiedOut:
+) -> VerifiedOut | HttpResponse:
     verified = container().verify_hold.execute(
         hold_id=Id(hold_id),
         code=payload.code,
         user_agent=request.headers.get("User-Agent", ""),
     )
-    set_session_cookie(response, verified.token, verified.expires_at)
     outcome = verified.outcome
     if isinstance(outcome, DomainError):
-        failure = FailureOut(
-            code=outcome.code.value, message=outcome.message, details=outcome.details
+        # The account and its session exist, so the refusal still carries the cookie.
+        refused = JsonResponse(
+            {"code": outcome.code.value, "message": outcome.message, "details": outcome.details},
+            status=outcome.code.http_status,
         )
-        return VerifiedOut(appointment=None, failure=failure)
-    return VerifiedOut(appointment=AppointmentOut.of(outcome), failure=None)
+        set_session_cookie(refused, verified.token, verified.expires_at)
+        return refused
+    set_session_cookie(response, verified.token, verified.expires_at)
+    return VerifiedOut(appointment=AppointmentOut.of(outcome))
 
 
 @router.post("/booking/holds/{hold_id}/resend", response={204: None}, auth=None)
