@@ -128,6 +128,19 @@ class StaffLookup(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class PatientMatch:
+    user_id: Id
+    full_name: str
+    email: str
+
+
+class PatientLookup(Protocol):
+    def active_patients(self, text: str) -> tuple[PatientMatch, ...]:
+        """At most 20 active patients whose name or email holds the text, any case, by name."""
+        ...
+
+
 class ProvidePatientAccount(Protocol):
     def execute(self, *, full_name: str, email: str, birth_date: date, phone: str | None) -> Id:
         """Reuse or create the patient of a proven email; staff or inactive get forbidden."""

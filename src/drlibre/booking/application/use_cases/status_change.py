@@ -6,9 +6,11 @@ from drlibre.booking.application.ports.outbound import (
     BookingDirectory,
     ScheduleLocks,
     SlotRefresh,
+    Staff,
 )
-from drlibre.booking.application.use_cases.own_clinician_appointment import (
-    locked_clinician_appointment,
+from drlibre.booking.application.use_cases.actor_scope import (
+    actor_scope,
+    locked_scoped_appointment,
 )
 from drlibre.booking.domain.appointment import Appointment
 from drlibre.shared_kernel.clock import Clock
@@ -17,7 +19,7 @@ from drlibre.shared_kernel.unit_of_work import UnitOfWork
 
 
 class StatusChange:
-    """Spec 5.6 steps every clinician status change runs; the patient is never notified."""
+    """Spec 5.6 steps every staff status change runs; the patient is never notified."""
 
     def __init__(
         self,
@@ -26,6 +28,7 @@ class StatusChange:
         uow: UnitOfWork,
         audit: AuditLog,
         directory: BookingDirectory,
+        staff: Staff,
         appointments: Appointments,
         locks: ScheduleLocks,
         slot_refresh: SlotRefresh,
@@ -34,6 +37,7 @@ class StatusChange:
         self._uow = uow
         self._audit = audit
         self._directory = directory
+        self._staff = staff
         self._appointments = appointments
         self._locks = locks
         self._slot_refresh = slot_refresh
@@ -46,12 +50,10 @@ class StatusChange:
         transition: Callable[[Appointment], Appointment],
     ) -> Appointment:
         with self._uow:
-            current = locked_clinician_appointment(
-                directory=self._directory,
-                appointments=self._appointments,
-                locks=self._locks,
-                actor_id=actor_id,
-                appointment_id=appointment_id,
+            scope = actor_scope(self._directory, self._staff, actor_id)
+            scope.require_staff()
+            current = locked_scoped_appointment(
+                scope, self._appointments, self._locks, appointment_id
             )
             changed = transition(current)
             self._appointments.save(changed)

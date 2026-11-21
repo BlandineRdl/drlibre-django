@@ -4,12 +4,15 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
+from drlibre.identity.application.ports.inbound import PatientLookup
 from drlibre.identity.application.ports.outbound import Sessions, Users
 from drlibre.identity.domain.session import Session
 from drlibre.identity.domain.user import Email, Role, User
+from drlibre.identity.infrastructure.queries import DjangoUserQueries
 from drlibre.identity.infrastructure.repositories import DjangoSessions, DjangoUsers
 from drlibre.shared_kernel.ids import Id
 from tests.fakes.sessions import InMemorySessions
+from tests.fakes.user_queries import InMemoryUserQueries
 from tests.fakes.users import InMemoryUsers
 
 AT = datetime(2026, 11, 20, 10, tzinfo=UTC)
@@ -96,3 +99,58 @@ def test_sessions_are_found_by_token_hash_extended_and_deleted(
     assert sessions.by_token_hash(first.token_hash) is None
     assert sessions.delete_for_user(user.id) == 1
     assert sessions.by_token_hash(second.token_hash) is None
+
+
+@pytest.fixture(
+    params=[pytest.param("fake", id="in-memory"), pytest.param("real", id="django", marks=REAL)]
+)
+def lookup(request: pytest.FixtureRequest) -> tuple[Users, PatientLookup]:
+    if request.param == "fake":
+        users = InMemoryUsers()
+        return users, InMemoryUserQueries(users)
+    return DjangoUsers(), DjangoUserQueries()
+
+
+def test_the_admin_finds_active_patients_by_name_or_email_by_name(
+    lookup: tuple[Users, PatientLookup],
+) -> None:
+    """Story L'admin réserve un RDV pour un patient : le patient est choisi parmi les actifs."""
+    users, patients = lookup
+    tag = uuid.uuid4().hex[:8]
+
+    def saved(name: str, *, role: Role = Role.PATIENT, active: bool = True) -> User:
+        user = dataclasses.replace(
+            a_user(),
+            email=Email(f"{name.split()[0].lower()}-{tag}@example.org"),
+            full_name=f"{name} {tag}",
+            role=role,
+            active=active,
+        )
+        users.save(user)
+        return user
+
+    zoe, ana = saved("Zoé Roux"), saved("Ana Petit")
+    saved("Inès Inactive", active=False)
+    saved("Paul Praticien", role=Role.CLINICIAN)
+
+    by_name = patients.active_patients(f"  {tag.upper()} ")
+    by_email = patients.active_patients(f"zoé-{tag}@")
+
+    assert [m.user_id for m in by_name] == [ana.id, zoe.id]
+    assert [(m.full_name, m.email) for m in by_email] == [(zoe.full_name, zoe.email.value)]
+
+
+def test_at_most_twenty_patients_are_found(lookup: tuple[Users, PatientLookup]) -> None:
+    """Story L'admin réserve un RDV pour un patient : la recherche rend 20 patients au plus."""
+    users, patients = lookup
+    tag = uuid.uuid4().hex[:8]
+    for number in range(21):
+        user = dataclasses.replace(
+            a_user(),
+            email=Email(f"p{number}-{tag}@example.org"),
+            full_name=f"Patient {number:02d} {tag}",
+            role=Role.PATIENT,
+        )
+        users.save(user)
+
+    assert len(patients.active_patients(tag)) == 20

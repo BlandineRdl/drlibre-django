@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from django.conf import settings
 
+from drlibre.audit.application.ports.inbound import AuditQueries
 from drlibre.audit.application.ports.outbound import AuditLog
 from drlibre.audit.infrastructure.audit_log import DjangoAuditLog
 from drlibre.audit.infrastructure.queries import DjangoAuditQueries
@@ -21,7 +22,9 @@ from drlibre.booking.application.ports.inbound import (
     DepartmentRoomsDay,
     ExpireHolds,
     ExpireWaitlist,
+    ExportAppointments,
     JoinWaitlist,
+    ListAllAppointments,
     ListAppointmentsAsCaller,
     ListPatientAppointments,
     MarkNoShow,
@@ -30,6 +33,7 @@ from drlibre.booking.application.ports.inbound import (
     RequirePatient,
     RescheduleAppointment,
     ResendCode,
+    RunReminders,
     SendReminders,
     VerifyHold,
     ViewAppointment,
@@ -38,6 +42,7 @@ from drlibre.booking.application.ports.inbound import (
     WriteClinicalNotes,
 )
 from drlibre.booking.application.ports.outbound import (
+    AdminAppointments,
     AppointmentHistory,
     BookingDirectory,
     BookingNotices,
@@ -80,7 +85,9 @@ from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.department_rooms_day import DepartmentRoomsDayUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
 from drlibre.booking.application.use_cases.expire_waitlist import ExpireWaitlistUseCase
+from drlibre.booking.application.use_cases.export_appointments import ExportAppointmentsUseCase
 from drlibre.booking.application.use_cases.join_waitlist import JoinWaitlistUseCase
+from drlibre.booking.application.use_cases.list_all_appointments import ListAllAppointmentsUseCase
 from drlibre.booking.application.use_cases.list_appointments_as_caller import (
     ListAppointmentsAsCallerUseCase,
 )
@@ -99,6 +106,7 @@ from drlibre.booking.application.use_cases.reschedule_appointment import (
     RescheduleAppointmentUseCase,
 )
 from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
+from drlibre.booking.application.use_cases.run_reminders import RunRemindersUseCase
 from drlibre.booking.application.use_cases.send_reminders import SendRemindersUseCase
 from drlibre.booking.application.use_cases.status_change import StatusChange
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
@@ -106,6 +114,7 @@ from drlibre.booking.application.use_cases.view_appointment import ViewAppointme
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
 from drlibre.booking.application.use_cases.waitlist_offers import WaitlistOffers
 from drlibre.booking.application.use_cases.write_clinical_notes import WriteClinicalNotesUseCase
+from drlibre.booking.infrastructure.admin_appointments import SqlAdminAppointments
 from drlibre.booking.infrastructure.audit_history import AuditAppointmentHistory
 from drlibre.booking.infrastructure.booking_slot_refresh import BookingSlotRefresh
 from drlibre.booking.infrastructure.clinician_agenda import SqlClinicianAgenda
@@ -139,6 +148,7 @@ from drlibre.identity.application.ports.inbound import (
     ChangePassword,
     DeleteUser,
     OpenPatientSession,
+    PatientLookup,
     ProvidePatientAccount,
     RequestSignInLink,
     SaveUser,
@@ -278,6 +288,11 @@ from drlibre.organisation.infrastructure.schedule_and_booking_dependents import 
 )
 from drlibre.organisation.infrastructure.slot_refresh import SchedulingSlotRefresh
 from drlibre.organisation.infrastructure.staff_directory import IdentityStaffDirectory
+from drlibre.reporting.application.ports.inbound import ViewDashboard
+from drlibre.reporting.application.ports.outbound import ActivityQueries, Admins
+from drlibre.reporting.application.use_cases.view_dashboard import ViewDashboardUseCase
+from drlibre.reporting.infrastructure.identity_admins import IdentityAdmins
+from drlibre.reporting.infrastructure.sql_activity import SqlActivityQueries
 from drlibre.scheduling.application.ports.inbound import (
     AvailabilityQueries,
     DeleteAvailabilityRule,
@@ -373,6 +388,7 @@ class BookingAdapters:
     waitlist: Waitlist
     waitlist_queries: WaitlistQueries
     staff: Staff
+    admin_appointments: AdminAppointments
     network_hourly_limit: int = 20
 
 
@@ -399,8 +415,10 @@ class Adapters:
     reference_queries: ReferenceQueries
     appointments: UpcomingAppointments
     actors: AuditActors
+    audit_queries: AuditQueries
     user_queries: UserQueries
     staff_lookup: StaffLookup
+    patient_lookup: PatientLookup
     profiles: ClinicianProfiles
     staff: StaffDirectory
     staff_profiles: StaffProfiles
@@ -416,6 +434,8 @@ class Adapters:
     links: SignInLinks
     link_notices: LinkNotices
     search_queries: SearchQueries
+    activity_queries: ActivityQueries
+    admins: Admins
     notifications: Notifications
     # Booking's notices write through it, so it is built with them.
     notify: Notify
@@ -450,6 +470,8 @@ class Container:
     delete_user: DeleteUser
     user_queries: UserQueries
     staff_lookup: StaffLookup
+    patient_lookup: PatientLookup
+    audit_queries: AuditQueries
     attach_clinician_profile: AttachClinicianProfile
     edit_clinician_profile: EditClinicianProfile
     delete_clinician_profile: DeleteClinicianProfile
@@ -491,6 +513,9 @@ class Container:
     accept_waitlist_offer: AcceptWaitlistOffer
     expire_waitlist: ExpireWaitlist
     waitlist_queries: WaitlistQueries
+    list_all_appointments: ListAllAppointments
+    export_appointments: ExportAppointments
+    run_reminders: RunReminders
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -506,6 +531,7 @@ class Container:
     list_notifications: ListNotifications
     mark_notification_read: MarkNotificationRead
     count_unread: CountUnread
+    view_dashboard: ViewDashboard
 
 
 def wire(a: Adapters) -> Container:
@@ -654,6 +680,8 @@ def wire(a: Adapters) -> Container:
         ),
         user_queries=a.user_queries,
         staff_lookup=a.staff_lookup,
+        patient_lookup=a.patient_lookup,
+        audit_queries=a.audit_queries,
         attach_clinician_profile=AttachClinicianProfileUseCase(
             clock=clock,
             uow=uow,
@@ -753,6 +781,9 @@ def wire(a: Adapters) -> Container:
         accept_waitlist_offer=booking.accept_waitlist_offer,
         expire_waitlist=booking.expire_waitlist,
         waitlist_queries=booking.waitlist_queries,
+        list_all_appointments=booking.list_all_appointments,
+        export_appointments=booking.export_appointments,
+        run_reminders=booking.run_reminders,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -788,6 +819,9 @@ def wire(a: Adapters) -> Container:
             clock=clock, uow=uow, audit=audit, notifications=a.notifications
         ),
         count_unread=CountUnreadUseCase(notifications=a.notifications),
+        view_dashboard=ViewDashboardUseCase(
+            clock=clock, admins=a.admins, queries=a.activity_queries, time_zone=a.time_zone
+        ),
     )
 
 
@@ -822,6 +856,9 @@ class _BookingUseCases:
     accept_waitlist_offer: AcceptWaitlistOffer
     expire_waitlist: ExpireWaitlist
     waitlist_queries: WaitlistQueries
+    list_all_appointments: ListAllAppointments
+    export_appointments: ExportAppointments
+    run_reminders: RunReminders
 
 
 def _wire_booking(
@@ -846,6 +883,7 @@ def _wire_booking(
         uow=a.uow,
         audit=a.audit,
         directory=booking.directory,
+        staff=booking.staff,
         appointments=booking.appointments,
         locks=booking.locks,
         slot_refresh=booking.slot_refresh,
@@ -858,6 +896,16 @@ def _wire_booking(
     )
     offers = WaitlistOffers(
         clock=a.clock, audit=a.audit, waitlist=booking.waitlist, notices=booking.notices
+    )
+    send_reminders = SendRemindersUseCase(
+        clock=a.clock,
+        uow=a.uow,
+        audit=a.audit,
+        appointments=booking.appointments,
+        notices=booking.notices,
+    )
+    list_all_appointments = ListAllAppointmentsUseCase(
+        staff=booking.staff, appointments=booking.admin_appointments
     )
     return _BookingUseCases(
         book_appointment=book_appointment,
@@ -911,6 +959,7 @@ def _wire_booking(
             audit=a.audit,
             appointments=booking.appointments,
             directory=booking.directory,
+            staff=booking.staff,
             locks=booking.locks,
             slot_refresh=booking.slot_refresh,
             notices=booking.notices,
@@ -922,19 +971,14 @@ def _wire_booking(
             audit=a.audit,
             appointments=booking.appointments,
             directory=booking.directory,
+            staff=booking.staff,
             free_slots=booking.free_slots,
             placement=placement,
             locks=booking.locks,
             slot_refresh=booking.slot_refresh,
             notices=booking.notices,
         ),
-        send_reminders=SendRemindersUseCase(
-            clock=a.clock,
-            uow=a.uow,
-            audit=a.audit,
-            appointments=booking.appointments,
-            notices=booking.notices,
-        ),
+        send_reminders=send_reminders,
         check_in_appointment=CheckInAppointmentUseCase(change=status_change),
         complete_appointment=CompleteAppointmentUseCase(change=status_change),
         mark_no_show=MarkNoShowUseCase(change=status_change),
@@ -948,9 +992,10 @@ def _wire_booking(
         ),
         book_appointment_as_caller=BookAppointmentAsCallerUseCase(
             directory=booking.directory,
+            staff=booking.staff,
             book_appointment=book_appointment,
             book_for_patient=BookForPatientUseCase(
-                uow=a.uow, directory=booking.directory, placement=placement
+                uow=a.uow, directory=booking.directory, staff=booking.staff, placement=placement
             ),
         ),
         clinician_day=ClinicianDayUseCase(
@@ -962,6 +1007,7 @@ def _wire_booking(
         clinician_appointment=ClinicianAppointmentUseCase(
             clock=a.clock,
             directory=booking.directory,
+            staff=booking.staff,
             appointments=booking.appointments,
             agenda=booking.clinician_agenda,
             history=booking.history,
@@ -974,10 +1020,12 @@ def _wire_booking(
         ),
         list_appointments_as_caller=ListAppointmentsAsCallerUseCase(
             directory=booking.directory,
+            staff=booking.staff,
             list_clinician_appointments=ListClinicianAppointmentsUseCase(
                 directory=booking.directory, agenda=booking.clinician_agenda
             ),
             list_patient_appointments=list_patient_appointments,
+            list_all_appointments=list_all_appointments,
         ),
         join_waitlist=JoinWaitlistUseCase(
             clock=a.clock,
@@ -1013,6 +1061,15 @@ def _wire_booking(
             clock=a.clock, uow=a.uow, audit=a.audit, waitlist=booking.waitlist
         ),
         waitlist_queries=booking.waitlist_queries,
+        list_all_appointments=list_all_appointments,
+        export_appointments=ExportAppointmentsUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            staff=booking.staff,
+            appointments=booking.admin_appointments,
+        ),
+        run_reminders=RunRemindersUseCase(staff=booking.staff, send_reminders=send_reminders),
     )
 
 
@@ -1084,8 +1141,10 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         reference_queries=reference_queries,
         appointments=BookingUpcomingAppointments(booking_queries),
         actors=AuditLogActors(DjangoAuditQueries()),
+        audit_queries=DjangoAuditQueries(),
         user_queries=user_queries,
         staff_lookup=user_queries,
+        patient_lookup=user_queries,
         profiles=profiles,
         staff=IdentityStaffDirectory(lookup=user_queries),
         staff_profiles=OrganisationStaffProfiles(reference_queries),
@@ -1127,6 +1186,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             waitlist=DjangoWaitlist(),
             waitlist_queries=SqlWaitlistQueries(),
             staff=IdentityStaff(user_queries),
+            admin_appointments=SqlAdminAppointments(),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),
@@ -1134,6 +1194,8 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             outbox=CeleryEmailOutbox(), public_base_url=settings.PUBLIC_BASE_URL
         ),
         search_queries=SqlSearchQueries(),
+        activity_queries=SqlActivityQueries(),
+        admins=IdentityAdmins(user_queries),
         notifications=notifications,
         notify=notify,
         time_zone=settings.TIME_ZONE,

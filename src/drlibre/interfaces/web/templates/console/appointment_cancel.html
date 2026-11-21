@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ view.form.title }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<h1>{{ view.heading }}</h1>
+<dl class="facts">
+  {% for fact in view.facts %}<dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd>{% endfor %}
+</dl>
+<p>L'annulation est définitive ; le patient en est informé.</p>
+{% include "_form.html" with form=view.form %}
+{% endblock %}

@@ -96,7 +96,7 @@ class EditClinicianProfile(Protocol):
 
 class DeleteClinicianProfile(Protocol):
     def execute(self, *, actor: Id | None, profile_id: Id) -> None:
-        """Delete a profile; not_found, or has_dependents while it has appointments."""
+        """Delete a profile; not_found, or has_dependents listing appointments and waitlist."""
         ...
 
 

@@ -9,7 +9,7 @@ class NavLink:
 
 
 _SECTIONS = (
-    ("/console/", "Accueil"),
+    ("/console/", "Tableau de bord"),
     ("/console/hospitals/", "Hôpitaux"),
     ("/console/specialties/", "Spécialités"),
     ("/console/departments/", "Départements"),
@@ -17,7 +17,10 @@ _SECTIONS = (
     ("/console/appointment-types/", "Types de RDV"),
     ("/console/users/", "Utilisateurs"),
     ("/console/clinicians/", "Praticiens"),
+    ("/console/appointments/", "Rendez-vous"),
     ("/console/waitlist/", "Liste d'attente"),
+    ("/console/audit/", "Journal d'audit"),
+    ("/console/settings/", "Réglages"),
 )
 
 

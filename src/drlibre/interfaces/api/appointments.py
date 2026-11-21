@@ -5,16 +5,19 @@ from ninja import Query, Router, Schema, Status
 from pydantic import AwareDatetime, ConfigDict, Field
 
 from drlibre.booking.application.ports.inbound import (
+    AdminAppointmentRow,
     AgendaEntry,
     AppointmentsQuery,
     AppointmentStatus,
     ClinicianAppointments,
     ClinicianEntry,
+    Source,
 )
 from drlibre.bootstrap.container import container
 from drlibre.interfaces.api.booking import AppointmentOut
 from drlibre.interfaces.web.auth import current_identity
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import Page
 
 router = Router(tags=["appointments"])
 
@@ -53,6 +56,9 @@ class AgendaQuery(Schema):
     status: AppointmentStatus | None = None
     start: AwareDatetime | None = Field(None, alias="from")
     end: AwareDatetime | None = Field(None, alias="to")
+    department: UUID | None = None
+    source: Source | None = None
+    page: int = Field(1, ge=1)
 
 
 class AgendaEntryOut(Schema):
@@ -134,8 +140,56 @@ class ClinicianAgendaOut(Schema):
     appointments: list[ClinicianEntryOut]
 
 
-@router.get("/appointments", response=AgendaOut | ClinicianAgendaOut, auth=None)
-def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> AgendaOut | ClinicianAgendaOut:
+class AdminEntryOut(Schema):
+    id: UUID
+    status: str
+    source: str
+    start: str
+    end: str
+    time_zone: str
+    reason: str | None
+    patient: UUID
+    patient_name: str
+    clinician: UUID
+    clinician_name: str
+    hospital_name: str
+    department: str
+    type: str
+    room: str | None
+
+    @staticmethod
+    def of(row: AdminAppointmentRow) -> "AdminEntryOut":
+        appointment = row.appointment
+        return AdminEntryOut(
+            id=appointment.id.value,
+            status=appointment.status.value,
+            source=appointment.source.value,
+            start=appointment.start.isoformat(),
+            end=appointment.end.isoformat(),
+            time_zone=row.time_zone,
+            reason=appointment.reason,
+            patient=appointment.patient_id.value,
+            patient_name=row.patient_name,
+            clinician=appointment.clinician_id.value,
+            clinician_name=row.clinician_name,
+            hospital_name=row.hospital_name,
+            department=row.department,
+            type=row.appointment_type,
+            room=row.room,
+        )
+
+
+class AdminAgendaOut(Schema):
+    items: list[AdminEntryOut]
+    total: int
+    page: int
+
+
+Listed = AgendaOut | ClinicianAgendaOut | AdminAgendaOut
+
+
+@router.get("/appointments", response=Listed, auth=None)
+def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> Listed:
     identity = current_identity(request)
     listed = container().list_appointments_as_caller.execute(
         actor_id=identity.user_id,
@@ -145,8 +199,17 @@ def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> AgendaOut | Cli
             status=query.status,
             start=query.start,
             end=query.end,
+            department_id=_optional_id(query.department),
+            source=query.source,
+            page=query.page,
         ),
     )
+    if isinstance(listed, Page):
+        return AdminAgendaOut(
+            items=[AdminEntryOut.of(row) for row in listed.items],
+            total=listed.total,
+            page=listed.number,
+        )
     if isinstance(listed, ClinicianAppointments):
         return ClinicianAgendaOut(appointments=[ClinicianEntryOut.of(e) for e in listed.entries])
     return AgendaOut(

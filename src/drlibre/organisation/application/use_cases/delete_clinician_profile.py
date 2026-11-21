@@ -37,7 +37,7 @@ class DeleteClinicianProfileUseCase(DeleteClinicianProfile):
         with self._uow:
             # Checked in the delete's transaction, next to the write it guards.
             Dependents(self._schedule.for_clinician_profile(profile.id)).refuse_if_any(
-                "Ce praticien a des rendez-vous."
+                "Ce praticien a des rendez-vous ou une liste d'attente."
             )
             self._profiles.delete(profile.id)
             self._slots.refresh((profile.id,))

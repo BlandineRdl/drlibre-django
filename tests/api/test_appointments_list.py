@@ -112,12 +112,31 @@ def test_an_anonymous_caller_is_unauthenticated(client: Client) -> None:
     assert response.json()["code"] == "unauthenticated"
 
 
-@pytest.mark.parametrize("role", [Role.CLINICIAN, Role.ADMIN], ids=["no-profile", "admin"])
-def test_an_admin_or_a_clinician_without_profile_is_forbidden_the_list(
-    client: Client, role: Role
-) -> None:
-    """Plan E6 : la liste sert patients et praticiens ; l'admin attend E7."""
-    response = signed_in(client, stored_user(role)).get(URL)
+def test_a_clinician_without_profile_is_forbidden_the_list(client: Client) -> None:
+    """Plan E6 : la liste sert patients, praticiens et admins ; un praticien sans profil non."""
+    response = signed_in(client, stored_user(Role.CLINICIAN)).get(URL)
 
     assert response.status_code == 403
     assert response.json()["code"] == "forbidden"
+
+
+def test_the_admin_lists_every_hospitals_appointments_filtered_and_paged(
+    client: Client, scene: StoredScene
+) -> None:
+    """Story « l'admin liste les RDV » : filtres département et statut, page 2, total."""
+    patient = stored_user(Role.PATIENT)
+    kept = [stored(scene, patient.id, day) for day in range(1, 23)]
+    stored(scene, patient.id, 30, status=AppointmentStatus.CANCELLED)
+    elsewhere = stored_scene()
+    stored(elsewhere, stored_user(Role.PATIENT).id, 2)
+    query = {"department": str(scene.department), "status": "BOOKED", "page": "2"}
+
+    response = signed_in(client, stored_user(Role.ADMIN)).get(URL, query)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["total"], body["page"]) == (22, 2)
+    oldest_first = sorted(kept, key=lambda a: a.start)
+    assert [item["id"] for item in body["items"]] == [str(a.id) for a in oldest_first[1::-1]]
+    assert body["items"][0]["time_zone"] == "Europe/Paris"
+    assert "clinical_notes" not in body["items"][0]

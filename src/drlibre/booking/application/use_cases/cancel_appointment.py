@@ -6,8 +6,12 @@ from drlibre.booking.application.ports.outbound import (
     BookingNotices,
     ScheduleLocks,
     SlotRefresh,
+    Staff,
 )
-from drlibre.booking.application.use_cases.own_clinician_appointment import own_appointment_of
+from drlibre.booking.application.use_cases.actor_scope import (
+    actor_scope,
+    locked_scoped_appointment,
+)
 from drlibre.booking.application.use_cases.waitlist_offers import WaitlistOffers
 from drlibre.booking.domain import booking_rules
 from drlibre.shared_kernel.clock import Clock
@@ -25,6 +29,7 @@ class CancelAppointmentUseCase(CancelAppointment):
         audit: AuditLog,
         appointments: Appointments,
         directory: BookingDirectory,
+        staff: Staff,
         locks: ScheduleLocks,
         slot_refresh: SlotRefresh,
         notices: BookingNotices,
@@ -35,6 +40,7 @@ class CancelAppointmentUseCase(CancelAppointment):
         self._audit = audit
         self._appointments = appointments
         self._directory = directory
+        self._staff = staff
         self._locks = locks
         self._slot_refresh = slot_refresh
         self._notices = notices
@@ -42,18 +48,16 @@ class CancelAppointmentUseCase(CancelAppointment):
 
     def execute(self, *, appointment_id: Id, actor_id: Id, reason: str) -> Appointment:
         with self._uow:
-            profile_id = self._directory.clinician_of_user(actor_id)
-            found = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
-            self._locks.lock_clinician(found.clinician_id)
-            self._locks.lock_patient(found.patient_id)
-            # Read again under the locks, so a change committed meanwhile is seen.
-            current = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
+            scope = actor_scope(self._directory, self._staff, actor_id)
+            current = locked_scoped_appointment(
+                scope, self._appointments, self._locks, appointment_id
+            )
             now = self._clock.now()
             cancelled = current.cancelled(at=now, reason=reason)
             # The 24 hour window binds patients only.
             broken = (
                 booking_rules.cancel_violations(start=current.start, now=now)
-                if profile_id is None
+                if scope.is_patient
                 else ()
             )
             if broken:

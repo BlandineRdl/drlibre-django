@@ -6,6 +6,7 @@ from drlibre.interfaces.api.appointments import router as appointments_router
 from drlibre.interfaces.api.auth import router as auth_router
 from drlibre.interfaces.api.booking import router as booking_router
 from drlibre.interfaces.api.health import router as health_router
+from drlibre.interfaces.api.jobs import router as jobs_router
 from drlibre.interfaces.api.public import router as public_router
 from drlibre.interfaces.api.search import router as search_router
 from drlibre.interfaces.api.slots import router as slots_router
@@ -21,6 +22,7 @@ api.add_router("/", public_router)
 api.add_router("/", booking_router)
 api.add_router("/", appointments_router)
 api.add_router("/", waitlist_router)
+api.add_router("/", jobs_router)
 
 
 @api.exception_handler(DomainError)

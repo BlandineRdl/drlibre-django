@@ -654,3 +654,46 @@ def profile_refreshed(world: FakeWorld, outcome: Outcome, state: str) -> None:
     assert outcome.error is None
     refreshed = outcome.people["profile"] in world.slot_refresh.refreshed
     assert refreshed is (state == "refreshed")
+
+
+@given(parsers.parse('the room "{code}" has an appointment'))
+def room_has_appointment(world: FakeWorld, code: str) -> None:
+    world.schedule.by_room[find(world, "room", code).id] = (
+        Dependent("appointment", Id(), "RDV 2026-12-01"),
+    )
+
+
+@given(parsers.re(r'an? (?P<role>patient|clinician) user "(?P<email>[^"]+)" with an appointment'))
+def user_with_appointment(world: FakeWorld, role: str, email: str) -> None:
+    user_id = world.app.save_user.execute(
+        actor=None,
+        user_id=None,
+        full_name="Someone",
+        email=email,
+        role=role.upper(),
+        active=True,
+        temporary_password="temporary-pass-1",
+    )
+    # Rows are (clinician, patient, start, active, dependent).
+    people = (Id(), user_id) if role == "patient" else (user_id, Id())
+    start = datetime(2026, 12, 4, 9, tzinfo=UTC)
+    world.appointments.rows.append(
+        (*people, start, True, Dependent("appointment", Id(), "RDV 2026-12-04"))
+    )
+
+
+@when(parsers.parse('the admin deletes the user "{email}"'))
+def deletes_user(world: FakeWorld, outcome: Outcome, email: str) -> None:
+    user = world.users.by_email(Email.parse(email))
+    assert user is not None
+    outcome.error = None
+    try:
+        world.app.delete_user.execute(actor=ADMIN, user_id=user.id)
+    except DomainError as error:
+        outcome.error = error
+
+
+@then(parsers.parse('the refusal says "{message}"'))
+def refusal_says(outcome: Outcome, message: str) -> None:
+    assert isinstance(outcome.error, DomainError)
+    assert message in outcome.error.message

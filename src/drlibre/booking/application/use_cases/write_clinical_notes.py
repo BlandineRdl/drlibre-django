@@ -1,9 +1,12 @@
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.booking.application.ports.inbound import WriteClinicalNotes
 from drlibre.booking.application.ports.outbound import Appointments, BookingDirectory, ScheduleLocks
-from drlibre.booking.application.use_cases.own_clinician_appointment import (
-    locked_clinician_appointment,
+from drlibre.booking.application.use_cases.actor_scope import (
+    ActorKind,
+    ActorScope,
+    locked_scoped_appointment,
 )
+from drlibre.booking.application.use_cases.own_clinician_appointment import clinician_profile
 from drlibre.booking.domain.appointment import Appointment
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.ids import Id
@@ -30,12 +33,11 @@ class WriteClinicalNotesUseCase(WriteClinicalNotes):
 
     def execute(self, *, actor_id: Id, appointment_id: Id, text: str) -> Appointment:
         with self._uow:
-            current = locked_clinician_appointment(
-                directory=self._directory,
-                appointments=self._appointments,
-                locks=self._locks,
-                actor_id=actor_id,
-                appointment_id=appointment_id,
+            # Clinical notes are the clinician's alone; an admin is refused too.
+            profile_id = clinician_profile(self._directory, actor_id)
+            scope = ActorScope(ActorKind.CLINICIAN, actor_id, profile_id)
+            current = locked_scoped_appointment(
+                scope, self._appointments, self._locks, appointment_id
             )
             written = current.with_notes(text)
             self._appointments.save(written)

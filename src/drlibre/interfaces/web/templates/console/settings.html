@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Réglages{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<h1>Réglages</h1>
+{% if view.notice %}<p role="status">{{ view.notice }}</p>{% endif %}
+<section aria-labelledby="rules">
+  <h2 id="rules">Règles de réservation</h2>
+  <dl class="facts">
+    {% for fact in view.facts %}<dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd>{% endfor %}
+  </dl>
+</section>
+<section aria-labelledby="reminders">
+  <h2 id="reminders">Rappels</h2>
+  <p>Envoie maintenant les rappels dus ; un RDV déjà rappelé ne l'est pas deux fois.</p>
+  <form method="post" action="{{ view.reminders_url }}">
+    {% csrf_token %}
+    <button type="submit">Lancer les rappels</button>
+  </form>
+</section>
+{% endblock %}

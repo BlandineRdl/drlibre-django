@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Contexte reporting : indicateurs, jours, praticiens chargés

@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import wraps
 from uuid import UUID
 
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -195,7 +195,7 @@ def _done(url: str, notice: str) -> HttpResponse:
     return redirect(f"{url}{'&' if '?' in url else '?'}done={notice}")
 
 
-def _change_status(action: ClinicianAction) -> Callable[[HttpRequest, UUID], HttpResponse]:
+def _change_status(action: ClinicianAction) -> Callable[[HttpRequest, UUID], HttpResponseBase]:
     @require_POST
     @require_role(Role.CLINICIAN)
     @_own_appointment

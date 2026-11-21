@@ -65,11 +65,19 @@
 - PostgreSQL guards behind the locks: `btree_gist` exclusions `appointment_clinician_no_overlap` and `appointment_patient_no_overlap` on active appointments, checks on end after start, known status, cancellation fields; an exclusion hit becomes `conflict`, never a 500.
 - Cancel and reschedule take the booking lock order and re-read the appointment under the locks; reschedule ignores its own appointment: `IsSlotFree`, `FindFreeSlots` and `FindFreeWeek` take `ignoring_appointment` and recompute that clinician's slots with `SlotEngine`, `conflicting_resources` and `busy_rooms` take `excluding`.
 - The audit log is append-only in PostgreSQL: triggers refuse every `UPDATE`, `DELETE` and `TRUNCATE` on `audit_auditentryrecord` (migration `audit.0002`), ORM bulk calls and raw SQL included; the test database disables only the `TRUNCATE` trigger in `tests/conftest.py` so transactional tests can flush.
-- Clinician guard: `BookingDirectory.clinician_of_user` gives the caller's profile; `own_clinician_appointment` answers `not_found` for an unknown id, `forbidden` for another clinician's (web shows « Not your appointment »); admins stay `forbidden` until E7.
+- Clinician guard: `BookingDirectory.clinician_of_user` gives the caller's profile; `own_clinician_appointment` answers `not_found` for an unknown id, `forbidden` for another clinician's (web shows « Not your appointment »).
 - Status changes (`CheckInAppointment`, `CompleteAppointment`, `MarkNoShow`) share `StatusChange`: lock clinician then patient, re-read, transition in `Appointment`, audit `{from, to}`, no notice; `NO_SHOW` rebuilds the clinician's slots.
 - Staff are bound only by availability and conflicts: cancel and reschedule pick the guard from the actor (clinician: no 24 h rule), `BookForPatient` places with `for_patient=False`, source `STAFF`; `FindFreeWeek(for_patient=False)` drops the 120-min clip.
 - Clinical notes: nullable `clinical_notes` on `AppointmentRecord`, written only by `WriteClinicalNotes` (≤ 5000), audited as `{fields: ("clinical_notes",)}`; never in API rows, emails or the patient portal.
 - Workspace reads go through booking's SQL `ClinicianAgenda` (`SqlClinicianAgenda`); the appointment history reads audit's `AuditQueries.entries_for` through `AuditAppointmentHistory`, indexed on `(entity_type, entity_id, at)` (`audit.0003`).
+- Actor scope: `actor_scope` maps a profile to clinician, `Staff.is_admin` to admin, else patient; `scoped_appointment` lets an admin read any appointment (`not_found` if absent), others keep their guards; admins follow staff rules (no 24 h, `for_patient=False`), clinical notes stay `forbidden` to them.
+- Admin `BookForPatient` requires a clinician; the named room must be active in the type's department (`not_found`), then free (`conflict`); source `STAFF`.
+- `reporting` is a read-only context: `DashboardQueries` in SQL plus pure `available_minutes`, minutes in each clinician's hospital zone; ratios with a zero denominator show « n/a »; bar widths are `.bar-N` classes, the CSP forbids inline styles.
+- `ExportAppointments` (admin only) writes one `booking.appointments_exported` audit entry `{count}`; `csv_cell` prefixes `'` before `= + - @ \t \r`.
+- The audit log is read through `AuditQueries.page` (newest first, total) and `entity_types()`; the web view resolves the actor filter's email through identity; times in `settings.TIME_ZONE`, named.
+- Index `appointment_start` on `start` (`booking.0005`) serves the admin list, export and dashboard across hospitals.
+- API admin `GET /appointments` takes the list filters, `from`/`to` keep the date of the aware datetime; `POST /jobs/reminders` runs `RunReminders` synchronously and returns `{count}`.
+- The admin file history shows clinician actions as « Personnel ».
 - Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 
 ## Flow

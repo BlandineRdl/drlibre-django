@@ -66,13 +66,14 @@ Tranchées au plan E6 (`aidd_docs/tasks/2026_11/2026_11_21_e6-praticien-agenda/p
 - Quand le praticien annule, son patient peut-il recevoir l'offre du créneau libéré ? → Non, comme en E5 : les entrées du patient du RDV annulé sont exclues, qui que soit celui qui annule.
 
 ## E7 Supervision admin
-- « Plus récents d'abord » : tri sur le début ou la création, et quelles colonnes ?
-- Minutes disponibles de l'utilisation : dans le fuseau de l'hôpital de chaque praticien ?
-- Égalités et moins de 5 praticiens dans le top 5 ?
-- Dans quel fuseau afficher le journal d'audit ?
-- La salle choisie par l'admin doit-elle être du département du praticien ?
-- D'où l'admin lance-t-il arrivée, absence et annulation ?
-- Le bouton de rappel affiche-t-il le nombre de rappels créés ?
+Tranchées au plan E7 (`aidd_docs/tasks/2026_11/2026_11_21_e7-supervision-admin/plan.md`, Decisions).
+- « Plus récents d'abord » : tri sur le début ou la création, et quelles colonnes ? → `start` décroissant puis `id` (pas de `created_at`) ; début dans le fuseau nommé de l'hôpital, patient, praticien, département, type, statut, source, salle.
+- Minutes disponibles de l'utilisation : dans le fuseau de l'hôpital de chaque praticien ? → Oui ; les jours sont aujourd'hui local de chaque hôpital et les n−1 précédents.
+- Égalités et moins de 5 praticiens dans le top 5 ? → RDV non annulés décroissants puis nom ; seulement les praticiens ayant un RDV, « Aucun RDV sur la période » sinon.
+- Dans quel fuseau afficher le journal d'audit ? → `settings.TIME_ZONE`, nommé sur la page ; filtre acteur par email, résolu dans la vue.
+- La salle choisie par l'admin doit-elle être du département du praticien ? → Du département du type, active (`not_found`) puis libre (`conflict`).
+- D'où l'admin lance-t-il arrivée, absence et annulation ? → De la fiche `/console/appointments/<id>`, liée depuis chaque ligne ; son historique montre les actions du praticien en « Personnel ».
+- Le bouton de rappel affiche-t-il le nombre de rappels créés ? → Oui, « N rappels envoyés » ; `POST /jobs/reminders` renvoie `{count}`.
 
 ## E8 FHIR R4
 - Quels champs de `PractitionerRole` sont publics sans jeton ?

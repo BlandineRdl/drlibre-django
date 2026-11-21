@@ -59,6 +59,8 @@ class AppointmentRecord(models.Model):
             models.Index(fields=("clinician", "start"), name="appointment_clinician_start"),
             models.Index(fields=("patient_id", "start"), name="appointment_patient_start"),
             models.Index(fields=("room", "start"), name="appointment_room_start"),
+            # Admin lists and exports scan every hospital by start.
+            models.Index(fields=("start",), name="appointment_start"),
         )
         constraints = (
             _no_overlap("appointment_clinician_no_overlap", "clinician"),

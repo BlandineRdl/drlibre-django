@@ -4,7 +4,7 @@ import pytest
 from django.apps import apps
 
 from drlibre.audit.infrastructure.django.models import AuditEntryRecord
-from drlibre.booking.infrastructure.django.models import AppointmentRecord
+from drlibre.booking.infrastructure.django.models import AppointmentRecord, WaitlistEntryRecord
 from drlibre.bootstrap.container import container
 from drlibre.identity.infrastructure.django.models import UserRecord
 from drlibre.organisation.infrastructure.django.models import (
@@ -134,3 +134,21 @@ def test_the_demo_clinician_is_named_once_with_an_honorific_title_even_after_a_r
     user.refresh_from_db()
     profile.refresh_from_db()
     assert (user.full_name, profile.title) == ("Claire Martin", "Dr")
+
+
+def test_the_demo_seed_fills_the_past_week_in_every_closed_status_and_source_once() -> None:
+    """Epic E7: the dashboard shows non-zero figures on the demo, a reseed adds nothing."""
+    seed.main()
+    seed.main()
+    now = datetime.now(UTC)
+    past = AppointmentRecord.objects.filter(
+        start__gte=now - timedelta(days=seed.PAST_DAYS + 1), start__lt=now
+    )
+    rows = list(past.values_list("id", "status", "source"))
+
+    assert len({r[0] for r in rows}) == len(rows)
+    assert {"COMPLETED", "CANCELLED", "NO_SHOW"} <= {r[1] for r in rows}
+    assert {"ONLINE", "ROUND_ROBIN", "STAFF"} <= {r[2] for r in rows}
+    waiting = WaitlistEntryRecord.objects.filter(status="WAITING")
+    assert waiting.values("patient_id").distinct().count() == 2
+    assert waiting.count() == 2

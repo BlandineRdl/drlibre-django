@@ -1,6 +1,6 @@
 ---
 objective: "Un admin global suit les indicateurs de §13 sur un tableau de bord, liste, exporte et pilote n'importe quel RDV, réserve pour un patient, consulte le journal d'audit et lance les rappels, chaque Story de l'Epic E7 prouvée par ses scénarios."
-status: pending
+status: implemented
 ---
 
 # Plan: E7 - L'admin supervise l'activité de tous les hôpitaux

@@ -86,7 +86,7 @@ class UpcomingAppointments(Protocol):
         ...
 
     def any_for_user(self, user_id: Id) -> tuple[Dependent, ...]:
-        """Every appointment where the user is the patient or the clinician."""
+        """The user's appointments as patient or clinician, then their waitlist entries."""
         ...
 
 

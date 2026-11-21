@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Rendez-vous{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<div class="actions">
+  <h1>Rendez-vous</h1>
+  <a href="{{ view.book_url }}" role="button">Réserver pour un patient</a>
+  <a href="{{ view.export_url }}" role="button" class="secondary outline">Exporter en CSV</a>
+</div>
+<p>{{ view.zone_note }}</p>
+<search>
+<form method="get" action="/console/appointments/">
+  <div class="grid">
+    <div>
+      <label for="from">Du</label>
+      <input type="date" id="from" name="from" value="{{ view.filters.start }}">
+    </div>
+    <div>
+      <label for="to">Au</label>
+      <input type="date" id="to" name="to" value="{{ view.filters.end }}">
+    </div>
+    <div>
+      <label for="department">Département</label>
+      <select id="department" name="department">
+        <option value="">Tous</option>
+        {% for c in view.filters.departments %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="grid">
+    <div>
+      <label for="clinician">Praticien</label>
+      <select id="clinician" name="clinician">
+        <option value="">Tous</option>
+        {% for c in view.filters.clinicians %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="status">Statut</label>
+      <select id="status" name="status">
+        <option value="">Tous</option>
+        {% for c in view.filters.statuses %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="source">Source</label>
+      <select id="source" name="source">
+        <option value="">Toutes</option>
+        {% for c in view.filters.sources %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <button type="submit">Filtrer</button>
+</form>
+</search>
+{% if view.rows %}
+<div class="overflow-auto" tabindex="0" role="region" aria-label="Rendez-vous de tous les hôpitaux">
+  <table>
+    <caption>Rendez-vous, plus récents d'abord : {{ view.summary }}</caption>
+    <thead><tr>{% for header in view.headers %}<th scope="col">{{ header }}</th>{% endfor %}<th scope="col">Fiche</th></tr></thead>
+    <tbody>
+    {% for row in view.rows %}
+      <tr>
+        {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+        <td><a href="{{ row.open_url }}" aria-label="Ouvrir le rendez-vous {{ row.label }}">Ouvrir</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>Aucun rendez-vous pour ces filtres.</p>
+{% endif %}
+<nav aria-label="Pagination" class="pagination">
+  <p>{{ view.summary }}</p>
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Page précédente</a>{% endif %}
+  {% if view.next_url %}<a href="{{ view.next_url }}">Page suivante ›</a>{% endif %}
+</nav>
+{% endblock %}

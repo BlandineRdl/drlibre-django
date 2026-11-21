@@ -36,6 +36,18 @@ caption { text-align: left; }
 .tiles div { border-left: 0.25rem solid var(--pico-primary); padding-left: 0.75rem; }
 .tiles dt { font-weight: normal; }
 .tiles dd { margin: 0; font-size: 1.25rem; font-weight: bold; }
+.histogram .bar { display: inline-block; height: 0.75rem; max-width: 60vw; vertical-align: middle; background: var(--pico-primary); }
+.bar-0 { width: 0rem; }
+.bar-10 { width: 1rem; }
+.bar-20 { width: 2rem; }
+.bar-30 { width: 3rem; }
+.bar-40 { width: 4rem; }
+.bar-50 { width: 5rem; }
+.bar-60 { width: 6rem; }
+.bar-70 { width: 7rem; }
+.bar-80 { width: 8rem; }
+.bar-90 { width: 9rem; }
+.bar-100 { width: 10rem; }
 .agenda-row { margin-bottom: 1rem; }
 .agenda-row p { margin-bottom: 0.5rem; }
 .facts dt { font-weight: bold; }

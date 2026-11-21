@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Lectures admin : RDV, export, patients, audit, rappels
