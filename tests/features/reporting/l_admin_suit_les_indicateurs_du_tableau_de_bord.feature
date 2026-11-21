@@ -59,6 +59,17 @@ Feature: L'admin suit les indicateurs du tableau de bord
     When the admin views the dashboard for the range "today"
     Then the utilisation is 50 %
 
+  Scenario: Règle §13 : les RDV d'un praticien désactivé comptent comme RDV mais pas dans l'utilisation
+    Given "Dr Paris" has a rule on weekday 5 from "09:00" to "12:00"
+    And "Dr Paris" is off from "2026-11-20T11:00" to "2026-11-20T13:00"
+    And the inactive clinician "Dr Parti" in "Europe/Paris" has a rule on weekday 5 from "09:00" to "12:00"
+    And "Dr Paris" has a "BOOKED" "ONLINE" appointment at "2026-11-20T09:00" for 30 minutes
+    And "Dr Paris" has a "COMPLETED" "STAFF" appointment at "2026-11-20T09:30" for 30 minutes
+    And "Dr Parti" has a "COMPLETED" "STAFF" appointment at "2026-11-20T09:00" for 60 minutes
+    When the admin views the dashboard for the range "today"
+    Then the utilisation is 50 %
+    And the dashboard counts 3 appointments and 0 cancellations
+
   Scenario: Taux d'absence : `NO_SHOW` ÷ RDV non annulés. Part en ligne : RDV de source `ONLINE` ou `ROUND_ROBIN` ÷ RDV non annulés.
     Given "Dr Paris" has a "BOOKED" "ONLINE" appointment at "2026-11-20T09:00" for 30 minutes
     And "Dr Paris" has a "COMPLETED" "ROUND_ROBIN" appointment at "2026-11-20T09:30" for 30 minutes

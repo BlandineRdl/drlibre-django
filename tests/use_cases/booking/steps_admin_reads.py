@@ -9,11 +9,10 @@ from typing import Any
 from urllib.parse import parse_qs
 
 import pytest
-from django.conf import settings
 from django.test import Client
 from pytest_bdd import given, parsers, then, when
 
-from drlibre.audit.application.ports.inbound import AuditFilter, AuditQueries, AuditRow
+from drlibre.audit.application.ports.inbound import AuditQueries, AuditRow, JournalQuery
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.booking.application.ports.inbound import (
     AdminAppointmentFilter,
@@ -24,7 +23,7 @@ from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, S
 from drlibre.identity.domain.user import Role
 from drlibre.interfaces.web.presenters.console_appointments import csv_cell
 from drlibre.interfaces.web.presenters.console_settings import REMINDERS_URL
-from drlibre.shared_kernel.errors import DomainError
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
 from tests.builders_booking import existing_appointment
@@ -312,23 +311,25 @@ def more_audit_entries(world: FakeWorld, scene: Scene, count: int, start: str) -
 
 
 @when(parsers.re(r'the admin reads the journal with "(?P<raw>[^"]*)"$'))
-def admin_reads_journal(world: FakeWorld, reads: AdminReads, raw: str) -> None:
+def admin_reads_journal(world: FakeWorld, scene: Scene, reads: AdminReads, raw: str) -> None:
     q = query(raw)
-    email = q.get("actor")
-    found = world.app.user_queries.user_by_email(email) if email else None
-    queries = world.app.audit_queries
-    reads.journal = queries.page(
-        AuditFilter.from_query(
-            # An email of no user matches no entry.
-            actor_id=(found.id if found else Id()) if email else None,
+    reads.journal = world.app.view_audit_journal.execute(
+        actor_id=actor(scene),
+        query=JournalQuery(
+            email=q.get("actor"),
             entity_type=q.get("entity_type"),
             start=q.get("start"),
             end=q.get("end"),
-            time_zone=settings.TIME_ZONE,
-            entity_types=queries.entity_types(),
+            request=PageRequest.from_query(page=q.get("page"), search=None),
         ),
-        PageRequest.from_query(page=q.get("page"), search=None),
-    )
+    ).page
+
+
+@then("reading the journal is forbidden")
+def journal_forbidden(world: FakeWorld, scene: Scene) -> None:
+    with pytest.raises(DomainError) as refused:
+        admin_reads_journal(world, scene, AdminReads(), "")
+    assert refused.value.code is ErrorCode.FORBIDDEN
 
 
 @then("the journal offers no way to change or delete an entry")

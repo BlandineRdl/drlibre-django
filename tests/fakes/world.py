@@ -37,6 +37,7 @@ from tests.fakes.database_probe import InMemoryDatabaseProbe
 from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
+from tests.fakes.journal_actors import InMemoryJournalActors
 from tests.fakes.notifications import InMemoryNotifications
 from tests.fakes.organisation import (
     InMemoryAppointmentTypes,
@@ -244,6 +245,7 @@ class FakeWorld:
             search_queries=SqlSearchQueries(),
             activity_queries=self.activity,
             admins=InMemoryAdmins(self.users),
+            journal_actors=InMemoryJournalActors(self.users),
             notifications=self.notifications,
             notify=self.notify,
             time_zone="Europe/Paris",

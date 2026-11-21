@@ -12,10 +12,12 @@ from drlibre.shared_kernel.ids import Id
 _IN_RANGE = """
 WITH located AS (
     SELECT a.clinician_id, a.start, a."end", a.status, a.source,
+           u.active AND u.role = 'CLINICIAN' AS clinician_active,
            (a.start AT TIME ZONE h.time_zone)::date AS day,
            (%(now)s::timestamptz AT TIME ZONE h.time_zone)::date AS today
     FROM booking_appointmentrecord a
     JOIN organisation_clinicianprofilerecord c ON c.id = a.clinician_id
+    JOIN identity_userrecord u ON u.id = c.user_id
     JOIN organisation_departmentrecord d ON d.id = c.department_id
     JOIN organisation_hospitalrecord h ON h.id = d.hospital_id
     WHERE a.start >= %(earliest)s AND a.start < %(latest)s
@@ -35,7 +37,7 @@ SELECT COUNT(*) FILTER (WHERE status <> 'CANCELLED') AS appointments,
            WHERE status <> 'CANCELLED' AND source IN ('ONLINE', 'ROUND_ROBIN')
        ) AS online,
        COALESCE(FLOOR(SUM(EXTRACT(EPOCH FROM "end" - start)) FILTER (
-           WHERE status NOT IN ('CANCELLED', 'NO_SHOW')
+           WHERE status NOT IN ('CANCELLED', 'NO_SHOW') AND clinician_active
        ) / 60), 0)::int AS active_minutes
 FROM in_range
 """,

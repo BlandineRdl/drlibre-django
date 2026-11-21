@@ -48,3 +48,7 @@ Feature: L'admin consulte le journal d'audit
   Scenario: Chaque entrée montre l'heure, l'acteur (vide pour un échec de connexion ou une étape avant vérification de l'email), l'action, l'entité et le correlation id. (acteur vide)
     When the admin reads the journal with "page=1"
     Then the entries "req-5, req-2" show no actor
+
+  Scenario: Règle §10 : seul l'admin consulte le journal
+    Given a signed-in "CLINICIAN" user
+    Then reading the journal is forbidden

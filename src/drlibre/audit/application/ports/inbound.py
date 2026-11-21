@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Protocol
@@ -81,4 +82,30 @@ class AuditQueries(Protocol):
 
     def entity_types(self) -> tuple[str, ...]:
         """Every entity type the journal holds, sorted."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class JournalQuery:
+    """The journal's raw filters; an unusable value means no filter."""
+
+    email: str | None
+    entity_type: str | None
+    start: str | None
+    end: str | None
+    request: PageRequest
+
+
+@dataclass(frozen=True, slots=True)
+class AuditJournal:
+    page: Page[AuditRow]
+    audit_filter: AuditFilter
+    entity_types: tuple[str, ...]
+    # Email of each actor of the page.
+    emails: Mapping[Id, str]
+
+
+class ViewAuditJournal(Protocol):
+    def execute(self, *, actor_id: Id, query: JournalQuery) -> AuditJournal:
+        """One journal page with its actors' emails; an unknown email matches no entry."""
         ...

@@ -217,7 +217,10 @@ def test_each_dashboard_figure_on_the_seed_matches_its_definition() -> None:
         if 0 <= _days_ago(a.start, now, zones[a.clinician_id]) < period.length
     ]
     kept = [a for a in in_range if a.status != "CANCELLED"]
-    active = [a for a in kept if a.status != "NO_SHOW"]
+    users = UserRecord.objects.filter(role="CLINICIAN", active=True).values_list("id", flat=True)
+    profiles = ClinicianProfileRecord.objects.filter(user_id__in=list(users))
+    working = set(profiles.values_list("id", flat=True))
+    active = [a for a in kept if a.status != "NO_SHOW" and a.clinician_id in working]
     minutes = int(sum((a.end - a.start).total_seconds() for a in active) // 60)
     online = [a for a in kept if a.source in ("ONLINE", "ROUND_ROBIN")]
     no_shows = [a for a in kept if a.status == "NO_SHOW"]

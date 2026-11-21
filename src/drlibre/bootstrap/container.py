@@ -2,9 +2,11 @@ from dataclasses import dataclass
 
 from django.conf import settings
 
-from drlibre.audit.application.ports.inbound import AuditQueries
-from drlibre.audit.application.ports.outbound import AuditLog
+from drlibre.audit.application.ports.inbound import AuditQueries, ViewAuditJournal
+from drlibre.audit.application.ports.outbound import AuditLog, JournalActors
+from drlibre.audit.application.use_cases.view_audit_journal import ViewAuditJournalUseCase
 from drlibre.audit.infrastructure.audit_log import DjangoAuditLog
+from drlibre.audit.infrastructure.identity_actors import IdentityJournalActors
 from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
@@ -436,6 +438,7 @@ class Adapters:
     search_queries: SearchQueries
     activity_queries: ActivityQueries
     admins: Admins
+    journal_actors: JournalActors
     notifications: Notifications
     # Booking's notices write through it, so it is built with them.
     notify: Notify
@@ -532,6 +535,7 @@ class Container:
     mark_notification_read: MarkNotificationRead
     count_unread: CountUnread
     view_dashboard: ViewDashboard
+    view_audit_journal: ViewAuditJournal
 
 
 def wire(a: Adapters) -> Container:
@@ -821,6 +825,9 @@ def wire(a: Adapters) -> Container:
         count_unread=CountUnreadUseCase(notifications=a.notifications),
         view_dashboard=ViewDashboardUseCase(
             clock=clock, admins=a.admins, queries=a.activity_queries, time_zone=a.time_zone
+        ),
+        view_audit_journal=ViewAuditJournalUseCase(
+            actors=a.journal_actors, queries=a.audit_queries, time_zone=a.time_zone
         ),
     )
 
@@ -1196,6 +1203,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         search_queries=SqlSearchQueries(),
         activity_queries=SqlActivityQueries(),
         admins=IdentityAdmins(user_queries),
+        journal_actors=IdentityJournalActors(users=user_queries, staff=user_queries),
         notifications=notifications,
         notify=notify,
         time_zone=settings.TIME_ZONE,

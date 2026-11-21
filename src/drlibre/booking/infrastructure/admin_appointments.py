@@ -30,6 +30,9 @@ JOIN organisation_appointmenttyperecord t ON t.id = a.appointment_type_id
 LEFT JOIN organisation_roomrecord r ON r.id = a.room_id
 WHERE (%(from)s::date IS NULL OR (a.start AT TIME ZONE h.time_zone)::date >= %(from)s::date)
   AND (%(to)s::date IS NULL OR (a.start AT TIME ZONE h.time_zone)::date <= %(to)s::date)
+  -- Sargable bounds wider than any zone offset, so appointment_start can serve the range.
+  AND (%(from)s::date IS NULL OR a.start >= %(from)s::date - interval '1 day')
+  AND (%(to)s::date IS NULL OR a.start < %(to)s::date + interval '2 days')
   AND (%(department)s::uuid IS NULL OR c.department_id = %(department)s::uuid)
   AND (%(clinician)s::uuid IS NULL OR a.clinician_id = %(clinician)s::uuid)
   AND (%(status)s::text IS NULL OR a.status = %(status)s::text)

@@ -12,6 +12,7 @@ from drlibre.booking.application.ports.inbound import (
     PatientAppointments,
 )
 from drlibre.booking.application.ports.outbound import BookingDirectory, Staff
+from drlibre.booking.application.use_cases.actor_scope import ActorKind, actor_scope
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
 
@@ -35,7 +36,8 @@ class ListAppointmentsAsCallerUseCase(ListAppointmentsAsCaller):
     def execute(
         self, *, actor_id: Id, query: AppointmentsQuery
     ) -> PatientAppointments | ClinicianAppointments | Page[AdminAppointmentRow]:
-        if self._directory.clinician_of_user(actor_id) is not None:
+        kind = actor_scope(self._directory, self._staff, actor_id).kind
+        if kind is ActorKind.CLINICIAN:
             entries = self._list_clinician_appointments.execute(
                 actor_id=actor_id,
                 agenda_filter=ClinicianFilter(
@@ -46,7 +48,7 @@ class ListAppointmentsAsCallerUseCase(ListAppointmentsAsCaller):
                 ),
             )
             return ClinicianAppointments(entries=entries)
-        if self._staff.is_admin(actor_id):
+        if kind is ActorKind.ADMIN:
             return self._list_all_appointments.execute(
                 actor_id=actor_id,
                 appointment_filter=AdminAppointmentFilter(

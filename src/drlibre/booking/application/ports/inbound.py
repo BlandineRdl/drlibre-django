@@ -548,6 +548,14 @@ class WaitlistOption:
     label: str
 
 
+@dataclass(frozen=True, slots=True)
+class BookingOptions:
+    """Who and where a type can be booked with; empty for an unknown type."""
+
+    clinicians: tuple[WaitlistOption, ...]
+    rooms: tuple[WaitlistOption, ...]
+
+
 class WaitlistQueries(Protocol):
     def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
         """The patient's entries, newest first."""
@@ -563,4 +571,8 @@ class WaitlistQueries(Protocol):
 
     def clinician_options(self) -> tuple[WaitlistOption, ...]:
         """Active clinicians labelled with their department, by label."""
+        ...
+
+    def booking_options(self, appointment_type_id: Id) -> BookingOptions:
+        """The type's department's active clinicians, as labelled above, and active rooms."""
         ...

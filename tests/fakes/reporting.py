@@ -47,7 +47,8 @@ class InMemoryActivityQueries(ActivityQueries):
     def tally(self, now: datetime, period: Range) -> Tally:
         rows = self._in_range(now, period)
         kept = [a for a in rows if a.status != "CANCELLED"]
-        active = [a for a in kept if a.status != "NO_SHOW"]
+        working = {i for i, c in self.clinicians.items() if c.active}
+        active = [a for a in kept if a.status != "NO_SHOW" and a.clinician_id in working]
         return Tally(
             appointments=len(kept),
             cancellations=len(rows) - len(kept),

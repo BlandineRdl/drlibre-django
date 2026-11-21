@@ -10,7 +10,7 @@ class ActivityQueries(Protocol):
     """Appointments count in the local day of their clinician's hospital, today included."""
 
     def tally(self, now: datetime, period: Range) -> Tally:
-        """Counts by status and source, and active minutes, of appointments in the range."""
+        """Counts by status and source of the range; active minutes of active clinicians only."""
         ...
 
     def per_day(self, now: datetime, period: Range) -> tuple[DayCount, ...]:

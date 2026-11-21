@@ -374,7 +374,7 @@ def book_page(
     patients: tuple[PatientMatch, ...],
     types: tuple[WaitlistOption, ...],
     clinicians: tuple[WaitlistOption, ...],
-    rooms: tuple[Option, ...],
+    rooms: tuple[WaitlistOption, ...],
     week: FreeWeek | None,
     error: DomainError | None = None,
 ) -> BookPage:

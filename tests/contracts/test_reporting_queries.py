@@ -33,6 +33,18 @@ def test_the_tally_counts_each_figure_of_the_range(scene: ActivityScene) -> None
     assert scene.queries.tally(NOW, Range.TODAY) == Tally(1, 0, 0, 1, 30)
 
 
+def test_active_minutes_leave_out_a_deactivated_clinician_whose_appointments_still_count(
+    scene: ActivityScene,
+) -> None:
+    """Règle §13 : l'utilisation ne compte que les RDV des praticiens actifs."""
+    dr = scene.clinician("Dr Paris", "Europe/Paris", True)
+    gone = scene.clinician("Dr Parti", "Europe/Paris", False)
+    scene.appointment(dr, datetime(2026, 11, 20, 9), 30, "BOOKED", "ONLINE")
+    scene.appointment(gone, datetime(2026, 11, 20, 9), 60, "COMPLETED", "STAFF")
+
+    assert scene.queries.tally(NOW, Range.TODAY) == Tally(2, 0, 0, 1, 30)
+
+
 def test_a_day_is_the_local_day_of_the_clinician_hospital(scene: ActivityScene) -> None:
     """Story indicateurs : jour compté dans le fuseau de l'hôpital du RDV."""
     late = datetime(2026, 11, 21, 1, tzinfo=UTC)

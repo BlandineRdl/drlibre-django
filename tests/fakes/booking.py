@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from drlibre.booking.application.ports.inbound import (
     AppointmentQueries,
     BookedPeriod,
+    BookingOptions,
     WaitlistOption,
     WaitlistQueries,
     WaitlistRow,
@@ -569,12 +570,21 @@ class WaitlistType:
     time_zone: str = "Europe/Paris"
     bookable_online: bool = True
     active: bool = True
+    department_id: Id | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class WaitlistClinician:
     name: str = "Dr Martin"
     department: str = "Cardiologie"
+    active: bool = True
+    department_id: Id | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistRoom:
+    department_id: Id
+    label: str
     active: bool = True
 
 
@@ -586,6 +596,7 @@ class InMemoryWaitlistQueries(WaitlistQueries):
         self.users = users
         self.types: dict[Id, WaitlistType] = {}
         self.clinicians: dict[Id, WaitlistClinician] = {}
+        self.rooms: dict[Id, WaitlistRoom] = {}
 
     def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
         mine = (e for e in self.waitlist.rows.values() if e.patient_id == patient_id)
@@ -614,6 +625,23 @@ class InMemoryWaitlistQueries(WaitlistQueries):
             if c.active
         )
         return tuple(sorted(found, key=lambda o: (o.label, o.id.value)))
+
+    def booking_options(self, appointment_type_id: Id) -> BookingOptions:
+        kind = self.types.get(appointment_type_id)
+        department = kind.department_id if kind else None
+        if department is None:
+            return BookingOptions((), ())
+        clinicians = (
+            o for o in self.clinician_options() if self.clinicians[o.id].department_id == department
+        )
+        rooms = (
+            WaitlistOption(i, r.label)
+            for i, r in self.rooms.items()
+            if r.department_id == department and r.active
+        )
+        return BookingOptions(
+            tuple(clinicians), tuple(sorted(rooms, key=lambda o: (o.label, o.id.value)))
+        )
 
     def _row(self, entry: WaitlistEntry) -> WaitlistRow:
         kind = self.types.get(entry.appointment_type_id, WaitlistType())

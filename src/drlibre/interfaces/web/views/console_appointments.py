@@ -10,7 +10,6 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from drlibre.booking.application.ports.inbound import (
     AppointmentFile,
     ClinicianAction,
-    WaitlistOption,
 )
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
@@ -30,7 +29,6 @@ from drlibre.interfaces.web.presenters.console_appointments import (
 from drlibre.interfaces.web.presenters.slots import local
 from drlibre.interfaces.web.presenters.workspace import day_param
 from drlibre.interfaces.web.views.portal import private
-from drlibre.organisation.application.ports.inbound import Option
 from drlibre.scheduling.application.ports.inbound import FreeWeek
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -237,24 +235,13 @@ def _book_view(
 ) -> HttpResponse:
     c = container()
     kind_id = parse_id(choice.appointment_type)
-    kind = c.reference_queries.appointment_type(kind_id) if kind_id else None
-    clinicians: tuple[WaitlistOption, ...] = ()
-    rooms: tuple[Option, ...] = ()
-    if kind is not None:
-        # Only the type's department's active clinicians and rooms are offered.
-        department = kind.department_id
-        profiles = {p.id for p in c.reference_queries.department_clinician_profiles(department)}
-        clinicians = tuple(o for o in c.waitlist_queries.clinician_options() if o.id in profiles)
-        rooms = tuple(
-            Option(r.id, r.label)
-            for r in c.reference_queries.department_rooms(department)
-            if r.active
-        )
+    options = c.waitlist_queries.booking_options(kind_id) if kind_id else None
+    clinicians = options.clinicians if options else ()
     clinician = next((o.id for o in clinicians if str(o.id) == choice.clinician), None)
     free = None
-    if kind is not None and clinician is not None and parse_id(choice.patient):
+    if kind_id is not None and clinician is not None and parse_id(choice.patient):
         free = c.find_free_week.execute(
-            appointment_type_id=kind.id,
+            appointment_type_id=kind_id,
             clinician_id=clinician,
             week=day_param(week),
             for_patient=False,
@@ -264,7 +251,7 @@ def _book_view(
         patients=c.patient_lookup.active_patients(choice.search) if choice.search else (),
         types=c.waitlist_queries.type_options(online_only=False),
         clinicians=clinicians,
-        rooms=rooms,
+        rooms=options.rooms if options else (),
         week=free,
         error=error,
     )
