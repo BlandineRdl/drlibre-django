@@ -53,3 +53,11 @@ def send_appointment_reminders() -> int:
         sent = container().send_reminders.execute()
         logger.info("appointment_reminders_sent", count=sent)
     return sent
+
+
+@shared_task(name="drlibre.expire_waitlist")
+def expire_waitlist() -> int:
+    with structlog.contextvars.bound_contextvars(correlation_id=str(uuid.uuid4())):
+        changed = container().expire_waitlist.execute()
+        logger.info("waitlist_expired", count=changed)
+    return changed

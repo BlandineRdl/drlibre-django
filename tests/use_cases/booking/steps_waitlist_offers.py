@@ -365,3 +365,24 @@ def audited_admin_source(world: FakeWorld, scene: Scene, action: str) -> None:
 @then(parsers.parse('the audit holds "{action}" by nobody with ids only'))
 def audited_by_nobody(world: FakeWorld, action: str) -> None:
     audited_ids_only(world, None, action)
+
+
+@when("the waitlist expiry job runs")
+def expiry_runs(world: FakeWorld, scene: Scene) -> None:
+    if not scene.expiry_runs:
+        scene.waitlist_before = dict(world.waitlist.rows)
+    scene.expiry_runs.append(world.app.expire_waitlist.execute())
+
+
+@then(parsers.parse("the job changed {counts} entries"))
+@then(parsers.parse("the job changed {counts} entries, then {later:d}"))
+def job_changed(scene: Scene, counts: str, later: int | None = None) -> None:
+    expected = [int(counts)] if later is None else [int(counts), later]
+    assert scene.expiry_runs == expected
+
+
+@then(parsers.parse('the audit holds "{action}" by nobody with the status "{status}"'))
+def audited_status(world: FakeWorld, action: str, status: str) -> None:
+    (entry,) = [e for e in world.audit.entries if e.action == action]
+    assert (entry.actor, entry.entity_type) == (None, "waitlist_entry")
+    assert dict(entry.metadata) == {"status": status}

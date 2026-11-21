@@ -55,6 +55,7 @@ class Scene:
         self.people: dict[str, Id] = {}
         self.freed: dict[str, Appointment] = {}
         self.waitlist_before: dict[Id, WaitlistEntry] = {}
+        self.expiry_runs: list[int] = []
 
 
 def at(raw: str) -> datetime:

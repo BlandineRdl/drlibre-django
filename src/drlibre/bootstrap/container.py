@@ -12,6 +12,7 @@ from drlibre.booking.application.ports.inbound import (
     CancelAppointment,
     CreateHold,
     ExpireHolds,
+    ExpireWaitlist,
     JoinWaitlist,
     ListPatientAppointments,
     OfferCancelledSlot,
@@ -50,6 +51,7 @@ from drlibre.booking.application.use_cases.book_appointment import BookAppointme
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.expire_waitlist import ExpireWaitlistUseCase
 from drlibre.booking.application.use_cases.join_waitlist import JoinWaitlistUseCase
 from drlibre.booking.application.use_cases.list_patient_appointments import (
     ListPatientAppointmentsUseCase,
@@ -435,6 +437,7 @@ class Container:
     join_waitlist: JoinWaitlist
     offer_cancelled_slot: OfferCancelledSlot
     accept_waitlist_offer: AcceptWaitlistOffer
+    expire_waitlist: ExpireWaitlist
     waitlist_queries: WaitlistQueries
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
@@ -685,6 +688,7 @@ def wire(a: Adapters) -> Container:
         join_waitlist=booking.join_waitlist,
         offer_cancelled_slot=booking.offer_cancelled_slot,
         accept_waitlist_offer=booking.accept_waitlist_offer,
+        expire_waitlist=booking.expire_waitlist,
         waitlist_queries=booking.waitlist_queries,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
@@ -742,6 +746,7 @@ class _BookingUseCases:
     join_waitlist: JoinWaitlist
     offer_cancelled_slot: OfferCancelledSlot
     accept_waitlist_offer: AcceptWaitlistOffer
+    expire_waitlist: ExpireWaitlist
     waitlist_queries: WaitlistQueries
 
 
@@ -876,6 +881,9 @@ def _wire_booking(
             staff=booking.staff,
             waitlist=booking.waitlist,
             notices=booking.notices,
+        ),
+        expire_waitlist=ExpireWaitlistUseCase(
+            clock=a.clock, uow=a.uow, audit=a.audit, waitlist=booking.waitlist
         ),
         waitlist_queries=booking.waitlist_queries,
     )
