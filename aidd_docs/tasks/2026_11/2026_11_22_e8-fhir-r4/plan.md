@@ -1,6 +1,6 @@
 ---
 objective: "Un client FHIR R4 lit le référentiel et les créneaux sans jeton puis, avec le jeton d'un utilisateur, fait tout ce que les écrans lui permettent sous les mêmes règles, chaque Story de l'Epic E8 prouvée par ses scénarios et le CapabilityStatement conforme à ce qui est servi."
-status: pending
+status: in-progress
 ---
 
 # Plan: E8 - Un client FHIR R4 fait tout ce que les écrans permettent, ni plus ni moins
