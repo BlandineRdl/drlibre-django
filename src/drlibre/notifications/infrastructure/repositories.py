@@ -18,6 +18,7 @@ def _notification(row: NotificationRecord) -> Notification:
         appointment_id=Id(row.appointment_id) if row.appointment_id else None,
         created_at=row.created_at,
         read_at=row.read_at,
+        time_zone=row.time_zone,
     )
 
 
@@ -31,6 +32,7 @@ def _fields(notification: Notification) -> dict[str, object]:
         "appointment_id": appointment.value if appointment else None,
         "created_at": notification.created_at,
         "read_at": notification.read_at,
+        "time_zone": notification.time_zone,
     }
 
 

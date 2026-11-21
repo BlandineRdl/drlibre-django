@@ -55,6 +55,8 @@ class Notification:
     appointment_id: Id | None
     created_at: datetime
     read_at: datetime | None = None
+    # The zone of the appointment's hospital, which its body uses; empty when unknown.
+    time_zone: str = ""
 
     @classmethod
     def for_event(
@@ -79,6 +81,7 @@ class Notification:
             body=body,
             appointment_id=appointment_id,
             created_at=at,
+            time_zone=zone_name,
         )
 
     @property

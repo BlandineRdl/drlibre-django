@@ -16,6 +16,7 @@ class NotificationRecord(models.Model):
     appointment_id = models.UUIDField(null=True)
     created_at = models.DateTimeField()
     read_at = models.DateTimeField(null=True)
+    time_zone = models.CharField(max_length=64, default="")
 
     class Meta:
         indexes = (

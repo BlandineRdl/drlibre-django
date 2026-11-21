@@ -219,6 +219,27 @@ def test_unread_notifications_are_marked_by_text_not_colour_alone() -> None:
     assert notifications_page(Page((), 0, 1), "Europe/Paris").empty_text == "Aucune notification."
 
 
+def test_each_notification_is_dated_in_its_appointment_hospital_zone() -> None:
+    """Story « notifications » : heure de réception dans le fuseau de l'hôpital du RDV, nommé."""
+    at = datetime(2026, 11, 20, 9, tzinfo=UTC)
+    overseas = Notification.for_event(
+        event=AppointmentEvent.BOOKED,
+        recipient_id=Id(),
+        appointment_id=Id(),
+        start=START,
+        zone_name="America/Martinique",
+        at=at,
+    )
+    unknown = dataclasses.replace(overseas, id=Id(), time_zone="")
+
+    view = notifications_page(Page((overseas, unknown), total=2, number=1), "Europe/Paris")
+
+    assert [item.received for item in view.items] == [
+        "Reçue le 20/11/2026 à 05:00 (America/Martinique)",
+        "Reçue le 20/11/2026 à 10:00 (Europe/Paris)",
+    ]
+
+
 def test_the_profile_shows_the_password_link_only_to_a_password_holder() -> None:
     """Story « profil » : changement de mot de passe pour qui en a un, caché sinon."""
     user = patient_user(Id())

@@ -24,6 +24,7 @@ NOTIFICATIONS_URL = "/portal/notifications"
 PROFILE_URL = "/portal/profile"
 PASSWORD_URL = "/account/password"  # noqa: S105
 SEARCH_URL = "/"
+RECEIVED_ZONE_NOTE = "Heures de réception dans le fuseau de l'hôpital du rendez-vous, nommé."
 EACH_ZONE_NOTE = "Heures affichées dans le fuseau de chaque hôpital, nommé sur chaque rendez-vous."
 STATUS_LABELS = {
     AppointmentStatus.BOOKED: "Réservé",
@@ -323,7 +324,8 @@ def reschedule_page(
     )
 
 
-def _notification(item: Notification, zone: str) -> NotificationView:
+def _notification(item: Notification, fallback_zone: str) -> NotificationView:
+    zone = item.time_zone or fallback_zone
     received = local(item.created_at, zone)
     unread = item.read_at is None
     return NotificationView(
@@ -337,14 +339,15 @@ def _notification(item: Notification, zone: str) -> NotificationView:
     )
 
 
-def notifications_page(page: Page[Notification], zone: str) -> NotificationsPageView:
+def notifications_page(page: Page[Notification], fallback_zone: str) -> NotificationsPageView:
+    """Each notification dated in its appointment's hospital zone, else in the fallback zone."""
     return NotificationsPageView(
-        items=tuple(_notification(n, zone) for n in page.items),
+        items=tuple(_notification(n, fallback_zone) for n in page.items),
         empty_text="Aucune notification.",
         summary=f"Page {page.number} sur {page.pages}",
         previous_url=f"{NOTIFICATIONS_URL}?page={page.number - 1}" if page.has_previous else "",
         next_url=f"{NOTIFICATIONS_URL}?page={page.number + 1}" if page.has_next else "",
-        zone_note=f"Heures de réception dans le fuseau {zone}.",
+        zone_note=RECEIVED_ZONE_NOTE,
     )
 
 
