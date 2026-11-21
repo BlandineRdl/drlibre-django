@@ -1,20 +1,24 @@
 from datetime import UTC, datetime
 
+from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.bootstrap.container import Adapters, BookingAdapters, Container, wire
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
 from tests.fakes.booking import (
     FixedBookingDirectory,
+    FixedCodeIssuer,
     InMemoryAppointments,
     InMemoryFreeSlots,
+    InMemoryHolds,
     InMemoryPatients,
     InMemoryRoundRobinLedger,
-    RecordingBookingNotices,
+    InMemoryVerificationCodes,
     RecordingScheduleLocks,
     RecordingSlotRefresh,
 )
 from tests.fakes.clock import FixedClock
 from tests.fakes.database_probe import InMemoryDatabaseProbe
+from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
 from tests.fakes.organisation import (
@@ -29,6 +33,7 @@ from tests.fakes.organisation import (
     InMemorySpecialties,
 )
 from tests.fakes.password_hasher import InMemoryPasswordHasher
+from tests.fakes.rate_limiter import InMemoryRateLimiter
 from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
     InMemoryAvailabilityQueries,
@@ -83,11 +88,21 @@ class FakeWorld:
         )
         self.booking_appointments = InMemoryAppointments()
         self.booking_directory = FixedBookingDirectory()
-        self.free_slots = InMemoryFreeSlots()
+        self.holds = InMemoryHolds()
+        self.codes = InMemoryVerificationCodes()
+        self.issuer = FixedCodeIssuer()
+        self.limiter = InMemoryRateLimiter(self.clock)
+        self.outbox = RecordingEmailOutbox()
+        self.free_slots = InMemoryFreeSlots(self.holds, self.clock)
         self.booking_slot_refresh = RecordingSlotRefresh()
         self.schedule_locks = RecordingScheduleLocks()
-        self.patients = InMemoryPatients()
-        self.notices = RecordingBookingNotices()
+        self.patients = InMemoryPatients(self.users)
+        self.notices = OutboxBookingNotices(
+            outbox=self.outbox,
+            directory=self.booking_directory,
+            patients=self.patients,
+            public_base_url="http://localhost:8000",
+        )
         self.ledger = InMemoryRoundRobinLedger()
         self.uow = InMemoryUnitOfWork(
             self.audit,
@@ -105,7 +120,9 @@ class FakeWorld:
             self.slot_refresh,
             self.booking_appointments,
             self.booking_slot_refresh,
-            self.notices,
+            self.holds,
+            self.codes,
+            self.outbox,
             self.ledger,
         )
         self.app: Container = wire(self.adapters())
@@ -160,5 +177,10 @@ class FakeWorld:
                 patients=self.patients,
                 notices=self.notices,
                 ledger=self.ledger,
+                holds=self.holds,
+                codes=self.codes,
+                issuer=self.issuer,
+                limiter=self.limiter,
+                outbox=self.outbox,
             ),
         )

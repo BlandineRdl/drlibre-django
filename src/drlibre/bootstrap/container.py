@@ -4,22 +4,48 @@ from drlibre.audit.application.ports.outbound import AuditLog
 from drlibre.audit.infrastructure.audit_log import DjangoAuditLog
 from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
-from drlibre.booking.application.ports.inbound import BookAppointment
+from drlibre.booking.application.ports.inbound import (
+    BookAppointment,
+    CreateHold,
+    ExpireHolds,
+    OpenHolds,
+    ResendCode,
+    VerifyHold,
+)
 from drlibre.booking.application.ports.outbound import (
     Appointments as BookingAppointments,
 )
 from drlibre.booking.application.ports.outbound import (
     BookingDirectory,
     BookingNotices,
+    CodeIssuer,
     FreeSlots,
+    Holds,
     Patients,
     RoundRobinLedger,
     ScheduleLocks,
+    VerificationCodes,
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefresh
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
+from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
+from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
-from drlibre.booking.infrastructure.unwired import UnwiredBookAppointment
+from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
+from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
+from drlibre.booking.infrastructure.identity_patients import (
+    IdentityPatientAccounts,
+    IdentityPatientSessions,
+)
+from drlibre.booking.infrastructure.unwired import (
+    UnwiredBookAppointment,
+    UnwiredCreateHold,
+    UnwiredExpireHolds,
+    UnwiredOpenHolds,
+    UnwiredResendCode,
+    UnwiredVerifyHold,
+)
 from drlibre.health.application.ports.inbound import CheckHealth
 from drlibre.health.application.ports.outbound import DatabaseProbe
 from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
@@ -28,6 +54,8 @@ from drlibre.identity.application.ports.inbound import (
     AuthenticateSession,
     ChangePassword,
     DeleteUser,
+    OpenPatientSession,
+    ProvidePatientAccount,
     SaveUser,
     SignIn,
     SignOut,
@@ -49,6 +77,10 @@ from drlibre.identity.application.use_cases.authenticate_session import (
 )
 from drlibre.identity.application.use_cases.change_password import ChangePasswordUseCase
 from drlibre.identity.application.use_cases.delete_user import DeleteUserUseCase
+from drlibre.identity.application.use_cases.open_patient_session import OpenPatientSessionUseCase
+from drlibre.identity.application.use_cases.provide_patient_account import (
+    ProvidePatientAccountUseCase,
+)
 from drlibre.identity.application.use_cases.save_user import SaveUserUseCase
 from drlibre.identity.application.use_cases.sign_in import SignInUseCase
 from drlibre.identity.application.use_cases.sign_out import SignOutUseCase
@@ -60,7 +92,7 @@ from drlibre.identity.infrastructure.repositories import DjangoSessions, DjangoU
 from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import NoAppointmentsYet
-from drlibre.notifications.application.ports.outbound import Mailer
+from drlibre.notifications.application.ports.outbound import EmailOutbox, Mailer
 from drlibre.notifications.infrastructure.smtp_mailer import SmtpMailer
 from drlibre.organisation.application.ports.inbound import (
     AttachClinicianProfile,
@@ -164,6 +196,7 @@ from drlibre.scheduling.infrastructure.repositories import (
 from drlibre.scheduling.infrastructure.slot_queries import DjangoSlotQueries
 from drlibre.scheduling.infrastructure.slot_store import DjangoSlotStore
 from drlibre.shared_kernel.clock import Clock
+from drlibre.shared_kernel.rate_limit import RateLimiter
 from drlibre.shared_kernel.system_clock import SystemClock
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
 
@@ -180,6 +213,12 @@ class BookingAdapters:
     patients: Patients
     notices: BookingNotices
     ledger: RoundRobinLedger
+    holds: Holds
+    codes: VerificationCodes
+    issuer: CodeIssuer
+    limiter: RateLimiter
+    outbox: EmailOutbox
+    network_hourly_limit: int = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -258,6 +297,13 @@ class Container:
     extend_slot_horizon: ExtendSlotHorizon
     find_free_slots: FindFreeSlots
     book_appointment: BookAppointment
+    create_hold: CreateHold
+    verify_hold: VerifyHold
+    resend_code: ResendCode
+    expire_holds: ExpireHolds
+    open_holds: OpenHolds
+    provide_patient_account: ProvidePatientAccount
+    open_patient_session: OpenPatientSession
 
 
 def wire(a: Adapters) -> Container:
@@ -272,7 +318,13 @@ def wire(a: Adapters) -> Container:
         store=a.slot_store,
     )
     slots = a.slot_refresh or SchedulingSlotRefresh(refresh=refresh)
-    book_appointment = _wire_booking(a)
+    provide_patient_account = ProvidePatientAccountUseCase(
+        clock=clock, uow=uow, audit=audit, users=a.users
+    )
+    open_patient_session = OpenPatientSessionUseCase(
+        clock=clock, uow=uow, audit=audit, users=a.users, sessions=a.sessions, tokens=a.tokens
+    )
+    booking = _wire_booking(a, provide_patient_account, open_patient_session)
     return Container(
         clock=clock,
         check_health=CheckHealthUseCase(clock=clock, database=a.database),
@@ -453,14 +505,40 @@ def wire(a: Adapters) -> Container:
         find_free_slots=FindFreeSlotsUseCase(
             clock=clock, directory=directory, queries=a.slot_queries
         ),
-        book_appointment=book_appointment,
+        book_appointment=booking.book_appointment,
+        create_hold=booking.create_hold,
+        verify_hold=booking.verify_hold,
+        resend_code=booking.resend_code,
+        expire_holds=booking.expire_holds,
+        open_holds=booking.open_holds,
+        provide_patient_account=provide_patient_account,
+        open_patient_session=open_patient_session,
     )
 
 
-def _wire_booking(a: Adapters) -> BookAppointment:
+@dataclass(frozen=True, slots=True)
+class _BookingUseCases:
+    book_appointment: BookAppointment
+    create_hold: CreateHold
+    verify_hold: VerifyHold
+    resend_code: ResendCode
+    expire_holds: ExpireHolds
+    open_holds: OpenHolds
+
+
+def _wire_booking(
+    a: Adapters, provide: ProvidePatientAccount, open_session: OpenPatientSession
+) -> "_BookingUseCases":
     booking = a.booking
     if booking is None:
-        return UnwiredBookAppointment()
+        return _BookingUseCases(
+            UnwiredBookAppointment(),
+            UnwiredCreateHold(),
+            UnwiredVerifyHold(),
+            UnwiredResendCode(),
+            UnwiredExpireHolds(),
+            UnwiredOpenHolds(),
+        )
     placement = Placement(
         clock=a.clock,
         uow=a.uow,
@@ -472,14 +550,54 @@ def _wire_booking(a: Adapters) -> BookAppointment:
         locks=booking.locks,
         patients=booking.patients,
         notices=booking.notices,
+        holds=booking.holds,
     )
-    return BookAppointmentUseCase(
-        clock=a.clock,
-        uow=a.uow,
-        placement=placement,
-        directory=booking.directory,
-        free_slots=booking.free_slots,
-        ledger=booking.ledger,
+    return _BookingUseCases(
+        book_appointment=BookAppointmentUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            placement=placement,
+            ledger=booking.ledger,
+        ),
+        create_hold=CreateHoldUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            placement=placement,
+            holds=booking.holds,
+            codes=booking.codes,
+            issuer=booking.issuer,
+            locks=booking.locks,
+            limiter=booking.limiter,
+            outbox=booking.outbox,
+            network_hourly_limit=booking.network_hourly_limit,
+        ),
+        verify_hold=VerifyHoldUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            placement=placement,
+            holds=booking.holds,
+            codes=booking.codes,
+            issuer=booking.issuer,
+            accounts=IdentityPatientAccounts(provide),
+            sessions=IdentityPatientSessions(open_session),
+            ledger=booking.ledger,
+        ),
+        resend_code=ResendCodeUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            holds=booking.holds,
+            codes=booking.codes,
+            issuer=booking.issuer,
+            limiter=booking.limiter,
+            outbox=booking.outbox,
+            network_hourly_limit=booking.network_hourly_limit,
+        ),
+        expire_holds=ExpireHoldsUseCase(
+            clock=a.clock, uow=a.uow, audit=a.audit, holds=booking.holds, codes=booking.codes
+        ),
+        open_holds=OpenHoldsUseCase(holds=booking.holds),
     )
 
 

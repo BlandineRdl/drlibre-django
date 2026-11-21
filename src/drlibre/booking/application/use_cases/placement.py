@@ -8,12 +8,14 @@ from drlibre.booking.application.ports.outbound import (
     BookingDirectory,
     BookingNotices,
     FreeSlots,
+    Holds,
     Patients,
     ScheduleLocks,
     SlotRefresh,
 )
 from drlibre.booking.domain import booking_rules
 from drlibre.booking.domain.appointment import Appointment, Source
+from drlibre.booking.domain.round_robin import Candidate, rank
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -36,6 +38,7 @@ class Placement:
         locks: ScheduleLocks,
         patients: Patients,
         notices: BookingNotices,
+        holds: Holds,
     ) -> None:
         self._clock = clock
         self._uow = uow
@@ -47,12 +50,42 @@ class Placement:
         self._locks = locks
         self._patients = patients
         self._notices = notices
+        self._holds = holds
 
     def bookable_type(self, appointment_type_id: Id) -> BookableType:
         kind = self._directory.appointment_type(appointment_type_id)
         if kind is None or not kind.active:
             raise DomainError(ErrorCode.NOT_FOUND, "Type de RDV introuvable.")
         return kind
+
+    def clinician_of(self, kind: BookableType, clinician_id: Id) -> BookableClinician:
+        clinician = self._directory.clinician(clinician_id)
+        if (
+            clinician is None
+            or not clinician.active
+            or clinician.department_id != kind.department_id
+        ):
+            raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
+        return clinician
+
+    def first_available(self, kind: BookableType, start: datetime) -> Id:
+        """The clinician ranked first among those with a free slot at the start."""
+        candidates = []
+        for clinician_id in self._free_slots.candidates_at(kind.id, start):
+            clinician = self._directory.clinician(clinician_id)
+            if (
+                clinician is not None
+                and clinician.active
+                and clinician.department_id == kind.department_id
+                and clinician.weight > 0
+            ):
+                candidates.append(
+                    Candidate(clinician.id, clinician.weight, clinician.last_assigned_at)
+                )
+        ranked = rank(tuple(candidates), self._clock.now())
+        if not ranked:
+            raise DomainError(ErrorCode.NO_CLINICIAN_AVAILABLE, "Aucun praticien disponible.")
+        return ranked[0].clinician_id
 
     def place(
         self,
@@ -63,6 +96,7 @@ class Placement:
         start: datetime,
         source: Source,
         ignoring_hold: Id | None = None,
+        reason: str | None = None,
     ) -> Appointment:
         with self._uow:
             self._locks.lock_clinician(clinician_id)
@@ -70,16 +104,12 @@ class Placement:
             if not self._patients.is_active(patient_id):
                 raise DomainError(ErrorCode.FORBIDDEN, "Réservé aux patients actifs.")
             kind = self.bookable_type(appointment_type_id)
-            clinician = self._directory.clinician(clinician_id)
-            if (
-                clinician is None
-                or not clinician.active
-                or clinician.department_id != kind.department_id
-            ):
-                raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
+            clinician = self.clinician_of(kind, clinician_id)
             duration = timedelta(minutes=kind.duration_minutes)
-            self._refuse_conflicts(patient_id, clinician_id, start, start + duration)
-            self._refuse_rule_violations(
+            self.refuse_conflicts(
+                patient_id, clinician_id, start, start + duration, ignoring_hold=ignoring_hold
+            )
+            self.refuse_rule_violations(
                 patient_id, clinician_id, kind, start, ignoring_hold=ignoring_hold
             )
             appointment = Appointment.book(
@@ -90,6 +120,7 @@ class Placement:
                 start=start,
                 duration=duration,
                 source=source,
+                reason=reason,
             )
             self._appointments.add(appointment)
             self._audit.record(self._booked_entry(appointment))
@@ -97,12 +128,31 @@ class Placement:
             self._notices.confirmed(appointment)
             return appointment
 
-    def _refuse_conflicts(
-        self, patient_id: Id, clinician_id: Id, start: datetime, end: datetime
+    def refuse_conflicts(
+        self,
+        patient_id: Id | None,
+        clinician_id: Id,
+        start: datetime,
+        end: datetime,
+        *,
+        ignoring_hold: Id | None,
     ) -> None:
-        resources = self._appointments.conflicting_resources(
-            clinician_id=clinician_id, patient_id=patient_id, start=start, end=end
+        """conflict when an active appointment or an open hold occupies the range."""
+        if patient_id is None:
+            resources = (
+                ("clinician",)
+                if self._appointments.clinician_busy(clinician_id, start, end)
+                else ()
+            )
+        else:
+            resources = self._appointments.conflicting_resources(
+                clinician_id=clinician_id, patient_id=patient_id, start=start, end=end
+            )
+        held = self._holds.held(
+            clinician_id, start, end, at=self._clock.now(), excluding=ignoring_hold
         )
+        if held and "clinician" not in resources:
+            resources = ("clinician", *resources)
         if resources:
             raise DomainError(
                 ErrorCode.CONFLICT,
@@ -110,9 +160,9 @@ class Placement:
                 {"resources": list(resources)},
             )
 
-    def _refuse_rule_violations(
+    def refuse_rule_violations(
         self,
-        patient_id: Id,
+        patient_id: Id | None,
         clinician_id: Id,
         kind: BookableType,
         start: datetime,
@@ -125,7 +175,9 @@ class Placement:
             start=start,
             now=now,
             type_online=kind.bookable_online,
-            open_online_count=self._appointments.open_online_count(patient_id, now),
+            open_online_count=(
+                0 if patient_id is None else self._appointments.open_online_count(patient_id, now)
+            ),
             is_free_slot=self._free_slots.is_free(
                 clinician_id, kind.id, start, ignoring_hold=ignoring_hold
             ),

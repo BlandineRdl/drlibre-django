@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Réservation provisoire, code, patient sans mot de passe, session 24 h sur fakes

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from drlibre.identity.domain.user import Role, User
@@ -11,6 +11,8 @@ __all__ = [
     "ChangePassword",
     "DeleteUser",
     "Identity",
+    "OpenPatientSession",
+    "ProvidePatientAccount",
     "Role",
     "SaveUser",
     "SignIn",
@@ -116,4 +118,19 @@ class StaffLookup(Protocol):
 
     def named_like(self, text: str) -> frozenset[Id]:
         """Users whose full name contains the text, ignoring case."""
+        ...
+
+
+class ProvidePatientAccount(Protocol):
+    def execute(self, *, full_name: str, email: str, birth_date: date, phone: str | None) -> Id:
+        """The patient for a proven email, created without password when unknown.
+
+        An active patient is reused unchanged; staff or an inactive user raises forbidden.
+        """
+        ...
+
+
+class OpenPatientSession(Protocol):
+    def execute(self, *, patient_id: Id, user_agent: str) -> SignedIn:
+        """Open a 24 hour session that is never extended for the patient."""
         ...

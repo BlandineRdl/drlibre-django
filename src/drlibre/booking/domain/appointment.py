@@ -44,6 +44,7 @@ class Appointment:
         start: datetime,
         duration: timedelta,
         source: Source,
+        reason: str | None = None,
     ) -> "Appointment":
         """A new BOOKED appointment whose end is the start plus the type's duration."""
         return cls(
@@ -56,6 +57,7 @@ class Appointment:
             end=start + duration,
             status=AppointmentStatus.BOOKED,
             source=source,
+            reason=reason,
         )
 
     @property

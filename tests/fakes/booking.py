@@ -5,15 +5,24 @@ from drlibre.booking.application.ports.outbound import (
     BookableClinician,
     BookableType,
     BookingDirectory,
-    BookingNotices,
+    CodeIssuer,
     FreeSlots,
+    Holds,
+    IssuedCode,
     Patients,
     RoundRobinLedger,
     ScheduleLocks,
     SlotRefresh,
+    Venue,
+    VerificationCodes,
 )
 from drlibre.booking.domain.appointment import Appointment, Source
+from drlibre.booking.domain.hold import BookingHold
+from drlibre.booking.domain.verification_code import VerificationCode
+from drlibre.identity.domain.user import Role
+from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.ids import Id
+from tests.fakes.users import InMemoryUsers
 
 
 class InMemoryAppointments(Appointments):
@@ -32,6 +41,12 @@ class InMemoryAppointments(Appointments):
             ("patient", any(a.patient_id == patient_id for a in overlapping)),
         )
         return tuple(name for name, hit in resources if hit)
+
+    def clinician_busy(self, clinician_id: Id, start: datetime, end: datetime) -> bool:
+        return any(
+            a.active and a.clinician_id == clinician_id and a.start < end and start < a.end
+            for a in self.rows
+        )
 
     def open_online_count(self, patient_id: Id, now: datetime) -> int:
         online = (Source.ONLINE, Source.ROUND_ROBIN)
@@ -58,6 +73,7 @@ class FixedBookingDirectory(BookingDirectory):
         self.types: dict[Id, BookableType] = {}
         self.clinicians: dict[Id, BookableClinician] = {}
         self.department_rooms: dict[Id, tuple[Id, ...]] = {}
+        self.venues: dict[Id, Venue] = {}
 
     def appointment_type(self, appointment_type_id: Id) -> BookableType | None:
         return self.types.get(appointment_type_id)
@@ -68,12 +84,27 @@ class FixedBookingDirectory(BookingDirectory):
     def rooms(self, department_id: Id) -> tuple[Id, ...]:
         return self.department_rooms.get(department_id, ())
 
+    def venue(self, clinician_id: Id) -> Venue | None:
+        return self.venues.get(clinician_id)
+
 
 class InMemoryFreeSlots(FreeSlots):
-    """Free slots as (clinician, type, start) rows."""
+    """Free slots as (clinician, type, start) rows, hidden while an open hold covers them."""
 
-    def __init__(self) -> None:
+    def __init__(self, holds: "InMemoryHolds", clock: Clock) -> None:
         self.free: set[tuple[Id, Id, datetime]] = set()
+        self.holds = holds
+        self.clock = clock
+
+    def _held(self, clinician_id: Id, start: datetime, ignoring: Id | None) -> bool:
+        now = self.clock.now()
+        return any(
+            h.clinician_id == clinician_id
+            and h.id != ignoring
+            and h.is_open(now)
+            and h.start <= start < h.end
+            for h in self.holds.rows.values()
+        )
 
     def is_free(
         self,
@@ -83,10 +114,15 @@ class InMemoryFreeSlots(FreeSlots):
         *,
         ignoring_hold: Id | None,
     ) -> bool:
-        return (clinician_id, appointment_type_id, start) in self.free
+        listed = (clinician_id, appointment_type_id, start) in self.free
+        return listed and not self._held(clinician_id, start, ignoring_hold)
 
     def candidates_at(self, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
-        return tuple(c for c, t, s in self.free if t == appointment_type_id and s == start)
+        return tuple(
+            c
+            for c, t, s in self.free
+            if t == appointment_type_id and s == start and not self._held(c, start, None)
+        )
 
 
 class RecordingSlotRefresh(SlotRefresh):
@@ -110,19 +146,18 @@ class RecordingScheduleLocks(ScheduleLocks):
 
 
 class InMemoryPatients(Patients):
-    def __init__(self) -> None:
-        self.active: set[Id] = set()
+    """Patients are the active PATIENT users of the in-memory users."""
+
+    def __init__(self, users: InMemoryUsers) -> None:
+        self.users = users
 
     def is_active(self, patient_id: Id) -> bool:
-        return patient_id in self.active
+        user = self.users.rows.get(patient_id)
+        return user is not None and user.active and user.role is Role.PATIENT
 
-
-class RecordingBookingNotices(BookingNotices):
-    def __init__(self) -> None:
-        self.confirmations: list[Appointment] = []
-
-    def confirmed(self, appointment: Appointment) -> None:
-        self.confirmations.append(appointment)
+    def email_of(self, patient_id: Id) -> str | None:
+        user = self.users.rows.get(patient_id)
+        return user.email.value if user is not None and user.role is Role.PATIENT else None
 
 
 class InMemoryRoundRobinLedger(RoundRobinLedger):
@@ -131,3 +166,76 @@ class InMemoryRoundRobinLedger(RoundRobinLedger):
 
     def record(self, clinician_id: Id, at: datetime) -> None:
         self.assigned[clinician_id] = at
+
+
+class InMemoryHolds(Holds):
+    def __init__(self) -> None:
+        self.rows: dict[Id, BookingHold] = {}
+
+    def add(self, hold: BookingHold) -> None:
+        self.rows[hold.id] = hold
+
+    def get(self, hold_id: Id) -> BookingHold | None:
+        return self.rows.get(hold_id)
+
+    def open_for_email(self, email: str, at: datetime) -> BookingHold | None:
+        return next((h for h in self.rows.values() if h.email == email and h.is_open(at)), None)
+
+    def held(
+        self,
+        clinician_id: Id,
+        start: datetime,
+        end: datetime,
+        *,
+        at: datetime,
+        excluding: Id | None,
+    ) -> bool:
+        return any(
+            h.clinician_id == clinician_id
+            and h.id != excluding
+            and h.is_open(at)
+            and h.overlaps(start, end)
+            for h in self.rows.values()
+        )
+
+    def open_in(
+        self, clinician_ids: tuple[Id, ...], start: datetime, end: datetime, *, at: datetime
+    ) -> tuple[BookingHold, ...]:
+        return tuple(
+            h
+            for h in self.rows.values()
+            if h.clinician_id in clinician_ids and h.is_open(at) and h.overlaps(start, end)
+        )
+
+    def expired(self, at: datetime) -> tuple[BookingHold, ...]:
+        return tuple(h for h in self.rows.values() if not h.is_open(at))
+
+    def delete(self, hold_id: Id) -> None:
+        self.rows.pop(hold_id, None)
+
+
+class InMemoryVerificationCodes(VerificationCodes):
+    def __init__(self) -> None:
+        self.rows: dict[Id, VerificationCode] = {}
+
+    def put(self, code: VerificationCode) -> None:
+        self.rows[code.hold_id] = code
+
+    def for_hold(self, hold_id: Id) -> VerificationCode | None:
+        return self.rows.get(hold_id)
+
+    def delete_for_hold(self, hold_id: Id) -> None:
+        self.rows.pop(hold_id, None)
+
+
+class FixedCodeIssuer(CodeIssuer):
+    """Issues the same code every time; the hash is the code itself."""
+
+    def __init__(self, code: str = "123456") -> None:
+        self.code = code
+
+    def issue(self) -> IssuedCode:
+        return IssuedCode(self.code, self.code)
+
+    def matches(self, code: str, code_hash: str) -> bool:
+        return code == code_hash
