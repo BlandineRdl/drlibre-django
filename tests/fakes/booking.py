@@ -152,6 +152,10 @@ class RecordingScheduleLocks(ScheduleLocks):
     def __init__(self) -> None:
         self.clinicians: list[Id] = []
         self.patients: list[Id] = []
+        self.departments: list[Id] = []
+
+    def lock_rooms(self, department_id: Id) -> None:
+        self.departments.append(department_id)
 
     def lock_clinician(self, clinician_id: Id) -> None:
         self.clinicians.append(clinician_id)

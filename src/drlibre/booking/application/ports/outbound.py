@@ -127,6 +127,10 @@ class ScheduleLocks(Protocol):
         """Hold the patient's bookings until the caller's unit ends; unknown ids lock nothing."""
         ...
 
+    def lock_rooms(self, department_id: Id) -> None:
+        """Hold the department's rooms until the caller's unit ends; unknown ids lock none."""
+        ...
+
 
 class Patients(Protocol):
     def is_active(self, patient_id: Id) -> bool:

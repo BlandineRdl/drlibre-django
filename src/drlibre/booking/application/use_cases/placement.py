@@ -194,6 +194,7 @@ class Placement:
     ) -> Id | None:
         if not kind.needs_room:
             return None
+        self._locks.lock_rooms(kind.department_id)
         rooms = self._directory.rooms(kind.department_id)
         preferred = (clinician.default_room_id,) if clinician.default_room_id in rooms else ()
         order = (*preferred, *rooms)

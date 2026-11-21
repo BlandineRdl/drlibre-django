@@ -1,6 +1,6 @@
 from drlibre.booking.application.ports.outbound import ScheduleLocks
 from drlibre.identity.infrastructure.django.models import UserRecord
-from drlibre.organisation.infrastructure.django.models import ClinicianProfileRecord
+from drlibre.organisation.infrastructure.django.models import ClinicianProfileRecord, RoomRecord
 from drlibre.shared_kernel.ids import Id
 
 
@@ -14,3 +14,9 @@ class DjangoScheduleLocks(ScheduleLocks):
     def lock_patient(self, patient_id: Id) -> None:
         rows = UserRecord.objects.select_for_update().filter(pk=patient_id.value)
         list(rows.values_list("pk", flat=True))
+
+    def lock_rooms(self, department_id: Id) -> None:
+        rows = RoomRecord.objects.select_for_update().filter(
+            department_id=department_id.value, active=True
+        )
+        list(rows.order_by("pk").values_list("pk", flat=True))
