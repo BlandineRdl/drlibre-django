@@ -764,6 +764,7 @@ def audit_by_patient(world: FakeWorld, scene: Scene, action: str) -> None:
     assert entries
     for entry in entries:
         assert entry.actor == patient.id
+        assert dict(entry.metadata)["email_domain"] == "example.org"
 
 
 @then("no audit entry holds personal data")

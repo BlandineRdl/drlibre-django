@@ -211,6 +211,9 @@ class Placement:
         }
         if appointment.room_id is not None:
             metadata["room_id"] = appointment.room_id
+        email = self._patients.email_of(appointment.patient_id)
+        if email is not None:
+            metadata["email_domain"] = email.rsplit("@", 1)[1]
         return AuditEntry.from_event(
             actor=appointment.patient_id,
             action="booking.appointment_booked",

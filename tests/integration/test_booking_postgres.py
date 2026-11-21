@@ -81,6 +81,7 @@ def test_the_booking_and_its_audit_commit_together() -> None:
         (action, metadata) = actions.get()
         assert action == "booking.appointment_booked"
         assert "ana" not in str(metadata).lower()
+        assert metadata["email_domain"] == "example.org"
         assert AuditEntryRecord.objects.filter(action="booking.hold_created").exists()
 
 
