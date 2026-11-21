@@ -12,8 +12,10 @@ from drlibre.booking.application.ports.inbound import ClinicianEntry, ClinicianF
 from drlibre.booking.domain.appointment import AppointmentStatus, Source
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.visitor_details import VisitorDetails
+from drlibre.interfaces.web.presenters.workspace import calendar_page
 from drlibre.scheduling.application.ports.outbound import StoredSlot
 from drlibre.scheduling.domain.slot import Slot
+from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import PageRequest
@@ -345,3 +347,51 @@ def room_taken(scene: Scene, room: str, start: str, label: str) -> None:
 @then(parsers.parse('the rooms are taken only at "{starts}"'))
 def rooms_taken_only(scene: Scene, starts: str) -> None:
     assert [b.start for b in view(scene).bookings] == [at(s) for s in csv(starts)]
+
+
+@given(parsers.parse('"{name}" is away from "{start}" to "{end}"'))
+def away(world: FakeWorld, scene: Scene, name: str, start: str, end: str) -> None:
+    world.time_offs.save(TimeOff(Id(), scene.clinicians[name], at(start), at(end), "Congrès"))
+
+
+@when(parsers.parse('the clinician opens the calendar of the week of "{day}"'))
+def opens_calendar(world: FakeWorld, scene: Scene, day: str) -> None:
+    opens_week(world, scene, day)
+    clinician = world.booking_directory.profiles_of_users[caller(scene)]
+    scene.calendar = calendar_page(
+        view(scene),
+        rules=world.availability_queries.rules_of(clinician),
+        time_offs=world.availability_queries.time_offs_of(clinician),
+    )
+
+
+@then(
+    parsers.parse(
+        'the calendar shows {days:d} days in rows from "{first}" to "{last}" by 30 minutes'
+    )
+)
+def calendar_grid(scene: Scene, days: int, first: str, last: str) -> None:
+    expected, row = [], at(f"2026-01-01 {first}")
+    while row < at(f"2026-01-01 {last}"):
+        expected.append(f"{row:%H:%M}")
+        row += HALF_HOUR
+    assert [r.time for r in scene.calendar.rows] == expected
+    assert len(scene.calendar.days) == days
+    assert {len(r.cells) for r in scene.calendar.rows} == {days}
+
+
+@then(parsers.parse('the calendar shows the absence only on "{day}" at "{times}"'))
+def calendar_absence(scene: Scene, day: str, times: str) -> None:
+    monday = view(scene).monday
+    shown = {
+        (monday + timedelta(days=n), row.time)
+        for row in scene.calendar.rows
+        for n, cell in enumerate(row.cells)
+        if cell.kind == "time-off"
+    }
+    assert shown == {(date.fromisoformat(day), t) for t in csv(times)}
+
+
+@then(parsers.parse('the calendar names the zone "{zone}"'))
+def calendar_zone(scene: Scene, zone: str) -> None:
+    assert scene.calendar.time_zone == zone

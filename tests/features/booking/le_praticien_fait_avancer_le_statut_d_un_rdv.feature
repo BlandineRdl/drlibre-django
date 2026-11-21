@@ -111,3 +111,22 @@ Feature: Le praticien fait avancer le statut d'un RDV
       | arrivé  | BOOKED     | check_in | CHECKED_IN |
       | absent  | BOOKED     | no_show  | NO_SHOW    |
       | terminé | CHECKED_IN | complete | COMPLETED  |
+
+  Scenario Outline: Les mêmes changements sont disponibles par `POST /appointments/{id}/check-in`, `/complete` et `/no-show` (§14). (<case>)
+    Given the patient has a "<from>" appointment with "A" at "2026-11-20 14:00" in room "R1"
+    When the clinician posts '{}' to <path> it
+    Then the API answers 200 with the appointment "<to>"
+    And the appointment is now "<to>"
+    And no one was notified
+
+    Examples:
+      | case    | from       | path     | to         |
+      | arrivé  | BOOKED     | check-in | CHECKED_IN |
+      | absent  | BOOKED     | no-show  | NO_SHOW    |
+      | terminé | CHECKED_IN | complete | COMPLETED  |
+
+  Scenario: Les mêmes changements sont disponibles par `POST /appointments/{id}/check-in`, `/complete` et `/no-show` (§14). (transition interdite)
+    Given the patient has a "BOOKED" appointment with "A" at "2026-11-20 14:00" in room "R1"
+    When the clinician posts '{}' to complete it
+    Then the API refuses with 409 "invalid_transition"
+    And nothing was changed or notified

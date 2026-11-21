@@ -70,3 +70,14 @@ Feature: Le praticien annule un RDV avec un motif
   Scenario: L'annulation laisse une entrée d'audit sans le motif ni donnée personnelle.
     When the clinician cancels it giving the reason "Urgence au bloc"
     Then the audit entry "booking.appointment_cancelled" has the clinician as actor and holds only "clinician_id"
+
+  Scenario: L'annulation est aussi disponible par `POST /appointments/{id}/cancel` (§14). (annulation acceptée)
+    When the clinician posts '{"reason": "Urgence au bloc"}' to cancel it
+    Then the API answers 200 with the appointment "CANCELLED"
+    And the appointment is cancelled now for the reason "Urgence au bloc"
+
+  Scenario: L'annulation est aussi disponible par `POST /appointments/{id}/cancel` (§14). (sans motif)
+    When the clinician posts '{"reason": "   "}' to cancel it
+    Then the API refuses with 400 "invalid_input"
+    And the API refusal names the field "reason"
+    And nothing was changed or notified

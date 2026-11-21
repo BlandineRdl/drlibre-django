@@ -53,6 +53,7 @@ class Scene:
         # Patients by name and the last read view of the clinician scenarios.
         self.named: dict[str, Id] = {}
         self.view: Any = None
+        self.calendar: Any = None
 
 
 def at(raw: str) -> datetime:

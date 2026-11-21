@@ -89,3 +89,14 @@ Feature: Le praticien déplace un RDV
   Scenario: Le déplacement laisse une entrée d'audit sans donnée personnelle.
     When the clinician moves it to "2026-11-20 10:30"
     Then the audit entry "booking.appointment_rescheduled" has the clinician as actor and holds only "clinician_id, room_id"
+
+  Scenario: Le déplacement est aussi disponible par `POST /appointments/{id}/reschedule` (§14). (déplacement accepté)
+    When the clinician posts '{"start": "2026-11-20T10:30:00Z"}' to reschedule it
+    Then the API answers 200 with the appointment "BOOKED"
+    And the appointment is "BOOKED" from "2026-11-20 10:30" for 30 minutes in room "R2"
+
+  Scenario: Le déplacement est aussi disponible par `POST /appointments/{id}/reschedule` (§14). (hors créneau)
+    When the clinician posts '{"start": "2026-11-20T13:00:00Z"}' to reschedule it
+    Then the API refuses with 422 "rule_violation"
+    And the API refusal names the rules "outside_availability"
+    And nothing was changed or notified
