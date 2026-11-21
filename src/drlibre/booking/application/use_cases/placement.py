@@ -72,8 +72,11 @@ class Placement:
 
     def ranked_candidates(self, kind: BookableType, start: datetime) -> tuple[Id, ...]:
         """The clinicians with a free slot at the start, best ranked first; none is refused."""
+        free = self._free_slots.candidates_at(kind.id, start)
+        # All candidates are locked in one order before ranking, so no two bookings deadlock.
+        self._locks.lock_clinicians(free)
         candidates = []
-        for clinician_id in self._free_slots.candidates_at(kind.id, start):
+        for clinician_id in free:
             clinician = self._directory.clinician(clinician_id)
             if (
                 clinician is not None

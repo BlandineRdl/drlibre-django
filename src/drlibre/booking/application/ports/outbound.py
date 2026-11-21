@@ -123,6 +123,10 @@ class ScheduleLocks(Protocol):
         """Hold the clinician's writes until the caller's unit ends; unknown ids lock nothing."""
         ...
 
+    def lock_clinicians(self, clinician_ids: tuple[Id, ...]) -> None:
+        """Hold all the clinicians' writes in one fixed order; unknown ids lock nothing."""
+        ...
+
     def lock_patient(self, patient_id: Id) -> None:
         """Hold the patient's bookings until the caller's unit ends; unknown ids lock nothing."""
         ...

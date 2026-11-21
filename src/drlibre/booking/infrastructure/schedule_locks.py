@@ -11,6 +11,12 @@ class DjangoScheduleLocks(ScheduleLocks):
         rows = ClinicianProfileRecord.objects.select_for_update().filter(pk=clinician_id.value)
         list(rows.values_list("pk", flat=True))
 
+    def lock_clinicians(self, clinician_ids: tuple[Id, ...]) -> None:
+        rows = ClinicianProfileRecord.objects.select_for_update().filter(
+            pk__in=[clinician_id.value for clinician_id in clinician_ids]
+        )
+        list(rows.order_by("pk").values_list("pk", flat=True))
+
     def lock_patient(self, patient_id: Id) -> None:
         rows = UserRecord.objects.select_for_update().filter(pk=patient_id.value)
         list(rows.values_list("pk", flat=True))

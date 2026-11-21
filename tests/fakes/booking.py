@@ -160,6 +160,9 @@ class RecordingScheduleLocks(ScheduleLocks):
     def lock_clinician(self, clinician_id: Id) -> None:
         self.clinicians.append(clinician_id)
 
+    def lock_clinicians(self, clinician_ids: tuple[Id, ...]) -> None:
+        self.clinicians.extend(sorted(clinician_ids, key=lambda c: c.value))
+
     def lock_patient(self, patient_id: Id) -> None:
         self.patients.append(patient_id)
 
