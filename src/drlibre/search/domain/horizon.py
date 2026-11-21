@@ -22,7 +22,3 @@ class Horizon:
     def local_days(self, time_zone: str) -> tuple[date, date]:
         zone = ZoneInfo(time_zone)
         return self.start.astimezone(zone).date(), self.end.astimezone(zone).date()
-
-
-def monday_of(day: date) -> date:
-    return day - timedelta(days=day.weekday())

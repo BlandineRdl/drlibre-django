@@ -2,11 +2,11 @@ from datetime import date
 
 from drlibre.scheduling.application.ports.inbound import FindFreeSlots, FindFreeWeek, FreeWeek
 from drlibre.scheduling.application.ports.outbound import SchedulingDirectory
-from drlibre.scheduling.domain.week import Week
 from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.week import Week
 
 
 class FindFreeWeekUseCase(FindFreeWeek):
