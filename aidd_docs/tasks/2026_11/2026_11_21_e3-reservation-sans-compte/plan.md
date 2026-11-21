@@ -52,7 +52,7 @@ Source: GitHub issue #6, `aidd_docs/backlog/epics/un-visiteur-trouve-et-reserve-
 | Decision | Why |
 | --- | --- |
 | New context `booking` owns `Appointment`, `BookingHold`, `VerificationCode`, booking rules, round robin and the placement steps shared by every booking path | INSTALL.md lists `booking`; §5.2 says every path runs the same steps |
-| New context `search` is a read side: its SQL adapter reads the organisation, scheduling and booking tables directly; its core imports no other context | light CQRS (architecture.md) to hold p95 < 200 ms |
+| New context `search` is a read side: its SQL adapter reads the organisation, identity, scheduling and booking tables directly; its core imports no other context | light CQRS (architecture.md) to hold p95 < 200 ms |
 | Search scenarios run with pytest-bdd on PostgreSQL (`integration`), not on fakes | the filtering and sorting rules live in the SQL; a fake holding them would carry business rules (testing.md forbids it) |
 | Holds never touch `scheduling_slot`; `FindFreeSlots` and the search SQL drop a slot overlapping an open hold (`expires_at > now`) of the same clinician, the hold extended by the buffer of the slot's type | expiry checked at read time (architecture gotcha): an expired hold frees the slot without any job |
 | Booking an appointment rebuilds the clinician's `scheduling_slot` rows in the same unit of work through scheduling's `RefreshSlots`; scheduling reads appointments through `ClinicianAppointments`, now backed by booking | « shown = bookable »; same mechanism as E2 |

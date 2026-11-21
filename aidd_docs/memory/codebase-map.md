@@ -7,7 +7,7 @@
 - `src/drlibre/identity/`: users, password sign-in, sessions (token hash), lockout (Redis), password change, user management, `authorize_owned` guard; `StaffLookup` inbound port for other contexts.
 - `src/drlibre/organisation/`: hospitals, specialties, departments, rooms, appointment types, clinician profiles; `DjangoReferenceQueries` reads; `SchedulingSlotRefresh` and `ScheduleAndBookingDependents` reach scheduling through its ports.
 - `src/drlibre/health/`: health check context; `DatabaseProbe` port, PostgreSQL adapter, `SystemClock`.
-- `src/drlibre/scheduling/`: availability rules, time off, pure `SlotEngine`; `scheduling_slot` table rebuilt by `RefreshSlots`, read by `FindFreeSlots`; `ExtendSlotHorizon` daily job; `NoAppointmentsYet` null adapter until E3.
+- `src/drlibre/scheduling/`: availability rules, time off, pure `SlotEngine`; `scheduling_slot` table rebuilt by `RefreshSlots`, read by `FindFreeSlots`; `NextBookableSlots` for refused bookings, `IsSlotFree` and `FreeCliniciansAt` for booking; `ExtendSlotHorizon` daily job; appointments and holds come from booking through `BookingClinicianAppointments` and `BookingSlotHolds`.
 - `src/drlibre/booking/`: appointments, booking holds, verification codes, booking rules, round robin and placement.
 - `src/drlibre/search/`: read side, `SqlSearchQueries` (providers, hospitals, specialties, provider, hospital and specialty pages).
 - `src/drlibre/notifications/`: `Mailer` port and its SMTP adapter, `CeleryEmailOutbox`.
