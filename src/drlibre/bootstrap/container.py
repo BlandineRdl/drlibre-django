@@ -149,6 +149,9 @@ from drlibre.notifications.application.use_cases.mark_notification_read import (
     MarkNotificationReadUseCase,
 )
 from drlibre.notifications.application.use_cases.notify import NotifyUseCase
+from drlibre.notifications.application.use_cases.reminded_appointments import (
+    RemindedAppointmentsUseCase,
+)
 from drlibre.notifications.infrastructure.celery_outbox import CeleryEmailOutbox
 from drlibre.notifications.infrastructure.repositories import DjangoNotifications
 from drlibre.notifications.infrastructure.smtp_mailer import SmtpMailer
@@ -905,6 +908,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             notices=OutboxBookingNotices(
                 outbox=CeleryEmailOutbox(),
                 notify=notify,
+                reminded=RemindedAppointmentsUseCase(notifications=notifications),
                 directory=booking_directory,
                 patients=patients,
                 public_base_url=settings.PUBLIC_BASE_URL,

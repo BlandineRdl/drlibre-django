@@ -17,6 +17,7 @@ __all__ = [
     "Notification",
     "NotificationKind",
     "Notify",
+    "RemindedAppointments",
 ]
 
 
@@ -49,4 +50,10 @@ class MarkNotificationRead(Protocol):
 class CountUnread(Protocol):
     def execute(self, *, recipient_id: Id) -> int:
         """How many of the caller's notifications are unread."""
+        ...
+
+
+class RemindedAppointments(Protocol):
+    def execute(self, *, appointment_ids: frozenset[Id]) -> frozenset[Id]:
+        """Those of the appointments that already have a reminder."""
         ...

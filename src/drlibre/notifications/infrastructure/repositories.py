@@ -71,3 +71,10 @@ class DjangoNotifications(Notifications):
         return NotificationRecord.objects.filter(
             recipient_id=recipient_id.value, read_at__isnull=True
         ).count()
+
+    def reminded_among(self, appointment_ids: frozenset[Id]) -> frozenset[Id]:
+        rows = NotificationRecord.objects.filter(
+            kind=NotificationKind.APPOINTMENT_REMINDER.value,
+            appointment_id__in=[i.value for i in appointment_ids],
+        )
+        return frozenset(Id(value) for value in rows.values_list("appointment_id", flat=True))

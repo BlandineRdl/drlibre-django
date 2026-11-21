@@ -45,3 +45,7 @@ class Notifications(Protocol):
     def unread_count(self, recipient_id: Id) -> int:
         """How many of the recipient's notifications are unread."""
         ...
+
+    def reminded_among(self, appointment_ids: frozenset[Id]) -> frozenset[Id]:
+        """Those of the appointments that already have a reminder."""
+        ...

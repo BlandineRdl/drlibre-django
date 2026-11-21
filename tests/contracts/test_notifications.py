@@ -112,3 +112,13 @@ def test_an_appointment_may_change_several_times(store: Notifications) -> None:
         notice(patient, event=AppointmentEvent.RESCHEDULED, appointment=appointment, minutes=1)
     )
     assert store.page_for(patient, PageRequest()).total == 2
+
+
+def test_only_appointments_with_a_reminder_are_found_reminded(store: Notifications) -> None:
+    patient, reminded, booked, other = Id(), Id(), Id(), Id()
+    store.add(notice(patient, event=AppointmentEvent.REMINDED, appointment=reminded))
+    store.add(notice(patient, appointment=booked))
+    store.add(notice(patient, event=AppointmentEvent.REMINDED, appointment=other))
+
+    assert store.reminded_among(frozenset({reminded, booked})) == {reminded}
+    assert store.reminded_among(frozenset()) == frozenset()

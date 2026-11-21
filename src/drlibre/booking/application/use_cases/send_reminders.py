@@ -26,7 +26,9 @@ class SendRemindersUseCase(SendReminders):
         now = self._clock.now()
         with self._uow:
             due = self._appointments.booked_starting(now, now + REMINDER_WINDOW)
-            sent = sum(1 for appointment in due if self._notices.reminded(appointment))
+            # The unique reminder index still refuses a reminder a concurrent run just wrote.
+            done = self._notices.already_reminded(frozenset(a.id for a in due))
+            sent = sum(1 for a in due if a.id not in done and self._notices.reminded(a))
             if sent:
                 self._audit.record(
                     AuditEntry.from_event(

@@ -37,3 +37,11 @@ class InMemoryNotifications(Notifications):
 
     def unread_count(self, recipient_id: Id) -> int:
         return sum(1 for row in self.rows if row.recipient_id == recipient_id and not row.is_read)
+
+    def reminded_among(self, appointment_ids: frozenset[Id]) -> frozenset[Id]:
+        return frozenset(
+            row.appointment_id
+            for row in self.rows
+            if row.kind is NotificationKind.APPOINTMENT_REMINDER
+            and row.appointment_id in appointment_ids
+        )

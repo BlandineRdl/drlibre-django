@@ -5,6 +5,9 @@ from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.bootstrap.container import Adapters, BookingAdapters, Container, wire
 from drlibre.identity.infrastructure.outbox_link_notices import OutboxLinkNotices
 from drlibre.notifications.application.use_cases.notify import NotifyUseCase
+from drlibre.notifications.application.use_cases.reminded_appointments import (
+    RemindedAppointmentsUseCase,
+)
 from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
@@ -115,6 +118,7 @@ class FakeWorld:
         self.notices = OutboxBookingNotices(
             outbox=self.outbox,
             notify=self.notify,
+            reminded=RemindedAppointmentsUseCase(notifications=self.notifications),
             directory=self.booking_directory,
             patients=self.patients,
             public_base_url="http://localhost:8000",

@@ -201,6 +201,10 @@ class BookingNotices(Protocol):
         """Write the reminder and queue its email; False, doing nothing, when already reminded."""
         ...
 
+    def already_reminded(self, appointment_ids: frozenset[Id]) -> frozenset[Id]:
+        """Those of the appointments whose reminder is already written."""
+        ...
+
 
 class RoundRobinLedger(Protocol):
     def record(self, clinician_id: Id, at: datetime) -> None:

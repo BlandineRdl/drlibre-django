@@ -12,6 +12,9 @@ from django.conf import settings
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.bootstrap.container import Adapters, Container, real_adapters, wire
 from drlibre.identity.infrastructure.rate_limiter import RedisRateLimiter
+from drlibre.notifications.application.use_cases.reminded_appointments import (
+    RemindedAppointmentsUseCase,
+)
 from drlibre.scheduling.application.ports.inbound import Slot
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import StoredScene, stored_scene
@@ -67,6 +70,7 @@ def recorded(at: datetime, outbox: RecordingEmailOutbox, limiter: RedisRateLimit
     notices = OutboxBookingNotices(
         outbox=outbox,
         notify=adapters.notify,
+        reminded=RemindedAppointmentsUseCase(notifications=adapters.notifications),
         directory=booking.directory,
         patients=booking.patients,
         public_base_url="http://localhost:8000",
