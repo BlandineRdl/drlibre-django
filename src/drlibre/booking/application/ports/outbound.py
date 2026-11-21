@@ -119,6 +119,10 @@ class SlotRefresh(Protocol):
 
 
 class ScheduleLocks(Protocol):
+    def lock_email(self, email: str) -> None:
+        """Serialise the visitors of one email until the caller's unit ends; stores nothing."""
+        ...
+
     def lock_clinician(self, clinician_id: Id) -> None:
         """Hold the clinician's writes until the caller's unit ends; unknown ids lock nothing."""
         ...

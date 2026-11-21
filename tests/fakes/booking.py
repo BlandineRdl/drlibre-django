@@ -150,9 +150,13 @@ class RecordingSlotRefresh(SlotRefresh):
 
 class RecordingScheduleLocks(ScheduleLocks):
     def __init__(self) -> None:
+        self.emails: list[str] = []
         self.clinicians: list[Id] = []
         self.patients: list[Id] = []
         self.departments: list[Id] = []
+
+    def lock_email(self, email: str) -> None:
+        self.emails.append(email)
 
     def lock_rooms(self, department_id: Id) -> None:
         self.departments.append(department_id)

@@ -102,6 +102,7 @@ class CreateHoldUseCase(CreateHold):
             per_network=self._network_limit,
         )
         with self._uow:
+            self._locks.lock_email(details.email)
             previous = self._holds.open_for_email(details.email, at)
             if previous is not None:
                 self._release(previous, at)

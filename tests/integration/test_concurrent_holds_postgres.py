@@ -33,6 +33,17 @@ class RacingHolds(DjangoHolds):
         return found
 
 
+class EmailRacingHolds(DjangoHolds):
+    def __init__(self, race: Race) -> None:
+        self._race = race
+
+    def open_for_email(self, email: str, at: datetime) -> BookingHold | None:
+        # Read before writing, so without the email lock both writers miss each other's hold.
+        found = super().open_for_email(email, at)
+        self._race.hold_first()
+        return found
+
+
 def test_two_visitors_holding_the_same_slot_at_once_leave_only_one_hold() -> None:
     """Story réservation provisoire : un créneau gardé n'est plus proposé, même au même instant."""
     race = Race()
@@ -77,3 +88,30 @@ def test_a_hold_replaces_the_previous_hold_of_the_same_email() -> None:
         assert list(BookingHoldRecord.objects.values_list("start", flat=True)) == [
             SLOT_START.replace(hour=9)
         ]
+
+
+def test_two_holds_of_one_email_at_once_never_leave_two_open() -> None:
+    """Story réservation provisoire : un email n'a jamais plus d'une réservation ouverte."""
+    race = Race()
+    with bookable() as world:
+        adapters = world.at(NOW)
+        racing = dataclasses.replace(adapters.booking, holds=EmailRacingHolds(race))
+        app = wire(dataclasses.replace(adapters, booking=racing))
+        visitor = world.visitor()
+
+        def hold(start: datetime):
+            def run() -> object:
+                return app.create_hold.execute(
+                    appointment_type_id=world.scene.kind,
+                    clinician_id=world.clinician,
+                    start=start,
+                    **visitor,  # type: ignore[arg-type]
+                )
+
+            return run
+
+        outcomes = race.run(hold(SLOT_START), hold(SLOT_START.replace(hour=9)))
+
+        assert race.second_was_blocked == [True]
+        assert outcomes == ["saved", "saved"]
+        assert BookingHoldRecord.objects.filter(email=visitor["email"]).count() == 1
