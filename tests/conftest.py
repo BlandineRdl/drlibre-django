@@ -1,7 +1,9 @@
+import uuid
 from collections.abc import Iterator
 from typing import Any
 
 import pytest
+import redis
 from django.conf import settings
 from django.test import Client
 
@@ -42,3 +44,19 @@ def admin_client(client: Client, db: None) -> Client:
     """A Django client signed in as a fresh admin, through a real stored session."""
     client.cookies[settings.SESSION_COOKIE_NAME] = stored_session(stored_user(Role.ADMIN))
     return client
+
+
+@pytest.fixture(autouse=True)
+def rate_limit_prefix(settings: Any) -> Iterator[None]:
+    """Each test counts rate limits under its own Redis prefix and flushes it afterwards."""
+    prefix = f"drlibre-test:{uuid.uuid4().hex}"
+    settings.RATE_LIMIT_PREFIX = prefix
+    use_container(None)
+    yield
+    use_container(None)
+    try:
+        client = redis.Redis.from_url(settings.REDIS_URL)
+        for key in client.scan_iter(f"{prefix}:*"):
+            client.delete(key)
+    except redis.RedisError:
+        pass  # No Redis, no keys: tests without the compose services.

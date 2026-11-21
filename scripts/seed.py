@@ -1,6 +1,11 @@
+import argparse
 import os
+import random
+import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import django
 
@@ -10,8 +15,19 @@ django.setup()
 import structlog  # noqa: E402
 from django.db import transaction  # noqa: E402
 
+from drlibre.booking.infrastructure.django.models import AppointmentRecord  # noqa: E402
 from drlibre.bootstrap.container import Container, container  # noqa: E402
+from drlibre.identity.infrastructure.django.models import UserRecord  # noqa: E402
 from drlibre.organisation.application.ports.inbound import SaveRecord  # noqa: E402
+from drlibre.organisation.infrastructure.django.models import (  # noqa: E402
+    AppointmentTypeRecord,
+    ClinicianProfileRecord,
+    DepartmentRecord,
+    HospitalRecord,
+    RoomRecord,
+    SpecialtyRecord,
+)
+from drlibre.scheduling.infrastructure.django.models import AvailabilityRuleModel  # noqa: E402
 from drlibre.shared_kernel.ids import Id  # noqa: E402
 from drlibre.shared_kernel.pagination import Page, PageRequest  # noqa: E402
 
@@ -104,6 +120,7 @@ TYPES = (
     },
 )
 ADMIN_EMAIL = "admin@drlibre.localhost"
+VISITOR_EMAIL = "visiteur@drlibre.localhost"
 USERS = (
     ("ADMIN", "Alice Admin", ADMIN_EMAIL),
     ("CLINICIAN", "Dr Claire Martin", "clinicien@drlibre.localhost"),
@@ -225,22 +242,223 @@ def seed_availability(app: Container) -> None:
             app.save_availability_rule.execute(actor=clinician, rule_id=None, fields=rule)
 
 
+def seed_passwordless_patient(app: Container) -> None:
+    """A patient who signs in only by email link (spec §3.1), as a booking visitor becomes."""
+    now = datetime.now(UTC)
+    UserRecord.objects.get_or_create(
+        email=VISITOR_EMAIL,
+        defaults={
+            "full_name": "Victor Visiteur",
+            "role": "PATIENT",
+            "active": True,
+            "email_verified_at": now,
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
+
+
+# Load size, bulk inserts through the ORM: 50k rows through the use cases would take hours.
+LOAD_HOSPITALS = 8
+LOAD_DEPARTMENTS_PER_HOSPITAL = 2
+LOAD_SPECIALTIES = ("CARDIO", "PEDIA", "DERMA", "ORTHO", "NEURO")
+LOAD_CLINICIANS = 200
+LOAD_PATIENTS = 5000
+LOAD_APPOINTMENTS_PER_CLINICIAN = 250
+LOAD_TIME_ZONE = ZoneInfo("Europe/Paris")
+_HOURS = (9, 10, 11, 14, 15, 16)
+_BATCH = 2000
+
+
+def _load_appointments(
+    clinician: ClinicianProfileRecord,
+    kind: AppointmentTypeRecord,
+    room_id: Any,
+    patients: list[uuid.UUID],
+    taken: set[tuple[uuid.UUID, datetime]],
+    rng: random.Random,
+    now: datetime,
+) -> list[AppointmentRecord]:
+    today = now.astimezone(LOAD_TIME_ZONE).date()
+    starts = [
+        datetime.combine(today + timedelta(days=day), time(hour), tzinfo=LOAD_TIME_ZONE)
+        for day in range(-35, 36)
+        if (today + timedelta(days=day)).isoweekday() <= 5
+        for hour in _HOURS
+    ]
+    rows = []
+    for start in sorted(rng.sample(starts, LOAD_APPOINTMENTS_PER_CLINICIAN)):
+        past = start < now
+        status = rng.choice(
+            ("COMPLETED",) * 8 + ("CANCELLED", "NO_SHOW") if past else ("BOOKED", "CONFIRMED")
+        )
+        patient = rng.choice(patients)
+        while (patient, start) in taken:
+            patient = rng.choice(patients)
+        taken.add((patient, start))
+        rows.append(
+            AppointmentRecord(
+                patient_id=patient,
+                clinician=clinician,
+                appointment_type=kind,
+                room_id=room_id,
+                start=start,
+                end=start + timedelta(minutes=kind.duration_minutes),
+                status=status,
+                source=rng.choice(("ONLINE", "ONLINE", "STAFF")),
+            )
+        )
+    return rows
+
+
+def seed_load(app: Container) -> None:
+    """Load volume with no room, clinician or patient overlap; skipped when already there."""
+    # To reseed a load set, empty the database: `docker compose down -v`, then `up` again.
+    if AppointmentRecord.objects.filter(clinician__department__code__startswith="LOAD-").exists():
+        return
+    now = datetime.now(UTC)
+    stamp = {"created_at": now, "updated_at": now}
+    rng = random.Random(2026)  # noqa: S311
+    specialties = {
+        code: SpecialtyRecord.objects.get_or_create(
+            code=code, defaults={"name": code.title(), "active": True, **stamp}
+        )[0]
+        for code in LOAD_SPECIALTIES
+    }
+    departments: list[DepartmentRecord] = []
+    for number in range(1, LOAD_HOSPITALS + 1):
+        hospital, _ = HospitalRecord.objects.get_or_create(
+            code=f"LOAD-H{number:02}",
+            defaults={
+                "name": f"Hôpital de charge {number:02}",
+                "street": f"{number} rue de la Charge",
+                "postal_code": "59000",
+                "city": "Lille",
+                "country": "France",
+                "phone": "+33 3 20 00 00 00",
+                "time_zone": "Europe/Paris",
+                "latitude": 43.0 + number * 0.7,
+                "longitude": 1.0 + number * 0.5,
+                "active": True,
+                **stamp,
+            },
+        )
+        for index in range(LOAD_DEPARTMENTS_PER_HOSPITAL):
+            department, _ = DepartmentRecord.objects.get_or_create(
+                code=f"LOAD-H{number:02}-D{index}",
+                defaults={
+                    "hospital": hospital,
+                    "name": LOAD_SPECIALTIES[(number + index) % 5],
+                    **stamp,
+                },
+            )
+            AppointmentTypeRecord.objects.get_or_create(
+                code=f"{department.code}-T",
+                defaults={
+                    "department": department,
+                    "name": "Consultation",
+                    "duration_minutes": 30,
+                    "buffer_minutes": 5,
+                    "colour": "#1D4E89",
+                    "needs_room": True,
+                    "bookable_online": True,
+                    "active": True,
+                    **stamp,
+                },
+            )
+            departments.append(department)
+    patients = [uuid.uuid4() for _ in range(LOAD_PATIENTS)]
+    UserRecord.objects.bulk_create(
+        (
+            UserRecord(
+                id=pid,
+                email=f"load-patient-{n:05}@drlibre.localhost",
+                full_name=f"Patient {n:05}",
+                role="PATIENT",
+                active=True,
+                email_verified_at=now,
+                **stamp,
+            )
+            for n, pid in enumerate(patients)
+        ),
+        batch_size=_BATCH,
+    )
+    appointments: list[AppointmentRecord] = []
+    taken: set[tuple[uuid.UUID, datetime]] = set()
+    today = now.astimezone(LOAD_TIME_ZONE).date()
+    for n in range(LOAD_CLINICIANS):
+        department = departments[n % len(departments)]
+        user = UserRecord.objects.create(
+            email=f"load-clinician-{n:03}@drlibre.localhost",
+            full_name=f"Dr Charge {n:03}",
+            role="CLINICIAN",
+            active=True,
+            email_verified_at=now,
+            **stamp,
+        )
+        # One room per clinician of a department, so seeded appointments never share a room.
+        room, _ = RoomRecord.objects.get_or_create(
+            code=f"{department.code}-R{n // len(departments)}",
+            defaults={
+                "department": department,
+                "name": "Consultation",
+                "floor": "0",
+                "capacity": 1,
+                "equipment": [],
+                "active": True,
+                **stamp,
+            },
+        )
+        profile = ClinicianProfileRecord.objects.create(
+            user_id=user.id,
+            department=department,
+            specialty=specialties[department.name],
+            title=f"Dr Charge {n:03}",
+            bio="Praticien du jeu de charge.",
+            default_room=room,
+            weight=1 + n % 3,
+            **stamp,
+        )
+        AvailabilityRuleModel.objects.bulk_create(
+            AvailabilityRuleModel(
+                clinician=profile,
+                weekday=day,
+                start=time(start),
+                end=time(end),
+                step_minutes=30,
+                valid_from=today - timedelta(days=1),
+            )
+            for day in range(1, 6)
+            for start, end in ((9, 12), (14, 17))
+        )
+        kind = AppointmentTypeRecord.objects.get(code=f"{department.code}-T")
+        appointments += _load_appointments(profile, kind, room.id, patients, taken, rng, now)
+    AppointmentRecord.objects.bulk_create(appointments, batch_size=_BATCH)
+    app.extend_slot_horizon.execute()
+    logger.info("seed_load_done", appointments=len(appointments), patients=len(patients))
+
+
 # Each seeder gets or creates its rows, so the whole seed can run again safely.
 SEEDERS: list[Callable[[Container], None]] = [
     seed_users,
     seed_referential,
     seed_clinician_profile,
     seed_availability,
+    seed_passwordless_patient,
 ]
 
 
-def main() -> None:
+def main(size: str = "demo") -> None:
     app = container()
     with transaction.atomic():
         for seeder in SEEDERS:
             seeder(app)
+        if size == "load":
+            seed_load(app)
     logger.info("seed_done", seeders=len(SEEDERS))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Seed the demo data, or the load volume on top.")
+    parser.add_argument("--size", choices=("demo", "load"), default="demo")
+    main(parser.parse_args().size)

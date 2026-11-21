@@ -100,7 +100,7 @@ def starts(
     found = setup.queries.free_slots(
         kind, clinicians, within=Period(paris(23, 0), paris(24, 0)), not_before=not_before
     )
-    return [s.start for s in found]
+    return [found_slot.slot.start for found_slot in found]
 
 
 def test_the_same_refresh_gives_the_same_slots_for_each_type(setup: Setup) -> None:
@@ -113,7 +113,7 @@ def test_the_same_refresh_gives_the_same_slots_for_each_type(setup: Setup) -> No
     thirty = setup.queries.free_slots(
         setup.types[0], (a,), within=Period(paris(23, 0), paris(24, 0)), not_before=NOW
     )
-    assert [(s.start, s.end) for s in thirty] == [
+    assert [(s.slot.start, s.slot.end) for s in thirty] == [
         (paris(23, 9), paris(23, 9, 30)),
         (paris(23, 9, 30), paris(23, 10)),
     ]
@@ -135,8 +135,10 @@ def test_a_refresh_replaces_only_that_clinicians_slots(setup: Setup) -> None:
     assert starts(setup, setup.types[0], (a, b)) == [paris(23, 14)]
 
 
-def test_a_department_read_gives_each_start_once_in_order(setup: Setup) -> None:
-    """Story département : les créneaux d'un département réunissent ceux de ses praticiens."""
+def test_a_department_read_gives_every_clinicians_starts_in_order_with_their_clinician(
+    setup: Setup,
+) -> None:
+    """Décision du plan : la lecture garde le praticien de chaque créneau, sans dédoublonner."""
     refresh = Refresh(setup)
     a, b = setup.clinicians
     refresh.rules.save(rule(a, weekday=1, start=time(10), end=time(11), step_minutes=30))
@@ -144,12 +146,21 @@ def test_a_department_read_gives_each_start_once_in_order(setup: Setup) -> None:
     refresh(a)
     refresh(b)
 
-    assert starts(setup, setup.types[0], (a, b)) == [
+    found = setup.queries.free_slots(
+        setup.types[0], (a, b), within=Period(paris(23, 0), paris(24, 0)), not_before=NOW
+    )
+
+    assert [f.slot.start for f in found] == [
         paris(23, 9),
         paris(23, 9, 30),
         paris(23, 10),
+        paris(23, 10),
         paris(23, 10, 30),
     ]
+    assert {(f.clinician_id, f.slot.start) for f in found if f.slot.start == paris(23, 10)} == {
+        (a, paris(23, 10)),
+        (b, paris(23, 10)),
+    }
     assert starts(setup, setup.types[0], (a,)) == [paris(23, 10), paris(23, 10, 30)]
 
 

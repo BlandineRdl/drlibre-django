@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from drlibre.scheduling.application.ports.outbound import SlotQueries
+from drlibre.scheduling.application.ports.outbound import ClinicianSlot, SlotQueries
 from drlibre.scheduling.domain.slot import Period, Slot
 from drlibre.scheduling.infrastructure.django.models import SlotModel
 from drlibre.shared_kernel.ids import Id
@@ -16,7 +16,7 @@ class DjangoSlotQueries(SlotQueries):
         *,
         within: Period,
         not_before: datetime,
-    ) -> tuple[Slot, ...]:
+    ) -> tuple[ClinicianSlot, ...]:
         rows = (
             SlotModel.objects.filter(
                 appointment_type_id=appointment_type_id.value,
@@ -24,8 +24,9 @@ class DjangoSlotQueries(SlotQueries):
                 start__gte=max(within.start, not_before),
                 end__lte=within.end,
             )
-            .order_by("start")
-            .distinct("start")
-            .values_list("start", "end")
+            .order_by("start", "clinician_id")
+            .values_list("clinician_id", "start", "end")
         )
-        return tuple(Slot(start, end) for start, end in rows)
+        return tuple(
+            ClinicianSlot(Id(clinician), Slot(start, end)) for clinician, start, end in rows
+        )

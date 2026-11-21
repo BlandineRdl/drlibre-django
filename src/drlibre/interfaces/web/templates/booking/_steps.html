@@ -1,0 +1,5 @@
+<nav aria-label="Étapes de la réservation">
+  <ol class="steps">
+    {% for step in view.steps %}<li{% if step.current %} aria-current="step"{% endif %}>{% if step.current %}<strong>{{ step.label }}</strong>{% else %}{{ step.label }}{% endif %}</li>{% endfor %}
+  </ol>
+</nav>

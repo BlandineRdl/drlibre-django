@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ view.name }}{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>{{ view.name }}</h1>
+  <p>{{ view.address }}</p>
+</hgroup>
+<p>Téléphone : {{ view.phone }}</p>
+{% if view.description %}<p>{{ view.description }}</p>{% endif %}
+<h2>Départements</h2>
+<ul>{% for d in view.departments %}<li>{{ d }}</li>{% endfor %}</ul>
+<h2>Spécialités</h2>
+<ul>{% for s in view.specialties %}<li>{{ s }}</li>{% endfor %}</ul>
+<h2>Premier disponible</h2>
+<ul>
+  {% for f in view.first_by_type %}
+  <li>{{ f.label }} :
+    {% if f.slot %}<a href="{{ f.slot.url }}">{{ f.slot.label }}</a>{% else %}{{ f.empty_text }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+<h2>Praticiens</h2>
+{% if view.providers %}
+<div class="results">
+  {% for result in view.providers %}{% include "search/_result.html" %}{% endfor %}
+</div>
+{% else %}<p>Aucun praticien réservable dans cet hôpital.</p>{% endif %}
+{% endblock %}

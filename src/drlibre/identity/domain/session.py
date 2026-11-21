@@ -8,6 +8,7 @@ from drlibre.shared_kernel.ids import Id
 
 ADMIN_LIFETIME = timedelta(hours=12)
 PASSWORD_LIFETIME = timedelta(days=7)
+EMAIL_PROOF_LIFETIME = timedelta(hours=24)
 
 
 def hash_token(token: str) -> str:
@@ -36,6 +37,21 @@ class Session:
             expires_at=at + lifetime,
             lifetime=lifetime,
             extendable=True,
+            user_agent=user_agent[:300],
+        )
+
+    @classmethod
+    def after_email_proof(
+        cls, *, token: str, user_id: Id, user_agent: str, at: datetime
+    ) -> "Session":
+        """A 24 hour session opened by a verified email code or link, never extended."""
+        return cls(
+            id=Id(),
+            token_hash=hash_token(token),
+            user_id=user_id,
+            expires_at=at + EMAIL_PROOF_LIFETIME,
+            lifetime=EMAIL_PROOF_LIFETIME,
+            extendable=False,
             user_agent=user_agent[:300],
         )
 

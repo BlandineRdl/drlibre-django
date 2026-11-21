@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ view.title }}{% endblock %}
+{% block content %}
+<article>
+  <h1>{{ view.title }}</h1>
+  <p role="status">{{ view.message }}</p>
+  <p><a href="/sign-in">Retour à la connexion</a></p>
+</article>
+{% endblock %}

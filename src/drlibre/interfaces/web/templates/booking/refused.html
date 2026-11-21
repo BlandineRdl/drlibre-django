@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ view.title }}{% endblock %}
+{% block timezone %}{% if view.time_zone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endif %}{% endblock %}
+{% block content %}
+{% include "booking/_steps.html" %}
+<h1>{{ view.title }}</h1>
+<div role="alert" class="error-summary"><p><strong>{{ view.message }}</strong></p></div>
+{% if view.slots %}
+<h2>{{ view.slots_heading }}</h2>
+<ul class="slot-list">
+  {% for slot in view.slots %}<li><a href="{{ slot.url }}" role="button" class="outline secondary">{{ slot.label }}</a></li>{% endfor %}
+</ul>
+{% else %}
+<p>{{ view.empty_text }}</p>
+{% endif %}
+<p><a href="{{ view.search_url }}">Chercher un autre créneau</a></p>
+{% endblock %}

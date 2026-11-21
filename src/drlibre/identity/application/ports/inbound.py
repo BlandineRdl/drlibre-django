@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from drlibre.identity.domain.user import Role, User
@@ -11,6 +11,9 @@ __all__ = [
     "ChangePassword",
     "DeleteUser",
     "Identity",
+    "OpenPatientSession",
+    "ProvidePatientAccount",
+    "RequestSignInLink",
     "Role",
     "SaveUser",
     "SignIn",
@@ -18,6 +21,7 @@ __all__ = [
     "SignedIn",
     "StaffLookup",
     "StaffMember",
+    "UseSignInLink",
     "User",
     "UserQueries",
 ]
@@ -116,4 +120,28 @@ class StaffLookup(Protocol):
 
     def named_like(self, text: str) -> frozenset[Id]:
         """Users whose full name contains the text, ignoring case."""
+        ...
+
+
+class ProvidePatientAccount(Protocol):
+    def execute(self, *, full_name: str, email: str, birth_date: date, phone: str | None) -> Id:
+        """Reuse or create the patient of a proven email; staff or inactive get forbidden."""
+        ...
+
+
+class OpenPatientSession(Protocol):
+    def execute(self, *, patient_id: Id, user_agent: str) -> SignedIn:
+        """Open a 24 hour session that is never extended for the patient."""
+        ...
+
+
+class RequestSignInLink(Protocol):
+    def execute(self, *, email: str, network: str) -> None:
+        """Email a sign-in link to an active patient, silent for others; malformed is refused."""
+        ...
+
+
+class UseSignInLink(Protocol):
+    def execute(self, *, token: str, user_agent: str) -> SignedIn:
+        """Consume the link and open a 24 hour session; unauthenticated if it is unusable."""
         ...

@@ -7,8 +7,11 @@ from drlibre.scheduling.application.ports.outbound import (
     AvailabilityRules,
     Clinician,
     ClinicianAppointments,
+    ClinicianSlot,
+    HeldPeriod,
     Room,
     SchedulingDirectory,
+    SlotHolds,
     SlotQueries,
     SlotStore,
     StoredSlot,
@@ -16,7 +19,7 @@ from drlibre.scheduling.application.ports.outbound import (
 )
 from drlibre.scheduling.domain.appointment import Appointment
 from drlibre.scheduling.domain.availability_rule import AvailabilityRule
-from drlibre.scheduling.domain.slot import Period, Slot
+from drlibre.scheduling.domain.slot import Period
 from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
@@ -91,16 +94,35 @@ class InMemorySlotStore(SlotStore, SlotQueries):
         *,
         within: Period,
         not_before: datetime,
-    ) -> tuple[Slot, ...]:
-        by_start = {
-            r.slot.start: r.slot
+    ) -> tuple[ClinicianSlot, ...]:
+        found = (
+            ClinicianSlot(r.clinician_id, r.slot)
             for r in self.rows
             if r.appointment_type_id == appointment_type_id
             and r.clinician_id in clinician_ids
             and within.covers(r.slot.period)
             and r.slot.start >= not_before
-        }
-        return tuple(by_start[start] for start in sorted(by_start))
+        )
+        return tuple(sorted(found, key=lambda c: (c.slot.start, str(c.clinician_id))))
+
+
+class InMemorySlotHolds(SlotHolds):
+    """Holds as (hold, clinician, period, expires_at) rows."""
+
+    def __init__(self) -> None:
+        self.rows: list[tuple[Id, Id, Period, datetime]] = []
+
+    def open(
+        self, clinician_ids: tuple[Id, ...], *, within: Period, at: datetime, ignoring: Id | None
+    ) -> tuple[HeldPeriod, ...]:
+        return tuple(
+            HeldPeriod(clinician, period)
+            for hold, clinician, period, expires_at in self.rows
+            if clinician in clinician_ids
+            and hold != ignoring
+            and at < expires_at
+            and period.overlaps(within)
+        )
 
 
 class FixedSchedulingDirectory(SchedulingDirectory):

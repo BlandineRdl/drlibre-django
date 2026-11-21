@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ view.title }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+{% include "booking/_steps.html" %}
+<h1>{{ view.title }}</h1>
+{% include "booking/_summary.html" %}
+<form method="post" action="{{ view.action }}">
+  {% csrf_token %}
+  {% for hidden in view.hidden_fields %}<input type="hidden" name="{{ hidden.0 }}" value="{{ hidden.1 }}">{% endfor %}
+  <button type="submit">{{ view.submit_label }}</button>
+</form>
+{% endblock %}

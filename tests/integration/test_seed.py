@@ -4,6 +4,7 @@ import pytest
 from django.apps import apps
 
 from drlibre.audit.infrastructure.django.models import AuditEntryRecord
+from drlibre.booking.infrastructure.django.models import AppointmentRecord
 from drlibre.bootstrap.container import container
 from drlibre.identity.infrastructure.django.models import UserRecord
 from drlibre.organisation.infrastructure.django.models import AppointmentTypeRecord
@@ -59,3 +60,25 @@ def test_the_demo_clinician_has_free_slots_after_the_seed() -> None:
     )
 
     assert slots
+
+
+def test_the_load_seed_never_double_books_a_room_a_clinician_or_a_patient(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec §14 load: seeded appointments respect the placement rules a booking enforces."""
+    monkeypatch.setattr(seed, "LOAD_CLINICIANS", 40)
+    monkeypatch.setattr(seed, "LOAD_PATIENTS", 400)
+    monkeypatch.setattr(seed, "LOAD_APPOINTMENTS_PER_CLINICIAN", 60)
+
+    seed.main(size="load")
+    seed.main(size="load")
+
+    rows = list(
+        AppointmentRecord.objects.filter(clinician__department__code__startswith="LOAD-").values(
+            "patient_id", "clinician_id", "room_id", "start"
+        )
+    )
+    assert len(rows) == 40 * 60
+    for key in ("patient_id", "clinician_id", "room_id"):
+        slots = [(row[key], row["start"]) for row in rows]
+        assert len(set(slots)) == len(slots), key

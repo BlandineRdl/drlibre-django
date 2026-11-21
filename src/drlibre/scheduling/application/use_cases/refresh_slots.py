@@ -12,10 +12,9 @@ from drlibre.scheduling.application.ports.outbound import (
 )
 from drlibre.scheduling.domain.slot import Period
 from drlibre.scheduling.domain.slot_engine import SlotEngine
+from drlibre.shared_kernel.booking_policy import SLOT_HORIZON_DAYS
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.ids import Id
-
-HORIZON_DAYS = 90
 
 
 class RefreshSlotsUseCase(RefreshSlots):
@@ -73,5 +72,5 @@ def _horizon(now: datetime, tz: ZoneInfo) -> Period:
     # From local midnight today through the last local day of the horizon.
     today = now.astimezone(tz).date()
     start = datetime.combine(today, time(), tzinfo=tz).astimezone(UTC)
-    end = datetime.combine(today + timedelta(days=HORIZON_DAYS + 1), time(), tzinfo=tz)
+    end = datetime.combine(today + timedelta(days=SLOT_HORIZON_DAYS + 1), time(), tzinfo=tz)
     return Period(start, end.astimezone(UTC))

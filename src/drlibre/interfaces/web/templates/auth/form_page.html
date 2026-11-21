@@ -6,4 +6,11 @@
   {% if intro %}<p>{{ intro }}</p>{% endif %}
   {% include "_form.html" %}
 </article>
+{% if link_form %}
+<article>
+  <h2>{{ link_form.title }}</h2>
+  <p>Patient ? Recevez un lien par email, sans mot de passe.</p>
+  {% include "_form.html" with form=link_form hidden_fields=None %}
+</article>
+{% endif %}
 {% endblock %}

@@ -12,6 +12,9 @@ class UserRecord(models.Model):
     password_hash = models.CharField(max_length=256, null=True)  # noqa: DJ001
     must_change_password = models.BooleanField(default=False)
     last_login_at = models.DateTimeField(null=True)
+    phone = models.CharField(max_length=30, null=True)  # noqa: DJ001
+    birth_date = models.DateField(null=True)
+    email_verified_at = models.DateTimeField(null=True)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
 
@@ -30,6 +33,18 @@ class SessionRecord(models.Model):
     lifetime = models.DurationField()
     extendable = models.BooleanField()
     user_agent = models.CharField(max_length=300, blank=True)
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+
+class SignInLinkRecord(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    token_hash = models.CharField(max_length=64, unique=True)
+    patient = models.ForeignKey(UserRecord, on_delete=models.CASCADE, related_name="sign_in_links")
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True)
+    cancelled_at = models.DateTimeField(null=True)
 
     def __str__(self) -> str:
         return str(self.id)

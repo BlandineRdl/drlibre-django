@@ -76,6 +76,12 @@ class SlotStore(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class ClinicianSlot:
+    clinician_id: Id
+    slot: Slot
+
+
 class SlotQueries(Protocol):
     def free_slots(
         self,
@@ -84,8 +90,22 @@ class SlotQueries(Protocol):
         *,
         within: Period,
         not_before: datetime,
-    ) -> tuple[Slot, ...]:
-        """Return stored slots inside the range starting from not_before, one per start."""
+    ) -> tuple[ClinicianSlot, ...]:
+        """Return stored slots inside the range from not_before, by start then clinician."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class HeldPeriod:
+    clinician_id: Id
+    period: Period
+
+
+class SlotHolds(Protocol):
+    def open(
+        self, clinician_ids: tuple[Id, ...], *, within: Period, at: datetime, ignoring: Id | None
+    ) -> tuple[HeldPeriod, ...]:
+        """Open holds of these clinicians overlapping the range, except the one in `ignoring`."""
         ...
 
 

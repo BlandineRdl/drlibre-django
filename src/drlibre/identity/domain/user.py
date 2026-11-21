@@ -1,7 +1,7 @@
 import dataclasses
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 from drlibre.shared_kernel.errors import DomainError
@@ -68,6 +68,16 @@ class UserDetails:
 
 
 @dataclass(frozen=True, slots=True)
+class PatientDetails:
+    """Validated profile of a patient created from a booking."""
+
+    full_name: str
+    email: Email
+    birth_date: date
+    phone: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class User:
     id: Id
     email: Email
@@ -79,6 +89,9 @@ class User:
     last_login_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    phone: str | None = None
+    birth_date: date | None = None
+    email_verified_at: datetime | None = None
 
     @classmethod
     def create(cls, *, details: UserDetails, password_hash: str, at: datetime) -> "User":
@@ -93,6 +106,25 @@ class User:
             last_login_at=None,
             created_at=at,
             updated_at=at,
+        )
+
+    @classmethod
+    def passwordless_patient(cls, *, details: "PatientDetails", at: datetime) -> "User":
+        """A patient with no password, whose email was proven by a code."""
+        return cls(
+            id=Id(),
+            email=details.email,
+            full_name=details.full_name,
+            role=Role.PATIENT,
+            active=True,
+            password_hash=None,
+            must_change_password=False,
+            last_login_at=None,
+            created_at=at,
+            updated_at=at,
+            phone=details.phone,
+            birth_date=details.birth_date,
+            email_verified_at=at,
         )
 
     @property

@@ -9,6 +9,7 @@ Hospital appointment scheduling, a hexagonal Django back end. Portfolio sandbox,
    - admin: `admin@drlibre.localhost`
    - clinician: `clinicien@drlibre.localhost`
    - patient: `patient@drlibre.localhost`
+   - passwordless patient, signs in by email link only: `visiteur@drlibre.localhost`
 5. The demo clinician works Monday to Friday, 09:00–12:00 and 14:00–17:00 (Paris): edit at `/workspace/availability/` and `/workspace/time-off/`; signed in, `GET /api/v1/slots?type=…&clinician=…&start=…&end=…` lists free slots.
 
 ## Develop

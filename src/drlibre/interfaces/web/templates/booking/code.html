@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ view.title }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+{% include "booking/_steps.html" %}
+<h1>{{ view.title }}</h1>
+{% include "booking/_summary.html" %}
+{% if view.notice %}<p role="status">{{ view.notice }}</p>{% endif %}
+<p>Un code a été envoyé à l'adresse saisie. {{ view.held_until }}.</p>
+{% include "_form.html" with form=view.form hidden_fields=None %}
+<form method="post" action="{{ view.resend_action }}">
+  {% csrf_token %}
+  <button type="submit" class="secondary outline">Renvoyer un code</button>
+</form>
+{% endblock %}

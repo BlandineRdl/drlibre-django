@@ -2,7 +2,12 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from drlibre.scheduling.application.ports.inbound import FindFreeSlots
-from drlibre.scheduling.application.ports.outbound import SchedulingDirectory, SlotQueries
+from drlibre.scheduling.application.ports.outbound import (
+    SchedulingDirectory,
+    SlotHolds,
+    SlotQueries,
+)
+from drlibre.scheduling.application.use_cases.open_slots import open_slots
 from drlibre.scheduling.domain.slot import Period, Slot
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -13,10 +18,18 @@ MAX_RANGE = timedelta(days=31)
 
 
 class FindFreeSlotsUseCase(FindFreeSlots):
-    def __init__(self, *, clock: Clock, directory: SchedulingDirectory, queries: SlotQueries):
+    def __init__(
+        self,
+        *,
+        clock: Clock,
+        directory: SchedulingDirectory,
+        queries: SlotQueries,
+        holds: SlotHolds,
+    ):
         self._clock = clock
         self._directory = directory
         self._queries = queries
+        self._holds = holds
 
     def execute(
         self, *, appointment_type_id: Id, clinician_id: Id | None, start: datetime, end: datetime
@@ -38,9 +51,16 @@ class FindFreeSlotsUseCase(FindFreeSlots):
             ):
                 raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
             clinicians = (clinician.id,)
-        return self._queries.free_slots(
-            kind.id, clinicians, within=within, not_before=self._clock.now()
+        found = open_slots(
+            queries=self._queries,
+            holds=self._holds,
+            kind=kind,
+            clinicians=clinicians,
+            within=within,
+            now=self._clock.now(),
         )
+        by_start = {s.slot.start: s.slot for s in found}
+        return tuple(by_start[at] for at in sorted(by_start))
 
 
 def _local_span(period: Period, tz: ZoneInfo) -> timedelta:

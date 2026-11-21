@@ -6,6 +6,7 @@ import pytest
 
 from drlibre.audit.application.ports.outbound import AuditEntry
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
+from drlibre.booking.infrastructure.queries import DjangoBookingQueries
 from drlibre.bootstrap.container import Container, real_adapters, wire
 from drlibre.organisation.domain.department import Department
 from drlibre.organisation.infrastructure.repositories import (
@@ -15,8 +16,8 @@ from drlibre.organisation.infrastructure.repositories import (
 )
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.domain.slot import Period, Slot
+from drlibre.scheduling.infrastructure.booking_appointments import BookingClinicianAppointments
 from drlibre.scheduling.infrastructure.django.models import AvailabilityRuleModel, SlotModel
-from drlibre.scheduling.infrastructure.no_appointments_yet import NoAppointmentsYet
 from drlibre.scheduling.infrastructure.repositories import DjangoAvailabilityRules, DjangoTimeOffs
 from drlibre.scheduling.infrastructure.slot_queries import DjangoSlotQueries
 from drlibre.scheduling.infrastructure.slot_store import DjangoSlotStore
@@ -38,7 +39,7 @@ def refresh_slots(clock: FixedClock) -> RefreshSlotsUseCase:
         directory=real_adapters().scheduling_directory,
         rules=DjangoAvailabilityRules(),
         time_offs=DjangoTimeOffs(),
-        appointments=NoAppointmentsYet(),
+        appointments=BookingClinicianAppointments(DjangoBookingQueries()),
         store=DjangoSlotStore(),
     )
 
@@ -50,9 +51,10 @@ def stored_type(department: Department) -> Id:
 
 
 def read(kind: Id, clinician: Id, start: datetime, end: datetime) -> tuple[Slot, ...]:
-    return DjangoSlotQueries().free_slots(
+    found = DjangoSlotQueries().free_slots(
         kind, (clinician,), within=Period(start, end), not_before=NOW
     )
+    return tuple(f.slot for f in found)
 
 
 def test_an_audit_failure_rolls_back_the_rule_and_its_slots_together() -> None:

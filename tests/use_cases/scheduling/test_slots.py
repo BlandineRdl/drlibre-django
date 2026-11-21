@@ -63,7 +63,10 @@ def refresh(world: FakeWorld, clinician_id: Id) -> None:
 
 def ask(world: FakeWorld, outcome: Outcome, clinician_id: Id | None, start: str, end: str) -> None:
     use_case = FindFreeSlotsUseCase(
-        clock=world.clock, directory=world.scheduling_directory, queries=world.slots
+        clock=world.clock,
+        directory=world.scheduling_directory,
+        queries=world.slots,
+        holds=world.slot_holds,
     )
     try:
         outcome.slots = use_case.execute(
@@ -278,7 +281,8 @@ def slots_without_session(fake_container: Container, outcome: Outcome, name: str
         "end": "2026-11-24T00:00:00+01:00",
     }
     response = Client().get("/api/v1/slots", query)
-    outcome.answer = (response.status_code, response.json()["code"])
+    body = response.json()
+    outcome.answer = (response.status_code, "slots" if "slots" in body else body["code"])
 
 
 @when(parsers.parse('the department\'s slots are asked from "{start}" to "{end}"'))
