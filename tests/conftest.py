@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 import redis
 from django.conf import settings
+from django.db import connection
 from django.test import Client
 
 from config.settings import env, smtp_mailers
@@ -13,6 +14,15 @@ from drlibre.identity.domain.user import Role
 from tests.builders import stored_session, stored_user
 from tests.fakes.database_probe import InMemoryDatabaseProbe
 from tests.fakes.world import FakeWorld
+
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup: None, django_db_blocker: Any) -> None:
+    """Transactional tests flush with TRUNCATE: only the test database lets it empty the audit."""
+    with django_db_blocker.unblock(), connection.cursor() as cursor:
+        cursor.execute(
+            "ALTER TABLE audit_auditentryrecord DISABLE TRIGGER audit_entries_never_truncated"
+        )
 
 
 @pytest.fixture
