@@ -206,4 +206,4 @@ class ListClinicianAppointmentsUseCase(ListClinicianAppointments):
         self, *, actor_id: Id, agenda_filter: ClinicianFilter
     ) -> tuple[ClinicianEntry, ...]:
         profile_id = clinician_profile(self._directory, actor_id)
-        return self._agenda.entries(profile_id, agenda_filter)
+        return tuple(_with_actions(e) for e in self._agenda.entries(profile_id, agenda_filter))

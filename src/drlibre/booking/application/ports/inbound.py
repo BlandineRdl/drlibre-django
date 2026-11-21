@@ -403,5 +403,5 @@ class ListClinicianAppointments(Protocol):
     def execute(
         self, *, actor_id: Id, agenda_filter: ClinicianFilter
     ) -> tuple[ClinicianEntry, ...]:
-        """The clinician's own appointments matching the filter, by start, never their notes."""
+        """The clinician's own appointments with their actions, by start, never their notes."""
         ...

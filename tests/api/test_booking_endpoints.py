@@ -169,12 +169,9 @@ def test_booking_as_a_patient_needs_a_session_and_refuses_an_end_time(
     assert booked.json()["start"].startswith("2026-11-23T09:00")
 
 
-@pytest.mark.parametrize("role", [Role.CLINICIAN, Role.ADMIN], ids=["clinician", "admin"])
-def test_a_signed_in_staff_member_cannot_book_through_the_api(
-    client: Client, world: Bookable, role: Role
-) -> None:
-    """Règle §7.1 : le personnel connecté ne réserve pas par l'API (forbidden)."""
-    client.cookies[COOKIE] = stored_session(stored_user(role))
+def test_a_signed_in_admin_cannot_book_through_the_api(client: Client, world: Bookable) -> None:
+    """Règle §7.1 : l'admin ne réserve pas par l'API avant E7 (forbidden)."""
+    client.cookies[COOKIE] = stored_session(stored_user(Role.ADMIN))
 
     refused = post(
         client,

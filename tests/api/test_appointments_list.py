@@ -112,11 +112,11 @@ def test_an_anonymous_caller_is_unauthenticated(client: Client) -> None:
     assert response.json()["code"] == "unauthenticated"
 
 
-@pytest.mark.parametrize("role", [Role.CLINICIAN, Role.ADMIN])
-def test_staff_callers_are_forbidden_until_their_workspaces_widen_the_list(
+@pytest.mark.parametrize("role", [Role.CLINICIAN, Role.ADMIN], ids=["no-profile", "admin"])
+def test_an_admin_or_a_clinician_without_profile_is_forbidden_the_list(
     client: Client, role: Role
 ) -> None:
-    """Plan E4 : la liste sert les patients seuls, le personnel reçoit forbidden."""
+    """Plan E6 : la liste sert patients et praticiens ; l'admin attend E7."""
     response = signed_in(client, stored_user(role)).get(URL)
 
     assert response.status_code == 403
