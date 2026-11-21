@@ -90,6 +90,19 @@ Feature: L'admin annule ou change le statut de n'importe quel RDV
     When the admin cancels it giving the reason "Erreur de planning"
     Then the entry of "lea@example.org" is offered the appointment the patient cancelled
 
+  Scenario Outline: Les mêmes actions sont disponibles par `POST /appointments/{id}/check-in`, `/complete`, `/no-show` et `/cancel` (§14). (<case>)
+    Given the patient has a "<from>" appointment with "A" at "2026-11-20 14:00" in room "R1"
+    When the admin posts '<body>' to <path> it
+    Then the API answers 200 with the appointment "<to>"
+    And the appointment is now "<to>"
+
+    Examples:
+      | case    | from       | path     | body                               | to         |
+      | arrivé  | BOOKED     | check-in | {}                                 | CHECKED_IN |
+      | absent  | BOOKED     | no-show  | {}                                 | NO_SHOW    |
+      | terminé | CHECKED_IN | complete | {}                                 | COMPLETED  |
+      | annulé  | BOOKED     | cancel   | {"reason": "Erreur de planning"}   | CANCELLED  |
+
   Scenario Outline: Chaque action laisse une entrée d'audit sans motif ni donnée personnelle. (<case>)
     Given the patient has a "<from>" appointment with "A" at "2026-11-20 14:00" in room "R1"
     When the admin applies "<action>" to it

@@ -30,6 +30,18 @@ Feature: L'admin exporte les RDV filtrés en CSV
     When the admin exports the appointments with ""
     Then no exported value is a name, a reason or a cancellation reason
 
+  Scenario Outline: Une cellule qui commence par `=`, `+`, `-` ou `@` est préfixée d'une apostrophe. (<case>)
+    When a cell "<value>" is exported
+    Then the exported cell reads "<cell>"
+
+    Examples:
+      | case            | value    | cell      |
+      | égal            | =SUM(A1) | '=SUM(A1) |
+      | plus            | +1       | '+1       |
+      | moins           | -1       | '-1       |
+      | arobase         | @SUM(A1) | '@SUM(A1) |
+      | texte ordinaire | BOOKED   | BOOKED    |
+
   Scenario: L'export laisse une entrée d'audit avec le nombre de lignes.
     When the admin exports the appointments with "clinician=A"
     Then the audit entry "booking.appointments_exported" has the admin as actor and counts 25

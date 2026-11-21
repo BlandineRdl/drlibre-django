@@ -1,6 +1,7 @@
 """Steps of an admin reading appointments, the export, the journal and running reminders."""
 
 import dataclasses
+import html
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -9,6 +10,7 @@ from urllib.parse import parse_qs
 
 import pytest
 from django.conf import settings
+from django.test import Client
 from pytest_bdd import given, parsers, then, when
 
 from drlibre.audit.application.ports.inbound import AuditFilter, AuditQueries, AuditRow
@@ -20,6 +22,8 @@ from drlibre.booking.application.ports.inbound import (
 )
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.identity.domain.user import Role
+from drlibre.interfaces.web.presenters.console_appointments import csv_cell
+from drlibre.interfaces.web.presenters.console_settings import REMINDERS_URL
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
@@ -27,7 +31,14 @@ from tests.builders_booking import existing_appointment
 from tests.fakes.booking import AdminClinician
 from tests.fakes.world import FakeWorld
 from tests.use_cases.booking.steps_waitlist import actor, add_user
-from tests.use_cases.booking.support import VISIT_REASON, Scene, at, csv
+from tests.use_cases.booking.support import (
+    VISIT_REASON,
+    Scene,
+    at,
+    csv,
+    open_session,
+    page_text,
+)
 
 EXPORT_COLUMNS = (
     "id, start, end, status, source, patient_id, clinician_id, department_id,"
@@ -409,3 +420,46 @@ def user_runs_reminders(world: FakeWorld, scene: Scene) -> None:
 @then(parsers.parse("the admin is told {count:d} reminders were sent"))
 def told_reminders(reads: AdminReads, count: int) -> None:
     assert reads.reminded == count
+
+
+@when("the admin opens the settings page")
+def admin_opens_settings(world: FakeWorld, scene: Scene, web: Client) -> None:
+    open_session(world, web, actor(scene))
+    scene.page = web.get("/console/settings/")
+
+
+@then("the settings page shows, with nothing to edit")
+def settings_read_only(scene: Scene, datatable: list[list[str]]) -> None:
+    assert scene.page.status_code == 200, scene.page.content
+    body = html.unescape(page_text(scene))
+    for label, value in datatable[1:]:
+        assert f"<dt>{label}</dt><dd>{value}</dd>" in body
+    # The page's only form runs the reminders; no field edits a rule.
+    content = body[body.index("<h1>Réglages</h1>") : body.index("</main>")]
+    assert content.count("<form") == 1
+    assert f'action="{REMINDERS_URL}"' in content
+    assert "<select" not in content
+    assert "<textarea" not in content
+    assert content.count("<input") == content.count('name="csrfmiddlewaretoken"')
+
+
+@when(parsers.re(r"(the admin|that user) posts to the reminder job"))
+def posts_reminder_job(world: FakeWorld, scene: Scene, web: Client) -> None:
+    open_session(world, web, actor(scene))
+    scene.page = web.post("/api/v1/jobs/reminders", "{}", content_type="application/json")
+
+
+@then(parsers.parse("the API answers 200 with {count:d} reminders sent"))
+def api_reminders_sent(scene: Scene, count: int) -> None:
+    assert scene.page.status_code == 200, scene.page.content
+    assert scene.page.json() == {"count": count}
+
+
+@when(parsers.parse('a cell "{value}" is exported'))
+def cell_exported(scene: Scene, value: str) -> None:
+    scene.view = csv_cell(value)
+
+
+@then(parsers.parse('the exported cell reads "{cell}"'))
+def exported_cell(scene: Scene, cell: str) -> None:
+    assert scene.view == cell

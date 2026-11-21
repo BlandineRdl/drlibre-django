@@ -371,11 +371,13 @@ PAST_STATUSES = ("COMPLETED", "CANCELLED", "COMPLETED", "NO_SHOW", "COMPLETED")
 PAST_SOURCES = ("ONLINE", "ROUND_ROBIN", "STAFF")
 # Local hour of each demo clinician's past appointment, so no patient is booked twice at once.
 PAST_HOURS = ((CLINICIAN_EMAIL, "HNORD-C101", 11), (SECOND_CLINICIAN_EMAIL, "HNORD-C102", 16))
+# Local hour of the demo clinician's appointment checked in this morning.
+CHECKED_IN_HOUR = 8
 _PAST_NAMESPACE = uuid.UUID("6f1c2a4e-7b1d-4c55-9a8e-2d3f5b6c7a80")
 
 
 def seed_past_appointments(app: Container) -> None:
-    """Past week appointments in every closed status and source, inserted once by start."""
+    """Past week appointments in every closed status and source, one checked in today; once."""
     kind = AppointmentTypeRecord.objects.filter(code="HNORD-CONSULT").first()
     found = (_user_id(app, e) for e in ("patient@drlibre.localhost", VISITOR_EMAIL))
     patients = [p for p in found if p is not None]
@@ -414,6 +416,24 @@ def seed_past_appointments(app: Container) -> None:
                 )
             )
             touched.add(profile.id)
+    clinician = _user_id(app, CLINICIAN_EMAIL)
+    profile = app.reference_queries.clinician_profile_of(clinician) if clinician else None
+    if profile is not None:
+        start = datetime.combine(today, time(CHECKED_IN_HOUR), tzinfo=DEMO_ZONE)
+        rows.append(
+            AppointmentRecord(
+                id=uuid.uuid5(_PAST_NAMESPACE, f"{CLINICIAN_EMAIL}/{start.isoformat()}"),
+                patient_id=patients[0].value,
+                clinician_id=profile.id.value,
+                appointment_type=kind,
+                room=RoomRecord.objects.filter(code=PAST_HOURS[0][1]).first(),
+                start=start,
+                end=start + timedelta(minutes=kind.duration_minutes),
+                status="CHECKED_IN",
+                source="STAFF",
+            )
+        )
+        touched.add(profile.id)
     # Demo data like the load seed, so unaudited; a clash with an existing row keeps that row.
     AppointmentRecord.objects.bulk_create(rows, ignore_conflicts=True)
     if touched:

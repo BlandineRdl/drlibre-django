@@ -13,6 +13,14 @@ Feature: L'admin consulte la politique de réservation et lance les rappels
     And the patient has a "BOOKED" appointment with "A" at "2026-11-21 10:00" in room "R1"
     And the patient has a "BOOKED" appointment with "A" at "2026-11-21 10:30" in room "R1"
 
+  Scenario: La page de réglages montre en lecture seule le délai minimal de 120 minutes, la fenêtre d'annulation de 24 heures et la limite de 3 réservations en ligne ouvertes.
+    When the admin opens the settings page
+    Then the settings page shows, with nothing to edit
+      | label                                     | value   |
+      | Délai minimal de réservation              | 120 min |
+      | Délai d'annulation ou de déplacement      | 24 h    |
+      | Réservations en ligne à venir par patient | 3       |
+
   Scenario: Un bouton lance le job de rappel : un rappel pour chaque RDV `BOOKED` qui commence dans les 24 heures et n'en a pas encore.
     When the admin runs the reminder job
     Then the admin is told 2 reminders were sent
@@ -28,10 +36,15 @@ Feature: L'admin consulte la politique de réservation et lance les rappels
     When the admin runs the reminder job twice
     Then the audit entry "booking.reminders_sent" has no actor and counts 2
 
-  Scenario Outline: Règle §10 : seul l'admin lance les rappels à la demande (<case>)
+  Scenario: `POST /jobs/reminders` lance le même job pour un admin ; tout autre rôle reçoit `forbidden`. (admin)
+    When the admin posts to the reminder job
+    Then the API answers 200 with 2 reminders sent
+    And the patient has "Rappel de RDV" notifications for the appointments at "2026-11-20 12:00, 2026-11-21 10:00"
+
+  Scenario Outline: `POST /jobs/reminders` lance le même job pour un admin ; tout autre rôle reçoit `forbidden`. (<case>)
     Given a signed-in "<role>" user
-    When that user runs the reminder job
-    Then the booking is refused as "forbidden"
+    When that user posts to the reminder job
+    Then the API refuses with 403 "forbidden"
     And no one was notified
 
     Examples:

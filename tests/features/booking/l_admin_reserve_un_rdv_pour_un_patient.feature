@@ -12,16 +12,36 @@ Feature: L'admin réserve un RDV pour un patient
     And a signed-in admin
     And "A" is free at "2026-11-20 10:30"
 
-  Scenario: L'assistant enchaîne type, praticien et créneau ; il ne propose pas « premier disponible » et inclut les types non réservables en ligne. (praticien nommé)
+  Scenario Outline: L'admin choisit le patient par son nom ou son email, parmi les patients actifs. (<case>)
+    Given these people
+      | name        | email               | role      | active |
+      | Zoé Martin  | zoe@martin.example  | PATIENT   | yes    |
+      | Paul Martin | paul@martin.example | PATIENT   | no     |
+      | Léa Martin  | lea@martin.example  | CLINICIAN | yes    |
+    When the admin looks for the patients matching "<text>"
+    Then the patients found are "Zoé Martin"
+
+    Examples:
+      | case     | text            |
+      | nom      | MARTIN          |
+      | email    | @martin.example |
+
+  Scenario: L'assistant enchaîne type, praticien et créneau ; il ne propose pas « premier disponible » et inclut les types non réservables en ligne. (type non réservable en ligne)
     Given the appointment type is not bookable online
     When the admin books the patient at "2026-11-20 10:30" with "A"
     Then the appointment is with "A"
+    And the appointment is of that type from "2026-11-20 10:30" for 30 minutes
     And the appointment belongs to the signed-in patient
 
-  Scenario: L'assistant enchaîne type, praticien et créneau ; il ne propose pas « premier disponible » et inclut les types non réservables en ligne. (sans praticien)
-    When the admin books the patient at "2026-11-20 10:30" without naming a clinician
-    Then the booking is refused as "invalid_input"
-    And the refusal names the field "clinician"
+  Scenario: La même réservation est disponible par `POST /appointments`, qui exige un praticien pour l'admin (§14). (praticien nommé)
+    When the admin posts the booking of the patient at "2026-11-20T10:30:00Z" with "A"
+    Then the API answers 201 with an appointment with "A"
+    And the appointment is "BOOKED" for "STAFF"
+
+  Scenario: La même réservation est disponible par `POST /appointments`, qui exige un praticien pour l'admin (§14). (sans praticien)
+    When the admin posts the booking of the patient at "2026-11-20T10:30:00Z" without a clinician
+    Then the API refuses with 400 "invalid_input"
+    And the API refusal names the field "clinician"
     And nothing was written
 
   Scenario: Règle §5.2 : le patient réservé par l'admin doit être actif
@@ -42,6 +62,12 @@ Feature: L'admin réserve un RDV pour un patient
   Scenario: L'admin peut choisir une salle active ; sinon un type qui exige une salle reçoit la salle par défaut du praticien si libre, puis la première salle libre du département, sinon `no_room_available`. (salle inactive ou d'un autre département)
     Given an inactive room "R3" in that department
     When the admin books the patient at "2026-11-20 10:30" with "A" in room "R3"
+    Then the booking is refused as "not_found"
+    And nothing was written
+
+  Scenario: Règle §5.2 : une salle nommée est vérifiée avant les conflits et les règles de réservation
+    Given an inactive room "R3" in that department
+    When the admin books the patient at "2026-11-20 13:00" with "A" in room "R3"
     Then the booking is refused as "not_found"
     And nothing was written
 

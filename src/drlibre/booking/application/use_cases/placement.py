@@ -128,8 +128,10 @@ class Placement:
             kind = self.bookable_type(appointment_type_id)
             clinician = self.clinician_of(kind, clinician_id)
             duration = timedelta(minutes=kind.duration_minutes)
+            end = start + duration
+            named = None if room_id is None else self.named_room(kind, room_id)
             self.refuse_conflicts(
-                patient_id, clinician_id, start, start + duration, ignoring_hold=ignoring_hold
+                patient_id, clinician_id, start, end, ignoring_hold=ignoring_hold, room_id=named
             )
             self.refuse_rule_violations(
                 patient_id,
@@ -139,16 +141,11 @@ class Placement:
                 ignoring_hold=ignoring_hold,
                 for_patient=for_patient,
             )
-            end = start + duration
             appointment = Appointment.book(
                 patient_id=patient_id,
                 clinician_id=clinician_id,
                 appointment_type_id=kind.id,
-                room_id=(
-                    self.room(kind, clinician, start, end)
-                    if room_id is None
-                    else self.named_room(kind, room_id, start, end)
-                ),
+                room_id=named or self.room(kind, clinician, start, end),
                 start=start,
                 duration=duration,
                 source=source,
@@ -172,8 +169,9 @@ class Placement:
         *,
         ignoring_hold: Id | None,
         excluding: Id | None = None,
+        room_id: Id | None = None,
     ) -> None:
-        """conflict when another active appointment than the excluded, or an open hold, is there."""
+        """conflict on an active appointment but the excluded, an open hold or a busy named room."""
         if patient_id is None:
             resources = (
                 ("clinician",)
@@ -193,6 +191,8 @@ class Placement:
         )
         if held and "clinician" not in resources:
             resources = ("clinician", *resources)
+        if room_id is not None and self._appointments.busy_rooms((room_id,), start, end):
+            resources = (*resources, "room")
         if resources:
             raise DomainError(
                 ErrorCode.CONFLICT,
@@ -255,19 +255,13 @@ class Placement:
                 return room_id
         raise DomainError(ErrorCode.NO_ROOM_AVAILABLE, "Aucune salle libre à cette heure.")
 
-    def named_room(self, kind: BookableType, room_id: Id, start: datetime, end: datetime) -> Id:
-        """The named active room of the type's department; not_found, else conflict when taken."""
+    def named_room(self, kind: BookableType, room_id: Id) -> Id:
+        """The named active room of the type's department, its rooms locked; else not_found."""
         if not kind.needs_room:
             raise invalid_field("room", "Ce type de rendez-vous ne prend pas de salle.")
         self._locks.lock_rooms(kind.department_id)
         if room_id not in self._directory.rooms(kind.department_id):
             raise DomainError(ErrorCode.NOT_FOUND, "Salle introuvable.")
-        if self._appointments.busy_rooms((room_id,), start, end):
-            raise DomainError(
-                ErrorCode.CONFLICT,
-                "Un rendez-vous actif occupe déjà cette salle.",
-                {"resources": ["room"]},
-            )
         return room_id
 
     def _booked_entry(self, appointment: Appointment, actor_id: Id) -> AuditEntry:

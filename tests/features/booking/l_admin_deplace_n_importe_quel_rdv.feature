@@ -73,6 +73,11 @@ Feature: L'admin déplace n'importe quel RDV
     Then the patient has one "RDV déplacé" notification about the appointment
     And one email "Votre rendez-vous est déplacé" names the time, hospital and provider, without the reason, linking only to the sign-in page
 
+  Scenario: Le déplacement est aussi disponible par `POST /appointments/{id}/reschedule` (§14).
+    When the admin posts '{"start": "2026-11-20T10:30:00Z"}' to reschedule it
+    Then the API answers 200 with the appointment "BOOKED"
+    And the appointment is "BOOKED" from "2026-11-20 10:30" for 30 minutes in room "R2"
+
   Scenario: Le déplacement laisse une entrée d'audit sans donnée personnelle.
     When the admin moves it to "2026-11-20 10:30"
     Then the audit entry "booking.appointment_rescheduled" has the admin as actor and holds only "clinician_id, room_id"

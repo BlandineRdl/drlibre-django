@@ -76,6 +76,8 @@ def posts_to_api(
     world: FakeWorld, scene: Scene, web: Client, who: str, body: str, action: str
 ) -> None:
     caller = scene.caller if who in ("caller", "clinician") else None
+    if who == "admin":
+        caller = scene.actor
     if who == "clinician" and caller is not None and caller not in world.users.rows:
         world.users.save(patient_user(caller, email="dr@example.org", role=Role.CLINICIAN))
     open_session(world, web, caller or scene.patient)
