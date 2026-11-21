@@ -13,6 +13,7 @@ from drlibre.booking.application.ports.outbound import (
     ScheduleLocks,
     SlotRefresh,
 )
+from drlibre.booking.application.use_cases.require_patient import refuse_non_patient
 from drlibre.booking.domain import booking_rules
 from drlibre.booking.domain.appointment import Appointment, Source
 from drlibre.booking.domain.round_robin import Candidate, rank
@@ -101,8 +102,7 @@ class Placement:
         with self._uow:
             self._locks.lock_clinician(clinician_id)
             self._locks.lock_patient(patient_id)
-            if not self._patients.is_active(patient_id):
-                raise DomainError(ErrorCode.FORBIDDEN, "Réservé aux patients actifs.")
+            refuse_non_patient(self._patients, patient_id)
             kind = self.bookable_type(appointment_type_id)
             clinician = self.clinician_of(kind, clinician_id)
             duration = timedelta(minutes=kind.duration_minutes)

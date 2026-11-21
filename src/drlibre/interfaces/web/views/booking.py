@@ -7,7 +7,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from drlibre.booking.application.ports.inbound import Appointment, HoldSummary
 from drlibre.bootstrap.container import container
-from drlibre.identity.application.ports.inbound import Identity, Role
+from drlibre.identity.application.ports.inbound import Identity
 from drlibre.interfaces.web.auth import identity_of, set_session_cookie, to_sign_in
 from drlibre.interfaces.web.presenters.booking import (
     SlotContext,
@@ -28,7 +28,6 @@ from drlibre.shared_kernel.ids import Id
 REFRESH_DAYS = 14
 RESENT = "Un nouveau code vient d'être envoyé."
 GONE = "Cette réservation provisoire a expiré. Choisissez un nouveau créneau."
-STAFF_REFUSED = "Les comptes du personnel ne peuvent pas réserver ici."
 _INLINE = frozenset(
     {
         ErrorCode.CONFLICT,
@@ -93,13 +92,6 @@ def _context(type_id: Id, clinician_id: Id | None) -> SlotContext:
     )
 
 
-def _patient(request: HttpRequest) -> Identity | None:
-    identity = identity_of(request)
-    if identity is not None and identity.role is not Role.PATIENT:
-        raise DomainError(ErrorCode.FORBIDDEN, STAFF_REFUSED)
-    return identity
-
-
 def _refused(
     request: HttpRequest,
     message: str,
@@ -138,7 +130,9 @@ def _gone(request: HttpRequest) -> HttpResponse:
 
 @require_http_methods(["GET", "POST"])
 def new(request: HttpRequest) -> HttpResponse:
-    identity = _patient(request)
+    identity = identity_of(request)
+    if identity is not None:
+        container().require_patient.execute(user_id=identity.user_id)
     data = request.GET if request.method == "GET" else request.POST
     slot, start = _parse(data.dict())
     context = _context(slot.type_id, slot.clinician_id)

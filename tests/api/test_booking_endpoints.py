@@ -7,6 +7,8 @@ from django.conf import settings
 from django.test import Client
 
 from drlibre.bootstrap.container import use_container
+from drlibre.identity.domain.user import Role
+from tests.builders import stored_session, stored_user
 from tests.integration.bookable import SLOT_START, Bookable, bookable
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
@@ -136,3 +138,19 @@ def test_booking_as_a_patient_needs_a_session_and_refuses_an_end_time(
     assert with_end.status_code == 400
     assert booked.status_code == 201
     assert booked.json()["start"].startswith("2026-11-23T09:00")
+
+
+@pytest.mark.parametrize("role", [Role.CLINICIAN, Role.ADMIN], ids=["clinician", "admin"])
+def test_a_signed_in_staff_member_cannot_book_through_the_api(
+    client: Client, world: Bookable, role: Role
+) -> None:
+    """Règle §7.1 : le personnel connecté ne réserve pas par l'API (forbidden)."""
+    client.cookies[COOKIE] = stored_session(stored_user(role))
+
+    refused = post(
+        client,
+        "/api/v1/appointments",
+        {"type": str(world.scene.kind), "start": SLOT_START.isoformat()},
+    )
+
+    assert refused.status_code == 403

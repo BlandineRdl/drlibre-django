@@ -11,6 +11,7 @@ from drlibre.booking.application.ports.inbound import (
     CreateHold,
     ExpireHolds,
     OpenHolds,
+    RequirePatient,
     ResendCode,
     VerifyHold,
     ViewAppointment,
@@ -36,6 +37,7 @@ from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
 from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
+from drlibre.booking.application.use_cases.require_patient import RequirePatientUseCase
 from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
@@ -350,6 +352,7 @@ class Container:
     extend_slot_horizon: ExtendSlotHorizon
     find_free_slots: FindFreeSlots
     book_appointment: BookAppointment
+    require_patient: RequirePatient
     create_hold: CreateHold
     verify_hold: VerifyHold
     resend_code: ResendCode
@@ -571,6 +574,7 @@ def wire(a: Adapters) -> Container:
             clock=clock, directory=directory, queries=a.slot_queries, holds=a.slot_holds
         ),
         book_appointment=booking.book_appointment,
+        require_patient=booking.require_patient,
         create_hold=booking.create_hold,
         verify_hold=booking.verify_hold,
         resend_code=booking.resend_code,
@@ -614,6 +618,7 @@ def wire(a: Adapters) -> Container:
 @dataclass(frozen=True, slots=True)
 class _BookingUseCases:
     book_appointment: BookAppointment
+    require_patient: RequirePatient
     create_hold: CreateHold
     verify_hold: VerifyHold
     resend_code: ResendCode
@@ -647,6 +652,7 @@ def _wire_booking(
             placement=placement,
             ledger=booking.ledger,
         ),
+        require_patient=RequirePatientUseCase(patients=booking.patients),
         create_hold=CreateHoldUseCase(
             clock=a.clock,
             uow=a.uow,

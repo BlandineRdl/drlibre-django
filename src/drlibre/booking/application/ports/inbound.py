@@ -19,12 +19,22 @@ __all__ = [
     "HoldCreated",
     "HoldSummary",
     "OpenHolds",
+    "RequirePatient",
     "ResendCode",
     "VerifiedBooking",
     "VerifyHold",
     "ViewAppointment",
     "ViewHold",
 ]
+
+
+class RequirePatient(Protocol):
+    def execute(self, *, user_id: Id) -> None:
+        """Let an active patient through.
+
+        Refused with forbidden for staff, inactive or unknown users.
+        """
+        ...
 
 
 class BookAppointment(Protocol):
@@ -38,8 +48,9 @@ class BookAppointment(Protocol):
     ) -> Appointment:
         """Book for the signed-in patient, the first available clinician when none is named.
 
-        Refused with not_found, conflict, rule_violation, no_room_available or
-        no_clinician_available, writing nothing; the end time and the room are never accepted.
+        Refused with not_found, conflict, rule_violation, no_room_available,
+        no_clinician_available or forbidden (not an active patient), writing nothing;
+        the end time and the room are never accepted.
         """
         ...
 

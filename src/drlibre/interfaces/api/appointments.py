@@ -5,7 +5,6 @@ from ninja import Router, Schema, Status
 from pydantic import AwareDatetime, ConfigDict
 
 from drlibre.bootstrap.container import container
-from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.api.booking import AppointmentOut
 from drlibre.interfaces.web.auth import identity_of
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -27,8 +26,6 @@ def book(request: HttpRequest, payload: BookingIn) -> Status[AppointmentOut]:
     identity = identity_of(request)
     if identity is None:
         raise DomainError(ErrorCode.UNAUTHENTICATED, "Connectez-vous pour continuer.")
-    if identity.role is not Role.PATIENT:
-        raise DomainError(ErrorCode.FORBIDDEN, "Seuls les patients réservent ici.")
     appointment = container().book_appointment.execute(
         patient_id=identity.user_id,
         appointment_type_id=Id(payload.type),
