@@ -1,8 +1,17 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
+from enum import StrEnum
 from typing import Protocol
 
-from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
+from drlibre.booking.application.ports.outbound import (
+    AgendaEntry,
+    AgendaFilter,
+    ClinicianEntry,
+    ClinicianFilter,
+    ClinicianPatient,
+    RoomBooking,
+    RoomLabel,
+)
 from drlibre.booking.domain.appointment import (
     MAX_CANCELLATION_REASON,
     MAX_CLINICAL_NOTES,
@@ -13,13 +22,16 @@ from drlibre.booking.domain.booking_rules import BookingRule, ClinicianAction, P
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import Page, PageRequest
 
 __all__ = [
     "MAX_CANCELLATION_REASON",
     "MAX_CLINICAL_NOTES",
     "AgendaEntry",
     "AgendaFilter",
+    "AgendaHour",
     "Appointment",
+    "AppointmentFile",
     "AppointmentQueries",
     "AppointmentStatus",
     "BookAppointment",
@@ -29,12 +41,26 @@ __all__ = [
     "CancelAppointment",
     "CheckInAppointment",
     "ClinicianAction",
+    "ClinicianAppointment",
+    "ClinicianDay",
+    "ClinicianDayView",
+    "ClinicianEntry",
+    "ClinicianFilter",
+    "ClinicianPatient",
+    "ClinicianPatients",
+    "ClinicianWeek",
+    "ClinicianWeekView",
     "CompleteAppointment",
     "CreateHold",
+    "DayCounts",
+    "DepartmentRoomsDay",
     "ExpireHolds",
     "HeldPeriod",
+    "HistoryActor",
+    "HistoryLine",
     "HoldCreated",
     "HoldSummary",
+    "ListClinicianAppointments",
     "ListPatientAppointments",
     "MarkNoShow",
     "OpenHolds",
@@ -43,6 +69,9 @@ __all__ = [
     "RequirePatient",
     "RescheduleAppointment",
     "ResendCode",
+    "RoomBooking",
+    "RoomLabel",
+    "RoomsDayView",
     "SendReminders",
     "VerifiedBooking",
     "VerifyHold",
@@ -272,4 +301,107 @@ class PatientAppointments:
 class ListPatientAppointments(Protocol):
     def execute(self, *, patient_id: Id, agenda_filter: AgendaFilter) -> PatientAppointments:
         """The patient's own appointments with their allowed actions; forbidden for staff."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class DayCounts:
+    """Cancelled appointments are counted apart, never among the appointments."""
+
+    appointments: int
+    cancelled: int
+    completed: int
+    no_show: int
+
+
+@dataclass(frozen=True, slots=True)
+class AgendaHour:
+    """The appointments starting within one hour of the hospital's day."""
+
+    hour: int
+    entries: tuple[ClinicianEntry, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianDayView:
+    day: date
+    time_zone: str
+    hours: tuple[AgendaHour, ...]
+    counts: DayCounts
+    next_free_slot: datetime | None
+
+
+class ClinicianDay(Protocol):
+    def execute(self, *, actor_id: Id, day: date | None) -> ClinicianDayView:
+        """The clinician's own day in the hospital zone, today when none; forbidden without one."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianWeekView:
+    monday: date
+    time_zone: str
+    entries: tuple[ClinicianEntry, ...]
+
+
+class ClinicianWeek(Protocol):
+    def execute(self, *, actor_id: Id, week: date | None) -> ClinicianWeekView:
+        """The clinician's active appointments of the week holding the date, this week if none."""
+        ...
+
+
+class HistoryActor(StrEnum):
+    PATIENT = "PATIENT"
+    CLINICIAN = "CLINICIAN"
+    STAFF = "STAFF"
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryLine:
+    action: str
+    actor: HistoryActor
+    at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentFile:
+    """One appointment as its clinician sees it, notes, allowed actions and history included."""
+
+    entry: ClinicianEntry
+    time_zone: str
+    patient_age: int | None
+    history: tuple[HistoryLine, ...]
+
+
+class ClinicianAppointment(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> AppointmentFile:
+        """The clinician's own appointment; not_found when absent, forbidden for another's."""
+        ...
+
+
+class ClinicianPatients(Protocol):
+    def execute(self, *, actor_id: Id, request: PageRequest) -> Page[ClinicianPatient]:
+        """The clinician's own patients, searched by name, 20 per page."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class RoomsDayView:
+    day: date
+    time_zone: str
+    rooms: tuple[RoomLabel, ...]
+    bookings: tuple[RoomBooking, ...]
+
+
+class DepartmentRoomsDay(Protocol):
+    def execute(self, *, actor_id: Id, day: date | None) -> RoomsDayView:
+        """The day's occupancy of the clinician's department rooms, today when none."""
+        ...
+
+
+class ListClinicianAppointments(Protocol):
+    def execute(
+        self, *, actor_id: Id, agenda_filter: ClinicianFilter
+    ) -> tuple[ClinicianEntry, ...]:
+        """The clinician's own appointments matching the filter, by start, never their notes."""
         ...

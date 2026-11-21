@@ -30,8 +30,9 @@ ORDER BY a.start
 """
 
 
-def _entry(row: dict[str, Any]) -> AgendaEntry:
-    appointment = Appointment(
+def appointment_of(row: dict[str, Any]) -> Appointment:
+    """The appointment of a row selecting the appointment columns, notes when selected."""
+    return Appointment(
         id=Id(row["id"]),
         patient_id=Id(row["patient_id"]),
         clinician_id=Id(row["clinician_id"]),
@@ -44,9 +45,13 @@ def _entry(row: dict[str, Any]) -> AgendaEntry:
         reason=row["reason"],
         cancelled_at=row["cancelled_at"],
         cancellation_reason=row["cancellation_reason"],
+        clinical_notes=row.get("clinical_notes"),
     )
+
+
+def _entry(row: dict[str, Any]) -> AgendaEntry:
     return AgendaEntry(
-        appointment=appointment,
+        appointment=appointment_of(row),
         clinician_name=row["clinician_name"],
         clinician_title=row["clinician_title"],
         specialty=row["specialty"],

@@ -50,6 +50,9 @@ class Scene:
         self.mine: Appointment | None = None
         self.caller: Id | None = None
         self.page: Any = None
+        # Patients by name and the last read view of the clinician scenarios.
+        self.named: dict[str, Id] = {}
+        self.view: Any = None
 
 
 def at(raw: str) -> datetime:

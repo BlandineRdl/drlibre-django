@@ -11,9 +11,15 @@ from drlibre.booking.application.ports.inbound import (
     BookForPatient,
     CancelAppointment,
     CheckInAppointment,
+    ClinicianAppointment,
+    ClinicianDay,
+    ClinicianPatients,
+    ClinicianWeek,
     CompleteAppointment,
     CreateHold,
+    DepartmentRoomsDay,
     ExpireHolds,
+    ListClinicianAppointments,
     ListPatientAppointments,
     MarkNoShow,
     OpenHolds,
@@ -27,11 +33,10 @@ from drlibre.booking.application.ports.inbound import (
     WriteClinicalNotes,
 )
 from drlibre.booking.application.ports.outbound import (
-    Appointments as BookingAppointments,
-)
-from drlibre.booking.application.ports.outbound import (
+    AppointmentHistory,
     BookingDirectory,
     BookingNotices,
+    ClinicianAgenda,
     CodeIssuer,
     FreeSlots,
     Holds,
@@ -41,11 +46,22 @@ from drlibre.booking.application.ports.outbound import (
     ScheduleLocks,
     VerificationCodes,
 )
+from drlibre.booking.application.ports.outbound import (
+    Appointments as BookingAppointments,
+)
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
 from drlibre.booking.application.use_cases.book_for_patient import BookForPatientUseCase
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.check_in_appointment import CheckInAppointmentUseCase
+from drlibre.booking.application.use_cases.clinician_reads import (
+    ClinicianAppointmentUseCase,
+    ClinicianDayUseCase,
+    ClinicianPatientsUseCase,
+    ClinicianWeekUseCase,
+    DepartmentRoomsDayUseCase,
+    ListClinicianAppointmentsUseCase,
+)
 from drlibre.booking.application.use_cases.complete_appointment import (
     CompleteAppointmentUseCase,
 )
@@ -68,7 +84,9 @@ from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
 from drlibre.booking.application.use_cases.write_clinical_notes import WriteClinicalNotesUseCase
+from drlibre.booking.infrastructure.audit_history import AuditAppointmentHistory
 from drlibre.booking.infrastructure.booking_slot_refresh import BookingSlotRefresh
+from drlibre.booking.infrastructure.clinician_agenda import SqlClinicianAgenda
 from drlibre.booking.infrastructure.code_issuer import HmacCodeIssuer
 from drlibre.booking.infrastructure.directory import OrganisationBookingDirectory
 from drlibre.booking.infrastructure.free_slots import SchedulingFreeSlots
@@ -325,6 +343,8 @@ class BookingAdapters:
     issuer: CodeIssuer
     limiter: RateLimiter
     agenda: PatientAgenda
+    clinician_agenda: ClinicianAgenda
+    history: AppointmentHistory
     network_hourly_limit: int = 20
 
 
@@ -432,6 +452,12 @@ class Container:
     mark_no_show: MarkNoShow
     write_clinical_notes: WriteClinicalNotes
     book_for_patient: BookForPatient
+    clinician_day: ClinicianDay
+    clinician_week: ClinicianWeek
+    clinician_appointment: ClinicianAppointment
+    clinician_patients: ClinicianPatients
+    department_rooms_day: DepartmentRoomsDay
+    list_clinician_appointments: ListClinicianAppointments
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -683,6 +709,12 @@ def wire(a: Adapters) -> Container:
         mark_no_show=booking.mark_no_show,
         write_clinical_notes=booking.write_clinical_notes,
         book_for_patient=booking.book_for_patient,
+        clinician_day=booking.clinician_day,
+        clinician_week=booking.clinician_week,
+        clinician_appointment=booking.clinician_appointment,
+        clinician_patients=booking.clinician_patients,
+        department_rooms_day=booking.department_rooms_day,
+        list_clinician_appointments=booking.list_clinician_appointments,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -741,6 +773,12 @@ class _BookingUseCases:
     mark_no_show: MarkNoShow
     write_clinical_notes: WriteClinicalNotes
     book_for_patient: BookForPatient
+    clinician_day: ClinicianDay
+    clinician_week: ClinicianWeek
+    clinician_appointment: ClinicianAppointment
+    clinician_patients: ClinicianPatients
+    department_rooms_day: DepartmentRoomsDay
+    list_clinician_appointments: ListClinicianAppointments
 
 
 def _wire_booking(
@@ -865,6 +903,28 @@ def _wire_booking(
         book_for_patient=BookForPatientUseCase(
             uow=a.uow, directory=booking.directory, placement=placement
         ),
+        clinician_day=ClinicianDayUseCase(
+            clock=a.clock, directory=booking.directory, agenda=booking.clinician_agenda
+        ),
+        clinician_week=ClinicianWeekUseCase(
+            clock=a.clock, directory=booking.directory, agenda=booking.clinician_agenda
+        ),
+        clinician_appointment=ClinicianAppointmentUseCase(
+            clock=a.clock,
+            directory=booking.directory,
+            appointments=booking.appointments,
+            agenda=booking.clinician_agenda,
+            history=booking.history,
+        ),
+        clinician_patients=ClinicianPatientsUseCase(
+            clock=a.clock, directory=booking.directory, agenda=booking.clinician_agenda
+        ),
+        department_rooms_day=DepartmentRoomsDayUseCase(
+            clock=a.clock, directory=booking.directory, agenda=booking.clinician_agenda
+        ),
+        list_clinician_appointments=ListClinicianAppointmentsUseCase(
+            directory=booking.directory, agenda=booking.clinician_agenda
+        ),
     )
 
 
@@ -974,6 +1034,8 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             issuer=HmacCodeIssuer(key=settings.SECRET_KEY),
             limiter=RedisRateLimiter(prefix=settings.RATE_LIMIT_PREFIX),
             agenda=SqlPatientAgenda(),
+            clinician_agenda=SqlClinicianAgenda(),
+            history=AuditAppointmentHistory(DjangoAuditQueries()),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),

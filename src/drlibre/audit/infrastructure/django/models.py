@@ -18,6 +18,11 @@ class AuditEntryRecord(models.Model):
     at = models.DateTimeField(db_index=True)
     correlation_id = models.CharField(max_length=128, blank=True)
 
+    class Meta:
+        indexes = (
+            models.Index(fields=("entity_type", "entity_id", "at"), name="audit_entry_target_at"),
+        )
+
     def __str__(self) -> str:
         return f"{self.action} {self.entity_type} {self.entity_id}"
 
