@@ -6,3 +6,4 @@
 - Build derived values through a named `@classmethod` constructor, such as `HealthReport.from_probes`, with keyword-only arguments.
 - Identify entities with `shared_kernel.ids.Id`, parsed with `Id.parse`; never pass raw UUID strings across layers.
 - Get the current time only from the `Clock` port, time zone aware; never call `datetime.now()` outside `SystemClock`.
+- Take "today" in the application time zone injected through the container (`at.astimezone(zone).date()`), never `at.date()` in UTC.

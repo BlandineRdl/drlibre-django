@@ -8,3 +8,4 @@
 - Never repeat a policy number as a literal, in code or in text.
 - Format display text from the policy constants, such as the lead time in hours.
 - Pass a window computed by a use case to the template; never recompute it in a view.
+- Offer an action only when every rule its use case applies would accept it now; derive it in the domain, never in a template.

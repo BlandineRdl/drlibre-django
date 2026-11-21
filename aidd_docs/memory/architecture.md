@@ -36,6 +36,7 @@
 
 ## Gotchas
 - Django Ninja checks CSRF only inside cookie auth, so anonymous POSTs need an explicit check.
+- A window clipped by a policy (now + lead time, horizon) can end empty or inverted: return no slots when its start reaches its end, and test that edge (late Sunday week).
 - The slot table is updated in the same transaction as each booking.
 - `scheduling_slot` holds free slots per clinician and type, today to today + 90 days; `RefreshSlots` rebuilds a clinician's rows inside the unit of work of each rule or time-off write, and of each appointment type save or clinician profile attach, edit, delete through organisation's `SlotRefresh` port.
 - A clinician's overlap and duplicate checks are serialised by `select_for_update` on their profile, inside the unit of work of the write.
