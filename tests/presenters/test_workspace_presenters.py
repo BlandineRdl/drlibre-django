@@ -8,10 +8,14 @@ from drlibre.booking.application.ports.inbound import (
     AppointmentStatus,
     ClinicianDayView,
     ClinicianEntry,
+    ClinicianPatient,
     ClinicianWeekView,
     DayCounts,
     HistoryActor,
     HistoryLine,
+    RoomBooking,
+    RoomLabel,
+    RoomsDayView,
 )
 from drlibre.booking.domain.booking_rules import clinician_actions
 from drlibre.interfaces.web.presenters.workspace import (
@@ -19,12 +23,15 @@ from drlibre.interfaces.web.presenters.workspace import (
     calendar_page,
     cancel_page,
     day_param,
+    patients_page,
+    rooms_page,
     today_page,
     workspace_nav,
 )
 from drlibre.scheduling.application.ports.inbound import FreeWeek, Slot
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import Page
 from tests.builders_booking import existing_appointment
 from tests.builders_scheduling import time_off
 
@@ -302,3 +309,76 @@ def test_the_navigation_marks_the_current_workspace_page() -> None:
     ]
     assert [link.label for link in links if link.current] == ["Aujourd'hui"]
     assert [link.label for link in calendar if link.current] == ["Calendrier"]
+
+
+def patient(name: str, *, last: datetime | None, next_visit: datetime | None) -> ClinicianPatient:
+    return ClinicianPatient(Id(), name, None, last, next_visit)
+
+
+def test_each_patient_shows_phone_last_and_next_visit_in_the_hospital_zone() -> None:
+    """Story patients : chaque patient montre son téléphone, sa dernière et prochaine visite."""
+    seen = ClinicianPatient(Id(), "Ana Martin", "0612345678", NINE - timedelta(days=7), NINE)
+    new = patient("Léo Roy", last=None, next_visit=None)
+
+    view = patients_page(Page((seen, new), total=2, number=1), search="", time_zone=ZONE)
+
+    assert [(r.name, r.phone, r.last_visit, r.next_visit) for r in view.rows] == [
+        ("Ana Martin", "0612345678", "16/11/2026 09:00", "23/11/2026 09:00"),
+        ("Léo Roy", "—", "—", "—"),
+    ]
+    assert (view.empty_text, view.previous_url, view.next_url) == ("", "", "")
+
+
+def test_a_name_search_keeps_its_query_across_pages() -> None:
+    """Story patients : une recherche par nom filtre la liste, paginée par 20."""
+    rows = tuple(patient(f"Martin {n}", last=None, next_visit=None) for n in range(20))
+
+    view = patients_page(Page(rows, total=25, number=1), search="mar", time_zone=ZONE)
+
+    assert view.search == "mar"
+    assert view.summary == "Page 1 sur 2"
+    assert view.next_url == "/workspace/patients?q=mar&page=2"
+
+
+def test_a_search_without_match_offers_a_reset_link() -> None:
+    """Story patients : sans résultat, un état vide avec un lien pour tout afficher."""
+    empty = patients_page(Page((), total=0, number=1), search="zz", time_zone=ZONE)
+    none = patients_page(Page((), total=0, number=1), search="", time_zone=ZONE)
+
+    assert (empty.empty_text, empty.reset_url) == (
+        "Aucun patient ne correspond à « zz ».",
+        "/workspace/patients",
+    )
+    assert (none.empty_text, none.reset_url) == ("Aucun patient pour l'instant.", "")
+
+
+def test_the_rooms_timeline_names_own_patients_and_marks_others_occupied() -> None:
+    """Story salles : 07:00 à 19:00 ; ses RDV nommés, ceux des autres « Occupied »."""
+    room, other = RoomLabel(Id(), "C101"), RoomLabel(Id(), "C102")
+    bookings = (
+        RoomBooking(room.id, NINE, NINE + timedelta(minutes=30), "Ana Martin"),
+        RoomBooking(room.id, NINE + timedelta(hours=1), NINE + timedelta(hours=2), None),
+    )
+
+    view = rooms_page(RoomsDayView(MONDAY, ZONE, (room, other), bookings))
+
+    cells = dict(zip(view.times, view.rows[0].cells, strict=True))
+    assert (len(view.times), view.times[0], view.times[-1]) == (24, "07:00", "18:30")
+    assert [r.name for r in view.rows] == ["C101", "C102"]
+    assert (cells["09:00"].text, cells["09:00"].english) == ("Ana Martin", False)
+    assert cells["09:30"].text == ""
+    assert [(cells[t].text, cells[t].english) for t in ("10:00", "10:30")] == [
+        ("Occupied", True),
+        ("Occupied", True),
+    ]
+    assert all(c.text == "" for c in view.rows[1].cells)
+    assert view.heading == "Salles du Lundi 23/11/2026"
+    assert view.time_zone == ZONE
+    assert view.nav.next_url == "/workspace/rooms?day=2026-11-24"
+
+
+def test_a_department_without_active_room_says_so() -> None:
+    """Story salles : la frise liste les salles actives du département, ici aucune."""
+    view = rooms_page(RoomsDayView(MONDAY, ZONE, (), ()))
+
+    assert (view.rows, view.empty_text) == ((), "Aucune salle active dans votre département.")

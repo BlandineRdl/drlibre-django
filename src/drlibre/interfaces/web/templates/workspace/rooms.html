@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ view.heading }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+<h1>{{ view.heading }}</h1>
+<p>Fuseau : {{ view.time_zone }}</p>
+{% include "workspace/_day_nav.html" with nav=view.nav %}
+{% if view.rows %}
+<div class="overflow-auto rooms-timeline" role="region" aria-labelledby="rooms-caption" tabindex="0">
+  <table>
+    <caption id="rooms-caption">Occupation des salles actives du département, heure locale ({{ view.time_zone }}) : vos patients nommés, les autres rendez-vous « <span lang="en">Occupied</span> »</caption>
+    <thead><tr><th scope="col">Salle</th>{% for time in view.times %}<th scope="col">{{ time }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in view.rows %}
+      <tr><th scope="row">{{ row.name }}</th>{% for cell in row.cells %}<td{% if cell.text %} class="busy"{% endif %}>{% if cell.english %}<span lang="en">{{ cell.text }}</span>{% else %}{{ cell.text }}{% endif %}</td>{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>{{ view.empty_text }}</p>
+{% endif %}
+{% endblock %}

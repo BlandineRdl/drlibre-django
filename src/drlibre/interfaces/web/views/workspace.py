@@ -22,6 +22,8 @@ from drlibre.interfaces.web.presenters.workspace import (
     calendar_page,
     cancel_page,
     day_param,
+    patients_page,
+    rooms_page,
     today_page,
 )
 from drlibre.interfaces.web.time_zones import hospital_time_zone
@@ -29,6 +31,7 @@ from drlibre.interfaces.web.views.portal import private
 from drlibre.scheduling.application.ports.inbound import AvailabilityRule, FreeWeek, TimeOff
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import PageRequest
 
 # Refusals the appointment pages show inline instead of an error page.
 _INLINE = frozenset(
@@ -286,3 +289,23 @@ def reschedule(request: HttpRequest, me: Me, appointment_id: Id) -> HttpResponse
             request, me, file, week=week, refusal=error, status=error.code.http_status
         )
     return _done(appointment_url(appointment_id), "moved")
+
+
+@require_GET
+@require_role(Role.CLINICIAN)
+def patients(request: HttpRequest) -> HttpResponse:
+    me = current_me(request)
+    page_request = PageRequest.from_query(page=request.GET.get("page"), search=request.GET.get("q"))
+    page = container().clinician_patients.execute(actor_id=me.user_id, request=page_request)
+    view = patients_page(page, search=page_request.search, time_zone=me.time_zone)
+    return _private_page(request, "workspace/patients.html", me, view)
+
+
+@require_GET
+@require_role(Role.CLINICIAN)
+def rooms(request: HttpRequest) -> HttpResponse:
+    me = current_me(request)
+    day = container().department_rooms_day.execute(
+        actor_id=me.user_id, day=day_param(request.GET.get("day"))
+    )
+    return _private_page(request, "workspace/rooms.html", me, rooms_page(day))

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Mes patients{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+<h1>Mes patients</h1>
+<form method="get" action="/workspace/patients" role="search">
+  <label for="patients-q">Rechercher par nom</label>
+  <div class="actions">
+    <input type="search" id="patients-q" name="q" value="{{ view.search }}" autocomplete="off">
+    <button type="submit">Rechercher</button>
+  </div>
+</form>
+{% if view.rows %}
+<div class="overflow-auto">
+  <table>
+    <caption>Patients ayant un rendez-vous avec vous, heure locale ({{ view.time_zone }})</caption>
+    <thead><tr><th scope="col">Nom</th><th scope="col">Téléphone</th><th scope="col">Dernière visite</th><th scope="col">Prochaine visite</th></tr></thead>
+    <tbody>
+    {% for row in view.rows %}<tr><th scope="row">{{ row.name }}</th><td>{{ row.phone }}</td><td>{{ row.last_visit }}</td><td>{{ row.next_visit }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+<nav aria-label="Pages" class="pagination">
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Page précédente</a>{% endif %}
+  <span>{{ view.summary }}</span>
+  {% if view.next_url %}<a href="{{ view.next_url }}">Page suivante ›</a>{% endif %}
+</nav>
+{% else %}
+<p role="status">{{ view.empty_text }}</p>
+{% if view.reset_url %}<p><a href="{{ view.reset_url }}">Afficher tous mes patients</a></p>{% endif %}
+{% endif %}
+{% endblock %}

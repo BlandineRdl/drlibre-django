@@ -40,3 +40,5 @@ caption { text-align: left; }
 .agenda-row p { margin-bottom: 0.5rem; }
 .facts dt { font-weight: bold; }
 .facts dd { margin: 0 0 0.5rem; }
+.rooms-timeline td { font-size: 0.8rem; white-space: nowrap; }
+.rooms-timeline td.busy { border-left: 0.25rem solid var(--pico-primary); }

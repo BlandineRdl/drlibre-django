@@ -32,6 +32,8 @@ urlpatterns: list[URLPattern | URLResolver] = [
     path("console/", areas.console_home),
     path("workspace/", workspace.today),
     path("workspace/calendar", workspace.calendar),
+    path("workspace/patients", workspace.patients),
+    path("workspace/rooms", workspace.rooms),
     path("workspace/appointments/<uuid:appointment_id>", workspace.appointment),
     path("workspace/appointments/<uuid:appointment_id>/check-in", workspace.check_in),
     path("workspace/appointments/<uuid:appointment_id>/complete", workspace.complete),

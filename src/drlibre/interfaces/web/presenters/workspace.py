@@ -1,6 +1,8 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
+from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 from drlibre.booking.application.ports.inbound import (
     MAX_CLINICAL_NOTES,
@@ -8,10 +10,15 @@ from drlibre.booking.application.ports.inbound import (
     ClinicianAction,
     ClinicianDayView,
     ClinicianEntry,
+    ClinicianPatient,
     ClinicianWeekView,
     HistoryActor,
+    RoomsDayView,
 )
 from drlibre.interfaces.web.presenters.availability import (
+    GRID_ROWS,
+    GRID_START,
+    GRID_STEP,
     WEEK_MARGIN,
     GridAppointment,
     WeekView,
@@ -36,6 +43,7 @@ from drlibre.scheduling.application.ports.inbound import (
 )
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import Page
 
 TODAY_URL = "/workspace/"
 CALENDAR_URL = "/workspace/calendar"
@@ -44,6 +52,7 @@ ROOMS_URL = "/workspace/rooms"
 APPOINTMENTS_URL = "/workspace/appointments"
 NOT_YOURS = "Not your appointment"
 NO_PROFILE = "Votre profil praticien n'est pas encore rattaché ; l'administration s'en charge."
+OCCUPIED = "Occupied"
 NONE = "—"
 _SECTIONS = (
     (TODAY_URL, "Aujourd'hui"),
@@ -392,4 +401,114 @@ def cancel_page(
         time_zone=file.time_zone,
         facts=_facts(file),
         form=form,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class PatientRowView:
+    name: str
+    phone: str
+    last_visit: str
+    next_visit: str
+
+
+@dataclass(frozen=True, slots=True)
+class PatientsPage:
+    time_zone: str
+    search: str
+    rows: tuple[PatientRowView, ...]
+    empty_text: str
+    reset_url: str
+    summary: str
+    previous_url: str
+    next_url: str
+
+
+def _visit(instant: datetime | None, zone: str) -> str:
+    return NONE if instant is None else f"{local(instant, zone):%d/%m/%Y %H:%M}"
+
+
+def _patients_url(search: str, number: int) -> str:
+    query = {"q": search, "page": number} if search else {"page": number}
+    return f"{PATIENTS_URL}?{urlencode(query)}"
+
+
+def patients_page(page: Page[ClinicianPatient], *, search: str, time_zone: str) -> PatientsPage:
+    """The clinician's patients with phone and visits in the hospital zone, 20 per page."""
+    if page.items:
+        empty = ""
+    elif search:
+        empty = f"Aucun patient ne correspond à « {search} »."
+    else:
+        empty = "Aucun patient pour l'instant."
+    return PatientsPage(
+        time_zone=time_zone,
+        search=search,
+        rows=tuple(
+            PatientRowView(
+                name=p.full_name,
+                phone=p.phone or NONE,
+                last_visit=_visit(p.last_visit, time_zone),
+                next_visit=_visit(p.next_visit, time_zone),
+            )
+            for p in page.items
+        ),
+        empty_text=empty,
+        reset_url=PATIENTS_URL if search and not page.items else "",
+        summary=f"Page {page.number} sur {page.pages}",
+        previous_url=_patients_url(search, page.number - 1) if page.has_previous else "",
+        next_url=_patients_url(search, page.number + 1) if page.has_next else "",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class RoomCellView:
+    text: str
+    english: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RoomRowView:
+    name: str
+    cells: tuple[RoomCellView, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RoomsPage:
+    heading: str
+    time_zone: str
+    nav: DayNavView
+    times: tuple[str, ...]
+    rows: tuple[RoomRowView, ...]
+    empty_text: str
+
+
+def rooms_page(view: RoomsDayView) -> RoomsPage:
+    """Active rooms by half hour from 07:00 to 19:00; others' patients never named."""
+    zone = view.time_zone
+    first = datetime.combine(view.day, GRID_START, ZoneInfo(zone))
+    starts = tuple(first + n * GRID_STEP for n in range(GRID_ROWS))
+    rows = []
+    for room in view.rooms:
+        bookings = tuple(b for b in view.bookings if b.room_id == room.id)
+        cells = []
+        for start in starts:
+            booked = next(
+                (b for b in bookings if b.start < start + GRID_STEP and start < b.end),
+                None,
+            )
+            if booked is None:
+                cells.append(RoomCellView("", english=False))
+            elif booked.patient_name is None:
+                cells.append(RoomCellView(OCCUPIED, english=True))
+            else:
+                cells.append(RoomCellView(booked.patient_name, english=False))
+        rows.append(RoomRowView(room.name, tuple(cells)))
+    return RoomsPage(
+        heading=f"Salles du {long_day(view.day)}",
+        time_zone=zone,
+        nav=_day_nav(ROOMS_URL, view.day),
+        times=tuple(f"{s:%H:%M}" for s in starts),
+        rows=tuple(rows),
+        empty_text="" if view.rooms else "Aucune salle active dans votre département.",
     )

@@ -13,6 +13,8 @@ from drlibre.booking.infrastructure.repositories import DjangoAppointments
 from drlibre.bootstrap.container import use_container
 from drlibre.identity.domain.user import Role, User
 from drlibre.identity.infrastructure.repositories import DjangoUsers
+from drlibre.organisation.infrastructure.repositories import DjangoRooms
+from tests import builders_organisation as build
 from tests.builders import stored_session, stored_user
 from tests.integration.bookable import SLOT_START, Bookable, bookable
 
@@ -233,3 +235,49 @@ def test_an_unknown_appointment_is_not_found(workspace: Workspace) -> None:
     response = workspace.client.get("/workspace/appointments/00000000-0000-4000-8000-000000000000")
 
     assert response.status_code == 404
+
+
+def test_the_patients_list_holds_own_patients_found_by_name(workspace: Workspace) -> None:
+    """Story patients : ses patients seuls, avec téléphone et visites ; recherche par nom."""
+    book(workspace.world, "Léo Roy", SLOT_START + timedelta(hours=1))
+    book(workspace.world, "Zoé Autre", SLOT_START + timedelta(hours=2), index=1)
+
+    listing = workspace.client.get("/workspace/patients")
+    found = main(workspace.client.get("/workspace/patients?q=mar"))
+
+    body = main(listing)
+    assert listing["Cache-Control"] == "no-store"
+    assert '<th scope="row">Ana Martin</th>' in body
+    assert '<th scope="row">Léo Roy</th>' in body
+    assert "Zoé Autre" not in body
+    assert "<td>23/11/2026 09:00</td>" in body
+    assert "Ana Martin" in found
+    assert "Léo Roy" not in found
+
+
+def test_a_name_search_without_match_offers_to_show_every_patient(workspace: Workspace) -> None:
+    """Story patients : une recherche sans résultat le dit et propose de tout afficher."""
+    body = main(workspace.client.get("/workspace/patients?q=zz"))
+
+    assert "Aucun patient ne correspond à « zz »." in body
+    assert '<a href="/workspace/patients">Afficher tous mes patients</a>' in body
+
+
+def test_the_rooms_timeline_names_only_own_patients_and_skips_inactive_rooms(
+    workspace: Workspace,
+) -> None:
+    """Story salles : salles actives, ses patients nommés, les autres « Occupied », fuseau."""
+    book(workspace.world, "Zoé Autre", SLOT_START + timedelta(hours=1), index=1)
+    room = build.room(workspace.world.scene.department, name="Salle fermée", active=False)
+    DjangoRooms().save(room)
+
+    response = workspace.client.get(f"/workspace/rooms?day={MONDAY}")
+
+    body = main(response)
+    assert response.status_code == 200
+    assert "Fuseau : Europe/Paris" in body
+    assert '<th scope="row">Salle 1</th>' in body
+    assert "Salle fermée" not in body
+    assert '<td class="busy">Ana Martin</td>' in body
+    assert '<td class="busy"><span lang="en">Occupied</span></td>' in body
+    assert "Zoé Autre" not in page(response)
