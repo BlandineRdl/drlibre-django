@@ -8,7 +8,7 @@ from typing import Any
 from pytest_bdd import given, parsers, then, when
 
 from drlibre.audit.application.ports.outbound import AuditEntry
-from drlibre.booking.application.ports.inbound import ClinicianEntry, ClinicianFilter
+from drlibre.booking.application.ports.inbound import AppointmentsQuery, ClinicianEntry
 from drlibre.booking.domain.appointment import AppointmentStatus, Source
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.visitor_details import VisitorDetails
@@ -182,8 +182,8 @@ def opens_rooms(world: FakeWorld, scene: Scene, day: str) -> None:
 def lists_appointments(world: FakeWorld, scene: Scene) -> None:
     read(
         scene,
-        lambda: world.app.list_clinician_appointments.execute(
-            actor_id=caller(scene), agenda_filter=ClinicianFilter()
+        lambda: world.app.list_appointments_as_caller.execute(
+            actor_id=caller(scene), query=AppointmentsQuery()
         ),
     )
 
@@ -256,7 +256,8 @@ def all_with(scene: Scene, name: str) -> None:
 
 @then("no listed appointment carries its notes")
 def listed_without_notes(scene: Scene) -> None:
-    assert [e.appointment.clinical_notes for e in view(scene)] == [None] * len(view(scene))
+    entries = view(scene).entries
+    assert [e.appointment.clinical_notes for e in entries] == [None] * len(entries)
 
 
 @then(parsers.parse('the week starts on "{day}" in the zone "{zone}"'))

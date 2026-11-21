@@ -34,6 +34,7 @@ __all__ = [
     "AppointmentFile",
     "AppointmentQueries",
     "AppointmentStatus",
+    "AppointmentsQuery",
     "BookAppointment",
     "BookAppointmentAsCaller",
     "BookForPatient",
@@ -43,6 +44,7 @@ __all__ = [
     "CheckInAppointment",
     "ClinicianAction",
     "ClinicianAppointment",
+    "ClinicianAppointments",
     "ClinicianDay",
     "ClinicianDayView",
     "ClinicianEntry",
@@ -61,6 +63,7 @@ __all__ = [
     "HistoryLine",
     "HoldCreated",
     "HoldSummary",
+    "ListAppointmentsAsCaller",
     "ListClinicianAppointments",
     "ListPatientAppointments",
     "MarkNoShow",
@@ -420,4 +423,28 @@ class ListClinicianAppointments(Protocol):
         self, *, actor_id: Id, agenda_filter: ClinicianFilter
     ) -> tuple[ClinicianEntry, ...]:
         """The clinician's own appointments with their actions, by start, never their notes."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentsQuery:
+    """Optional narrowing of the caller's appointments; the range bounds the start, end excluded."""
+
+    clinician_id: Id | None = None
+    patient_id: Id | None = None
+    status: AppointmentStatus | None = None
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianAppointments:
+    entries: tuple[ClinicianEntry, ...]
+
+
+class ListAppointmentsAsCaller(Protocol):
+    def execute(
+        self, *, actor_id: Id, query: AppointmentsQuery
+    ) -> PatientAppointments | ClinicianAppointments:
+        """Clinicians get their own calendar, patients their own list; forbidden for other staff."""
         ...

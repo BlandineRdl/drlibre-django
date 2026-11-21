@@ -19,7 +19,7 @@ from drlibre.booking.application.ports.inbound import (
     CreateHold,
     DepartmentRoomsDay,
     ExpireHolds,
-    ListClinicianAppointments,
+    ListAppointmentsAsCaller,
     ListPatientAppointments,
     MarkNoShow,
     OpenHolds,
@@ -69,6 +69,9 @@ from drlibre.booking.application.use_cases.complete_appointment import (
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.department_rooms_day import DepartmentRoomsDayUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.list_appointments_as_caller import (
+    ListAppointmentsAsCallerUseCase,
+)
 from drlibre.booking.application.use_cases.list_clinician_appointments import (
     ListClinicianAppointmentsUseCase,
 )
@@ -462,7 +465,7 @@ class Container:
     clinician_appointment: ClinicianAppointment
     clinician_patients: ClinicianPatients
     department_rooms_day: DepartmentRoomsDay
-    list_clinician_appointments: ListClinicianAppointments
+    list_appointments_as_caller: ListAppointmentsAsCaller
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -719,7 +722,7 @@ def wire(a: Adapters) -> Container:
         clinician_appointment=booking.clinician_appointment,
         clinician_patients=booking.clinician_patients,
         department_rooms_day=booking.department_rooms_day,
-        list_clinician_appointments=booking.list_clinician_appointments,
+        list_appointments_as_caller=booking.list_appointments_as_caller,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -783,7 +786,7 @@ class _BookingUseCases:
     clinician_appointment: ClinicianAppointment
     clinician_patients: ClinicianPatients
     department_rooms_day: DepartmentRoomsDay
-    list_clinician_appointments: ListClinicianAppointments
+    list_appointments_as_caller: ListAppointmentsAsCaller
 
 
 def _wire_booking(
@@ -814,6 +817,9 @@ def _wire_booking(
     )
     book_appointment = BookAppointmentUseCase(
         clock=a.clock, uow=a.uow, placement=placement, ledger=booking.ledger
+    )
+    list_patient_appointments = ListPatientAppointmentsUseCase(
+        clock=a.clock, patients=booking.patients, agenda=booking.agenda
     )
     return _BookingUseCases(
         book_appointment=book_appointment,
@@ -860,9 +866,7 @@ def _wire_booking(
         open_holds=booking.open_holds,
         view_hold=ViewHoldUseCase(clock=a.clock, holds=booking.holds),
         view_appointment=ViewAppointmentUseCase(appointments=booking.appointments),
-        list_patient_appointments=ListPatientAppointmentsUseCase(
-            clock=a.clock, patients=booking.patients, agenda=booking.agenda
-        ),
+        list_patient_appointments=list_patient_appointments,
         cancel_appointment=CancelAppointmentUseCase(
             clock=a.clock,
             uow=a.uow,
@@ -929,8 +933,12 @@ def _wire_booking(
         department_rooms_day=DepartmentRoomsDayUseCase(
             clock=a.clock, directory=booking.directory, agenda=booking.clinician_agenda
         ),
-        list_clinician_appointments=ListClinicianAppointmentsUseCase(
-            directory=booking.directory, agenda=booking.clinician_agenda
+        list_appointments_as_caller=ListAppointmentsAsCallerUseCase(
+            directory=booking.directory,
+            list_clinician_appointments=ListClinicianAppointmentsUseCase(
+                directory=booking.directory, agenda=booking.clinician_agenda
+            ),
+            list_patient_appointments=list_patient_appointments,
         ),
     )
 

@@ -6,13 +6,12 @@ from pydantic import AwareDatetime, ConfigDict, Field
 
 from drlibre.booking.application.ports.inbound import (
     AgendaEntry,
-    AgendaFilter,
+    AppointmentsQuery,
     AppointmentStatus,
+    ClinicianAppointments,
     ClinicianEntry,
-    ClinicianFilter,
 )
 from drlibre.bootstrap.container import container
-from drlibre.identity.application.ports.inbound import Identity, Role
 from drlibre.interfaces.api.booking import AppointmentOut
 from drlibre.interfaces.web.auth import current_identity
 from drlibre.shared_kernel.ids import Id
@@ -135,38 +134,24 @@ class ClinicianAgendaOut(Schema):
     appointments: list[ClinicianEntryOut]
 
 
-def _clinician_agenda(identity: Identity, query: AgendaQuery) -> ClinicianAgendaOut:
-    # A clinician sees only their own calendar, so a `clinician` parameter changes nothing.
-    entries = container().list_clinician_appointments.execute(
+@router.get("/appointments", response=AgendaOut | ClinicianAgendaOut, auth=None)
+def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> AgendaOut | ClinicianAgendaOut:
+    identity = current_identity(request)
+    listed = container().list_appointments_as_caller.execute(
         actor_id=identity.user_id,
-        agenda_filter=ClinicianFilter(
+        query=AppointmentsQuery(
+            clinician_id=_optional_id(query.clinician),
             patient_id=_optional_id(query.patient),
             status=query.status,
             start=query.start,
             end=query.end,
         ),
     )
-    return ClinicianAgendaOut(appointments=[ClinicianEntryOut.of(e) for e in entries])
-
-
-@router.get("/appointments", response=AgendaOut | ClinicianAgendaOut, auth=None)
-def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> AgendaOut | ClinicianAgendaOut:
-    identity = current_identity(request)
-    if identity.role is Role.CLINICIAN:
-        return _clinician_agenda(identity, query)
-    # A patient sees only their own appointments, so a `patient` parameter changes nothing.
-    agenda = container().list_patient_appointments.execute(
-        patient_id=identity.user_id,
-        agenda_filter=AgendaFilter(
-            clinician_id=_optional_id(query.clinician),
-            status=query.status,
-            start=query.start,
-            end=query.end,
-        ),
-    )
+    if isinstance(listed, ClinicianAppointments):
+        return ClinicianAgendaOut(appointments=[ClinicianEntryOut.of(e) for e in listed.entries])
     return AgendaOut(
-        upcoming=[AgendaEntryOut.of(e) for e in agenda.upcoming],
-        past=[AgendaEntryOut.of(e) for e in agenda.past],
+        upcoming=[AgendaEntryOut.of(e) for e in listed.upcoming],
+        past=[AgendaEntryOut.of(e) for e in listed.past],
     )
 
 

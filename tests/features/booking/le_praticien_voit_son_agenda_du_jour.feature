@@ -83,6 +83,11 @@ Feature: Le praticien voit son agenda du jour
     When the clinician opens their day
     Then the reading is refused as "forbidden"
 
+  Scenario: Seuls les RDV du praticien connecté apparaissent ; `GET /appointments` ne lui renvoie que les siens. (liste sans profil praticien)
+    Given the signed-in user holds no clinician profile
+    When the clinician lists their appointments
+    Then the reading is refused as "forbidden"
+
   Scenario: Les heures sont affichées dans le fuseau de l'hôpital, et la page indique ce fuseau.
     Given "Marie Curie" has a "BOOKED" appointment with "A" at "2026-11-19 23:30" in room "R1"
     And "Paul Valéry" has a "BOOKED" appointment with "A" at "2026-11-20 23:30" in room "R1"
