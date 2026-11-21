@@ -3,7 +3,7 @@
 - Python and Django: the project showcases a Django back end.
 - Django Ninja serves the application API and the FHIR API, Pydantic native.
 - PostgreSQL holds all data; Redis serves cache, rate limiting and the Celery broker.
-- Celery with beat runs emails, hold expiry (every 60 s), reminders (every 15 min) and the daily slot horizon (00:15 local, `CELERY_TIMEZONE`); Django's built-in tasks lack a production worker and scheduler.
+- Celery with beat runs emails, hold expiry and waitlist expiry (every 60 s), reminders (every 15 min) and the daily slot horizon (00:15 local, `CELERY_TIMEZONE`); Django's built-in tasks lack a production worker and scheduler.
 - Django templates with HTMX and Pico.css; the front stays minimal.
 - Libraries: Pydantic validates every boundary; structlog writes JSON logs; pydantic-settings loads config; no freezegun, no factory_boy, no mock library.
 - Pinned versions and why: `aidd_docs/INSTALL.md`.
@@ -14,7 +14,7 @@
 
 ## Decisions
 - Hexagonal architecture per bounded context, so the domain stays pure Python and testable without Django.
-- `booking` owns appointments, holds, codes, booking rules, round robin and the placement shared by every booking path; `search` is a read side whose SQL adapter reads the organisation, identity, scheduling and booking tables directly.
+- `booking` owns appointments, holds, codes, booking rules, round robin, the waitlist and the placement shared by every booking path; `search` is a read side whose SQL adapter reads the organisation, identity, scheduling and booking tables directly.
 - Light CQRS: commands go through the domain, search, slots and reporting read through SQL query ports to hold p95 under 200 ms.
 - FHIR R4 is a facade with hand-written Pydantic schemas, because the fhir.resources library dropped R4.
 - One composition root wires ports to adapters, so web, API, FHIR and Celery run the same use cases.
@@ -50,13 +50,17 @@
 - Wiring order in `real_adapters()`: booking queries, then scheduling adapters reading them, then booking use cases using scheduling's ports (`IsSlotFree`, `FreeCliniciansAt`, `RefreshSlots`) and organisation's `RecordRoundRobinAssignment`.
 - A hold's code attempts are counted under `select_for_update` on the code row (`VerificationCodes.for_hold_locked`) inside the unit of work of each check, so concurrent wrong codes never exceed 5 attempts.
 - `booking/infrastructure/schedule_locks.py`, like scheduling's E2 `lock_profile`, locks other contexts' rows (clinician profile, user) through their ORM models: the accepted exception to contexts reaching each other only through ports.
-- A hold first takes `lock_email` (`pg_advisory_xact_lock` on a 64-bit hash of the lower-cased email, nothing stored) before reading the email's open hold, so an email never has two open holds; the global order is email, clinician(s), patient, rooms.
+- A hold first takes `lock_email` (`pg_advisory_xact_lock` on a 64-bit hash of the lower-cased email, nothing stored) before reading the email's open hold, so an email never has two open holds; the global order is email, clinician(s), patient, waitlist entries, rooms.
 - A booking locks in one order, clinician(s), then patient, then the department's active rooms (`lock_rooms`, before `busy_rooms`), so two clinicians of one department never get the same room and writers never deadlock; a first-available booking locks every candidate clinician at once in pk order (`lock_clinicians`), then ranks and picks under those locks.
 - Emails are queued on commit by `CeleryEmailOutbox` (`send_task`, redacted reprs keep codes and link tokens out of worker logs; the request log keeps `path` only).
 - Rate-limit keys use `settings.RATE_LIMIT_PREFIX`; a code is stored as HMAC-SHA256 keyed by `SECRET_KEY`, a sign-in link token as sha256.
-- Web views catch `invalid_input`, `has_dependents` and `forbidden` to re-render their form or delete confirmation, booking and portal pages also `rule_violation`, `invalid_transition`, `conflict`, `no_clinician_available` and `no_room_available` inline; other refusals become error pages through `DomainErrorPagesMiddleware` (rule 6-domain-errors).
+- Web views catch `invalid_input`, `has_dependents` and `forbidden` to re-render their form or delete confirmation, booking, portal and waitlist pages also `rule_violation`, `invalid_transition`, `conflict`, `no_clinician_available` and `no_room_available` inline, waitlist pages also `not_found` on a join or a manual offer; other refusals become error pages through `DomainErrorPagesMiddleware` (rule 6-domain-errors).
 - Appointment statuses: `BOOKED`, `CHECKED_IN`, `COMPLETED`, `CANCELLED`, `NO_SHOW`; `CONFIRMED` is removed, migrated to `BOOKED`.
-- In-app notifications live in `notifications` (`Notify`, `ListNotifications`, `MarkNotificationRead`, `CountUnread`); booking's `BookingNotices` writes the row in the unit of work and queues the email on commit; « RDV réservé » is in-app only, the E3 confirmation stays the booking email.
+- In-app notifications live in `notifications` (`Notify`, `ListNotifications`, `MarkNotificationRead`, `CountUnread`); booking's `BookingNotices` writes the row in the unit of work and queues the email on commit; « RDV réservé » is in-app only, the E3 confirmation stays the booking email; `Notify` takes an optional appointment, « Créneau proposé » links none (the freed one is another patient's).
+- Waitlist: `CancelAppointmentUseCase` offers the freed slot in its unit of work, after the slot refresh, to the oldest matching `WAITING` entry of another patient (`Waitlist.candidates_locked` locks the set in id order, the oldest is picked from that re-read); the offer reserves nothing.
+- Partial unique index `waitlist_one_offer_per_appointment` (`offered_appointment` where `OFFERED`): its `IntegrityError` becomes `conflict`.
+- Accept locks clinician, patient, then the entry, re-reads it and runs `Placement.place(announce=False)` in the same unit of work; a `conflict` puts the entry back to `WAITING` and commits, then is raised; `rule_violation` writes nothing.
+- `ExpireWaitlist` (beat `expire-waitlist`, 60 s) expires `WAITING` entries past their window and frees `OFFERED` ones whose slot started, one audit entry each, actor empty.
 - One reminder per appointment: a partial unique index on `APPOINTMENT_REMINDER`, inserted in a savepoint; its `IntegrityError` means already sent, so no email.
 - PostgreSQL guards behind the locks: `btree_gist` exclusions `appointment_clinician_no_overlap` and `appointment_patient_no_overlap` on active appointments, checks on end after start, known status, cancellation fields; an exclusion hit becomes `conflict`, never a 500.
 - Cancel and reschedule take the booking lock order and re-read the appointment under the locks; reschedule ignores its own appointment: `IsSlotFree`, `FindFreeSlots` and `FindFreeWeek` take `ignoring_appointment` and recompute that clinician's slots with `SlotEngine`, `conflicting_resources` and `busy_rooms` take `excluding`.
