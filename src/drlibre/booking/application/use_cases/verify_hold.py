@@ -11,6 +11,7 @@ from drlibre.booking.application.ports.outbound import (
     RoundRobinLedger,
     VerificationCodes,
 )
+from drlibre.booking.application.use_cases.hold_release import ReleaseReason, release_hold
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.domain.appointment import Source
 from drlibre.booking.domain.hold import BookingHold
@@ -66,12 +67,12 @@ class VerifyHoldUseCase(VerifyHold):
                 )
                 if hold.source is Source.ROUND_ROBIN:
                     self._ledger.record(hold.clinician_id, self._clock.now())
-                self._release(hold.id)
+                self._release(hold, ReleaseReason.BOOKED)
         except DomainError as failure:
             with self._uow:
-                self._release(hold.id)
-            return VerifiedBooking(session.token, session.expires_at, None, failure)
-        return VerifiedBooking(session.token, session.expires_at, appointment, None)
+                self._release(hold, ReleaseReason.REFUSED)
+            return VerifiedBooking(session.token, session.expires_at, failure)
+        return VerifiedBooking(session.token, session.expires_at, appointment)
 
     def _open_hold(self, hold_id: Id) -> BookingHold:
         hold = self._holds.get(hold_id)
@@ -90,6 +91,8 @@ class VerifyHoldUseCase(VerifyHold):
         stored = self._codes.for_hold_locked(hold.id)
         if stored is not None and stored.is_usable(at):
             if self._issuer.matches(typed, stored.code_hash):
+                # Consumed under the lock, so a second correct submission finds no code.
+                self._codes.delete_for_hold(hold.id)
                 return True
             self._codes.put(stored.failed_once())
         self._record_failure(hold, at)
@@ -120,9 +123,15 @@ class VerifyHoldUseCase(VerifyHold):
                 return patient_id, self._sessions.open(patient_id=patient_id, user_agent=user_agent)
         except DomainError:
             with self._uow:
-                self._release(hold.id)
+                self._release(hold, ReleaseReason.REFUSED)
             raise
 
-    def _release(self, hold_id: Id) -> None:
-        self._codes.delete_for_hold(hold_id)
-        self._holds.delete(hold_id)
+    def _release(self, hold: BookingHold, reason: ReleaseReason) -> None:
+        release_hold(
+            holds=self._holds,
+            codes=self._codes,
+            audit=self._audit,
+            hold=hold,
+            reason=reason,
+            at=self._clock.now(),
+        )

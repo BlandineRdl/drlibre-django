@@ -48,3 +48,19 @@ Feature: Un visiteur réserve le premier praticien disponible
     When the visitor asks to hold the first available at "2026-11-23 09:00"
     Then the booking is refused as "no_clinician_available"
     And no hold was created
+
+  Scenario: Règle §5.5 : un candidat pris entre-temps cède la place au candidat suivant
+    Given "A" and "B" are free at "2026-11-23 09:00"
+    And "A" was assigned at "2026-11-10 10:00"
+    And "B" was assigned at "2026-11-19 10:00"
+    And "A" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    When the visitor asks to hold the first available at "2026-11-23 09:00"
+    Then the hold is on "B"
+
+  Scenario: Règle §5.5 : tous les candidats pris entre-temps, la réservation échoue faute de praticien disponible
+    Given "A" and "B" are free at "2026-11-23 09:00"
+    And "A" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    And "B" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    When the visitor asks to hold the first available at "2026-11-23 09:00"
+    Then the booking is refused as "no_clinician_available"
+    And no hold was created

@@ -79,8 +79,7 @@ class VerifiedBooking:
 
     token: str
     expires_at: datetime
-    appointment: Appointment | None
-    failure: DomainError | None
+    outcome: Appointment | DomainError
 
 
 class VerifyHold(Protocol):

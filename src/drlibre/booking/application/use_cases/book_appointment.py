@@ -43,13 +43,18 @@ class BookAppointmentUseCase(BookAppointment):
                     source=Source.ONLINE,
                 )
             kind = self._placement.bookable_type(appointment_type_id)
-            chosen = self._placement.first_available(kind, start)
-            appointment = self._placement.place(
-                patient_id=patient_id,
-                clinician_id=chosen,
-                appointment_type_id=appointment_type_id,
-                start=start,
-                source=Source.ROUND_ROBIN,
+
+            def attempt(chosen: Id) -> Appointment:
+                appointment = self._placement.place(
+                    patient_id=patient_id,
+                    clinician_id=chosen,
+                    appointment_type_id=appointment_type_id,
+                    start=start,
+                    source=Source.ROUND_ROBIN,
+                )
+                self._ledger.record(chosen, self._clock.now())
+                return appointment
+
+            return self._placement.first_free(
+                self._placement.ranked_candidates(kind, start), attempt
             )
-            self._ledger.record(chosen, self._clock.now())
-            return appointment

@@ -43,6 +43,8 @@ Feature: Un visiteur réserve un créneau en validant un code reçu par email
     Then the appointment is "BOOKED" for "ONLINE"
     And the appointment ends 30 minutes after it starts
     And the hold is gone
+    And the audit entry "booking.hold_released" has no actor and only the email domain
+    And the audit entry "booking.hold_released" names the reason "booked"
 
   Scenario: Si le type exige une salle, le RDV reçoit la salle par défaut du praticien si elle est libre, sinon la première salle active libre du département par ordre de code ; un type sans salle n'en reçoit pas (salle par défaut)
     Given the visitor asks to hold "A" at "2026-11-23 09:00"
@@ -91,3 +93,5 @@ Feature: Un visiteur réserve un créneau en validant un code reçu par email
     And "A" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
     When the visitor enters the code "123456"
     Then the booking failed as "conflict" while the patient session stays open
+    And the audit entry "booking.hold_released" has no actor and only the email domain
+    And the audit entry "booking.hold_released" names the reason "refused"

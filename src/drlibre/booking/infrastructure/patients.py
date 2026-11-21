@@ -13,6 +13,10 @@ class IdentityPatients(Patients):
         user = self._queries.user(patient_id)
         return user is not None and user.active and user.role is Role.PATIENT
 
+    def email_domain_of(self, patient_id: Id) -> str | None:
+        user = self._queries.user(patient_id)
+        return user.email.domain if user is not None and user.role is Role.PATIENT else None
+
     def email_of(self, patient_id: Id) -> str | None:
         user = self._queries.user(patient_id)
         return user.email.value if user is not None and user.role is Role.PATIENT else None

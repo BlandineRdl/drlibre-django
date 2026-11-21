@@ -137,6 +137,10 @@ class Patients(Protocol):
         """Whether the id is an active patient."""
         ...
 
+    def email_domain_of(self, patient_id: Id) -> str | None:
+        """The domain of the patient's email, or None when the id is no patient."""
+        ...
+
     def email_of(self, patient_id: Id) -> str | None:
         """The patient's email, or None when the id is not a patient."""
         ...

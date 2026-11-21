@@ -32,6 +32,8 @@ Feature: Les réservations provisoires et les codes sont limités
     Then the slot of "A" at "2026-11-23 09:00" is offered again
     And the slot of "A" at "2026-11-23 09:30" is no longer offered
     And only the second hold and its code remain
+    And the audit entry "booking.hold_released" has no actor and only the email domain
+    And the audit entry "booking.hold_released" names the reason "replaced"
 
   Scenario: Le créneau redevient libre dès l'heure d'expiration, même avant le passage du job d'expiration ; ce job tourne chaque minute et audite chaque expiration avec le domaine de l'email (avant le job)
     Given the visitor asks to hold "A" at "2026-11-23 09:00"

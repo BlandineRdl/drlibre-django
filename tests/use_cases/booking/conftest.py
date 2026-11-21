@@ -377,7 +377,8 @@ def verify_code(world: FakeWorld, scene: Scene, code: str) -> None:
         ),
     )
     if scene.verified is not None:
-        scene.appointment = scene.verified.appointment
+        outcome = scene.verified.outcome
+        scene.appointment = None if isinstance(outcome, DomainError) else outcome
 
 
 def request_code(world: FakeWorld, scene: Scene, hold: HoldCreated, network: str = NETWORK) -> bool:
@@ -715,9 +716,8 @@ def same_answers(world: FakeWorld) -> None:
 @then(parsers.parse('the booking failed as "{code}" while the patient session stays open'))
 def failed_after_code(world: FakeWorld, scene: Scene, code: str) -> None:
     result = verified(scene)
-    assert result.appointment is None
-    assert result.failure is not None
-    assert result.failure.code.value == code
+    assert isinstance(result.outcome, DomainError)
+    assert result.outcome.code.value == code
     assert world.sessions.by_token_hash(hash_token(result.token)) is not None
     assert typed_patient(world, scene).role is Role.PATIENT
     assert world.holds.rows == {}
@@ -753,6 +753,12 @@ def audit_anonymous(world: FakeWorld, action: str) -> None:
     for entry in entries:
         assert entry.actor is None
         assert dict(entry.metadata)["email_domain"] == "example.org"
+
+
+@then(parsers.parse('the audit entry "{action}" names the reason "{reason}"'))
+def audit_reason(world: FakeWorld, action: str, reason: str) -> None:
+    entries = [e for e in world.audit.entries if e.action == action]
+    assert [dict(e.metadata)["reason"] for e in entries] == [reason]
 
 
 @then(

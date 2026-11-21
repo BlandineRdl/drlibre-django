@@ -7,6 +7,7 @@ from pydantic import AwareDatetime, ConfigDict
 from drlibre.booking.application.ports.inbound import Appointment
 from drlibre.bootstrap.container import container
 from drlibre.interfaces.web.auth import set_session_cookie
+from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
 router = Router(tags=["booking"])
@@ -101,15 +102,13 @@ def verify_hold(
         user_agent=request.headers.get("User-Agent", ""),
     )
     set_session_cookie(response, verified.token, verified.expires_at)
-    failure = verified.failure
-    return VerifiedOut(
-        appointment=AppointmentOut.of(verified.appointment) if verified.appointment else None,
-        failure=FailureOut(
-            code=failure.code.value, message=failure.message, details=failure.details
+    outcome = verified.outcome
+    if isinstance(outcome, DomainError):
+        failure = FailureOut(
+            code=outcome.code.value, message=outcome.message, details=outcome.details
         )
-        if failure
-        else None,
-    )
+        return VerifiedOut(appointment=None, failure=failure)
+    return VerifiedOut(appointment=AppointmentOut.of(outcome), failure=None)
 
 
 @router.post("/booking/holds/{hold_id}/resend", response={204: None}, auth=None)

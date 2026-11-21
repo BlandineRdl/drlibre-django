@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
@@ -69,8 +70,8 @@ class Placement:
             raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
         return clinician
 
-    def first_available(self, kind: BookableType, start: datetime) -> Id:
-        """The clinician ranked first among those with a free slot at the start."""
+    def ranked_candidates(self, kind: BookableType, start: datetime) -> tuple[Id, ...]:
+        """The clinicians with a free slot at the start, best ranked first; none is refused."""
         candidates = []
         for clinician_id in self._free_slots.candidates_at(kind.id, start):
             clinician = self._directory.clinician(clinician_id)
@@ -86,7 +87,19 @@ class Placement:
         ranked = rank(tuple(candidates), self._clock.now())
         if not ranked:
             raise DomainError(ErrorCode.NO_CLINICIAN_AVAILABLE, "Aucun praticien disponible.")
-        return ranked[0].clinician_id
+        return tuple(candidate.clinician_id for candidate in ranked)
+
+    def first_free[T](self, candidates: tuple[Id, ...], attempt: Callable[[Id], T]) -> T:
+        """The first attempt not refused as taken; no_clinician_available when all are."""
+        for clinician_id in candidates:
+            try:
+                return attempt(clinician_id)
+            except DomainError as refusal:
+                if refusal.code is not ErrorCode.CONFLICT or (
+                    "clinician" not in refusal.details.get("resources", [])
+                ):
+                    raise
+        raise DomainError(ErrorCode.NO_CLINICIAN_AVAILABLE, "Aucun praticien disponible.")
 
     def place(
         self,
@@ -212,9 +225,9 @@ class Placement:
         }
         if appointment.room_id is not None:
             metadata["room_id"] = appointment.room_id
-        email = self._patients.email_of(appointment.patient_id)
-        if email is not None:
-            metadata["email_domain"] = email.rsplit("@", 1)[1]
+        domain = self._patients.email_domain_of(appointment.patient_id)
+        if domain is not None:
+            metadata["email_domain"] = domain
         return AuditEntry.from_event(
             actor=appointment.patient_id,
             action="booking.appointment_booked",

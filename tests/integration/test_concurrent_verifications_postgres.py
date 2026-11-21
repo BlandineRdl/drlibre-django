@@ -13,6 +13,7 @@ from drlibre.booking.infrastructure.repositories import (
 )
 from drlibre.bootstrap.container import wire
 from drlibre.identity.domain.user import Role
+from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from tests.builders import stored_user
 from tests.integration.bookable import NOW, SLOT_START, Bookable, bookable
@@ -76,8 +77,8 @@ def test_two_verifications_of_one_patient_at_once_never_exceed_three_open_bookin
         def verify(hold_id: Id, code: str):
             def run() -> object:
                 done = app.verify_hold.execute(hold_id=hold_id, code=code, user_agent="test")
-                if done.failure:
-                    raise done.failure
+                if isinstance(done.outcome, DomainError):
+                    raise done.outcome
                 return done
 
             return run
@@ -124,3 +125,25 @@ def test_two_wrong_codes_at_once_both_count_as_attempts() -> None:
         assert outcomes == ["invalid_input", "invalid_input"]
         assert after is not None
         assert after.attempts == MAX_ATTEMPTS
+
+
+def test_two_correct_codes_at_once_open_one_booking_and_refuse_the_other() -> None:
+    """Story réservation : un code correct ne sert qu'une fois, même saisi en même temps."""
+    race = Race()
+    with bookable() as world:
+        hold_id, code = hold_for(world, "visitor@example.org", world.clinician, SLOT_START)
+        adapters = world.at(NOW)
+        racing = dataclasses.replace(adapters.booking, codes=RacingCodes(race))
+        app = wire(dataclasses.replace(adapters, booking=racing))
+
+        def verify() -> object:
+            done = app.verify_hold.execute(hold_id=hold_id, code=code, user_agent="test")
+            if isinstance(done.outcome, DomainError):
+                raise done.outcome
+            return done
+
+        outcomes = race.run(verify, verify)
+
+        assert race.second_was_blocked == [True]
+        assert outcomes == ["invalid_input", "saved"]
+        assert AppointmentRecord.objects.filter(clinician_id=world.clinician.value).count() == 1

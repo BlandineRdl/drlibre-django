@@ -231,19 +231,19 @@ def hold(request: HttpRequest, hold_id: UUID) -> HttpResponse:
         if error.code is ErrorCode.NOT_FOUND:
             return _expired(request, summary, context)
         raise
-    if verified.appointment is not None:
-        response = redirect(f"/booking/appointments/{verified.appointment.id}")
-    else:
-        failure = verified.failure
+    outcome = verified.outcome
+    if isinstance(outcome, DomainError):
         response = _refused(
             request,
-            failure.message if failure else GONE,
+            outcome.message,
             type_id=summary.appointment_type_id,
             clinician_id=None if summary.first_available else summary.clinician_id,
             context=context,
             current_step=2,
-            status=failure.code.http_status if failure else 409,
+            status=outcome.code.http_status,
         )
+    else:
+        response = redirect(f"/booking/appointments/{outcome.id}")
     set_session_cookie(response, verified.token, verified.expires_at)
     return response
 

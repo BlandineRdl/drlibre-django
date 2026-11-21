@@ -11,6 +11,7 @@ from drlibre.booking.infrastructure.django.models import (
 from drlibre.bootstrap.container import use_container
 from drlibre.interfaces.jobs.tasks import send_email
 from drlibre.notifications.application.ports.outbound import EmailMessage, Mailer
+from drlibre.shared_kernel.errors import DomainError
 from tests.integration.bookable import SLOT_START, Bookable, bookable
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
@@ -85,9 +86,9 @@ def test_a_failed_confirmation_email_keeps_the_appointment() -> None:
             **world.visitor(),  # type: ignore[arg-type]
         )
         done = app.verify_hold.execute(hold_id=created.hold_id, code=world.code(), user_agent="t")
-        assert done.appointment is not None
+        assert not isinstance(done.outcome, DomainError)
 
         deliver_all(world, DownMailer())
 
-        booked = AppointmentRecord.objects.get(id=done.appointment.id.value)
+        booked = AppointmentRecord.objects.get(id=done.outcome.id.value)
         assert booked.status == "BOOKED"

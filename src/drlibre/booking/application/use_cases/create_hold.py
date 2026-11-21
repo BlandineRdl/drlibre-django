@@ -3,12 +3,14 @@ from datetime import datetime, timedelta
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.booking.application.ports.inbound import CreateHold, HoldCreated
 from drlibre.booking.application.ports.outbound import (
+    BookableType,
     BookingNotices,
     CodeIssuer,
     Holds,
     ScheduleLocks,
     VerificationCodes,
 )
+from drlibre.booking.application.use_cases.hold_release import ReleaseReason, release_hold
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.domain.appointment import Source
 from drlibre.booking.domain.hold import BookingHold
@@ -102,25 +104,17 @@ class CreateHoldUseCase(CreateHold):
         with self._uow:
             previous = self._holds.open_for_email(details.email, at)
             if previous is not None:
-                self._release(previous.id)
+                self._release(previous, at)
             kind = self._placement.bookable_type(appointment_type_id)
-            source = Source.ONLINE if clinician_id else Source.ROUND_ROBIN
-            chosen = clinician_id or self._placement.first_available(kind, start)
-            self._placement.clinician_of(kind, chosen)
-            self._locks.lock_clinician(chosen)
-            end = start + timedelta(minutes=kind.duration_minutes)
-            self._placement.refuse_conflicts(None, chosen, start, end, ignoring_hold=None)
-            self._placement.refuse_rule_violations(None, chosen, kind, start, ignoring_hold=None)
-            hold = BookingHold.open(
-                clinician_id=chosen,
-                appointment_type_id=kind.id,
-                start=start,
-                duration=end - start,
-                source=source,
-                details=details,
-                at=at,
-            )
-            self._holds.add(hold)
+
+            def open_hold(chosen: Id) -> BookingHold:
+                return self._open_hold(kind, chosen, start, details, at, clinician_id is None)
+
+            if clinician_id is not None:
+                hold = open_hold(clinician_id)
+            else:
+                ranked = self._placement.ranked_candidates(kind, start)
+                hold = self._placement.first_free(ranked, open_hold)
             issued = self._issuer.issue()
             self._codes.put(
                 VerificationCode.issue(
@@ -131,9 +125,41 @@ class CreateHoldUseCase(CreateHold):
             self._audit.record(self._created_entry(hold, at))
         return HoldCreated(hold.id, hold.clinician_id, hold.expires_at)
 
-    def _release(self, hold_id: Id) -> None:
-        self._codes.delete_for_hold(hold_id)
-        self._holds.delete(hold_id)
+    def _open_hold(
+        self,
+        kind: BookableType,
+        chosen: Id,
+        start: datetime,
+        details: VisitorDetails,
+        at: datetime,
+        first_available: bool,
+    ) -> BookingHold:
+        self._placement.clinician_of(kind, chosen)
+        self._locks.lock_clinician(chosen)
+        end = start + timedelta(minutes=kind.duration_minutes)
+        self._placement.refuse_conflicts(None, chosen, start, end, ignoring_hold=None)
+        self._placement.refuse_rule_violations(None, chosen, kind, start, ignoring_hold=None)
+        hold = BookingHold.open(
+            clinician_id=chosen,
+            appointment_type_id=kind.id,
+            start=start,
+            duration=end - start,
+            source=Source.ROUND_ROBIN if first_available else Source.ONLINE,
+            details=details,
+            at=at,
+        )
+        self._holds.add(hold)
+        return hold
+
+    def _release(self, hold: BookingHold, at: datetime) -> None:
+        release_hold(
+            holds=self._holds,
+            codes=self._codes,
+            audit=self._audit,
+            hold=hold,
+            reason=ReleaseReason.REPLACED,
+            at=at,
+        )
 
     def _created_entry(self, hold: BookingHold, at: datetime) -> AuditEntry:
         return AuditEntry.from_event(

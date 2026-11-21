@@ -47,3 +47,17 @@ Feature: Un patient connecté réserve sans ressaisir ses informations
     When the patient books without naming a clinician at "2026-11-23 09:30"
     Then the booking is refused as "no_clinician_available"
     And nothing was written
+
+  Scenario: Règle §5.5 : un candidat pris entre-temps cède la place au candidat suivant
+    Given "A" was assigned at "2026-11-10 10:00"
+    And "B" was assigned at "2026-11-19 10:00"
+    And "A" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    When the patient books without naming a clinician at "2026-11-23 09:00"
+    Then the appointment is with "B"
+
+  Scenario: Règle §5.5 : tous les candidats pris entre-temps, la réservation échoue faute de praticien disponible
+    Given "A" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    And "B" has an active appointment from "2026-11-23 09:00" to "2026-11-23 09:30"
+    When the patient books without naming a clinician at "2026-11-23 09:00"
+    Then the booking is refused as "no_clinician_available"
+    And nothing was written

@@ -31,8 +31,8 @@ def hold_and_verify(world: Bookable) -> tuple[Id, Id]:
         **visitor,  # type: ignore[arg-type]
     )
     done = app.verify_hold.execute(hold_id=created.hold_id, code=world.code(), user_agent="test")
-    assert done.appointment is not None
-    return created.hold_id, done.appointment.id
+    assert not isinstance(done.outcome, DomainError)
+    return created.hold_id, done.outcome.id
 
 
 def test_a_correct_code_books_the_slot_and_takes_it_off_the_free_slots() -> None:
