@@ -22,7 +22,7 @@
 </form>
 </search>
 {% if view.rows %}
-<div class="overflow-auto">
+<div class="overflow-auto" tabindex="0" role="region" aria-label="Entrées de la liste d'attente">
   <table>
     <caption>Liste d'attente : {{ view.summary }}</caption>
     <thead><tr>{% for header in view.headers %}<th scope="col">{{ header }}</th>{% endfor %}<th scope="col">Actions</th></tr></thead>

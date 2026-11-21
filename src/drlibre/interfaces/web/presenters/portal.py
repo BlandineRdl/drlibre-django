@@ -50,6 +50,8 @@ KIND_LABELS = {
     NotificationKind.SCHEDULE_CHANGED: "Changement de planning",
     NotificationKind.APPOINTMENT_CANCELLED: "Annulation",
     NotificationKind.APPOINTMENT_REMINDER: "Rappel",
+    NotificationKind.WAITLIST_OFFERED: "Liste d'attente",
+    NotificationKind.WAITLIST_BOOKED: "Liste d'attente",
 }
 NOTICES = {
     "cancelled": "Le rendez-vous est annulé.",
