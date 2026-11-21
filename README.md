@@ -12,6 +12,7 @@ Hospital appointment scheduling, a hexagonal Django back end. Portfolio sandbox,
    - patient: `patient@drlibre.localhost`
    - passwordless patient, signs in by email link only: `visiteur@drlibre.localhost`
 5. Both demo clinicians work Monday to Friday, 09:00–12:00 and 14:00–17:00 (Paris): edit at `/workspace/availability/` and `/workspace/time-off/`; signed in, `GET /api/v1/slots?type=…&clinician=…&start=…&end=…` lists free slots.
+6. Showcase volume for a live demo: `docker compose exec web python -m scripts.seed_showcase` adds two hospitals, 13 clinicians (`prenom.nom@drlibre.localhost`, same password), 600 patients and ~5,600 appointments over the past 6 and next 3 weeks; once per database (`docker compose down -v` to start over). The e2e journeys expect the plain demo seed.
 
 ## Develop
 1. `uv sync` and `uv run pre-commit install`.
