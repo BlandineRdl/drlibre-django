@@ -9,7 +9,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from drlibre.interfaces.web.views import search
 from drlibre.notifications.domain.notification import AppointmentEvent, Notification
 from tests.fakes.world import FakeWorld
-from tests.use_cases.booking.conftest import Scene, open_session, page_text
+from tests.use_cases.booking.support import Scene, open_session, page_text
 
 scenarios("../../features/booking/le_patient_voit_son_prochain_rendez_vous_des_l_accueil.feature")
 

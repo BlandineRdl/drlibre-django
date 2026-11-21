@@ -11,7 +11,7 @@ from drlibre.booking.domain.appointment import AppointmentStatus
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import existing_appointment, patient_user
 from tests.fakes.world import FakeWorld
-from tests.use_cases.booking.conftest import (
+from tests.use_cases.booking.support import (
     COOKIE,
     TYPE_NAME,
     VISIT_REASON,

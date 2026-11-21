@@ -2,7 +2,7 @@ from django.test import Client
 from pytest_bdd import parsers, scenarios, then, when
 
 from tests.fakes.world import FakeWorld
-from tests.use_cases.booking.conftest import Scene, mine, open_session, page_text
+from tests.use_cases.booking.support import Scene, mine, open_session, page_text
 
 scenarios("../../features/booking/le_patient_ajoute_un_rendez_vous_a_son_agenda.feature")
 

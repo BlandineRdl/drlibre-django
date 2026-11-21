@@ -15,6 +15,15 @@ from tests.builders import stored_session, stored_user
 from tests.fakes.database_probe import InMemoryDatabaseProbe
 from tests.fakes.world import FakeWorld
 
+# Booking's steps, one module per area; pytest only reads plugins from the top conftest.
+pytest_plugins = [
+    "tests.use_cases.booking.steps_scene",
+    "tests.use_cases.booking.steps_holds",
+    "tests.use_cases.booking.steps_changes",
+    "tests.use_cases.booking.steps_reminders",
+    "tests.use_cases.booking.steps_pages",
+]
+
 
 @pytest.fixture(scope="session")
 def django_db_setup(django_db_setup: None, django_db_blocker: Any) -> None:
