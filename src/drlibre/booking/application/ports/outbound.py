@@ -115,6 +115,10 @@ class BookingDirectory(Protocol):
         """The clinician's hospital and name, or None when unknown."""
         ...
 
+    def clinician_of_user(self, user_id: Id) -> Id | None:
+        """The clinician profile id of the user, or None when the user holds none."""
+        ...
+
 
 class FreeSlots(Protocol):
     def is_free(

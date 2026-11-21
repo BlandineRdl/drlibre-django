@@ -1,3 +1,4 @@
+import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -116,6 +117,8 @@ class FixedBookingDirectory(BookingDirectory):
         self.clinicians: dict[Id, BookableClinician] = {}
         self.department_rooms: dict[Id, tuple[Id, ...]] = {}
         self.venues: dict[Id, Venue] = {}
+        # Clinician profile of each user holding one.
+        self.profiles_of_users: dict[Id, Id] = {}
 
     def appointment_type(self, appointment_type_id: Id) -> BookableType | None:
         return self.types.get(appointment_type_id)
@@ -128,6 +131,9 @@ class FixedBookingDirectory(BookingDirectory):
 
     def venue(self, clinician_id: Id) -> Venue | None:
         return self.venues.get(clinician_id)
+
+    def clinician_of_user(self, user_id: Id) -> Id | None:
+        return self.profiles_of_users.get(user_id)
 
 
 class InMemoryFreeSlots(FreeSlots):
@@ -401,7 +407,8 @@ class InMemoryPatientAgenda(PatientAgenda):
     def _entry(self, appointment: Appointment) -> AgendaEntry:
         who = self.clinicians.get(appointment.clinician_id, AgendaClinician())
         return AgendaEntry(
-            appointment=appointment,
+            # Like the SQL agenda, never the clinician's notes.
+            appointment=dataclasses.replace(appointment, clinical_notes=None),
             clinician_name=who.name,
             clinician_title=who.title,
             specialty=who.specialty,

@@ -9,9 +9,12 @@ from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
     BookAppointment,
     CancelAppointment,
+    CheckInAppointment,
+    CompleteAppointment,
     CreateHold,
     ExpireHolds,
     ListPatientAppointments,
+    MarkNoShow,
     OpenHolds,
     RequirePatient,
     RescheduleAppointment,
@@ -20,6 +23,7 @@ from drlibre.booking.application.ports.inbound import (
     VerifyHold,
     ViewAppointment,
     ViewHold,
+    WriteClinicalNotes,
 )
 from drlibre.booking.application.ports.outbound import (
     Appointments as BookingAppointments,
@@ -39,11 +43,16 @@ from drlibre.booking.application.ports.outbound import (
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
+from drlibre.booking.application.use_cases.check_in_appointment import CheckInAppointmentUseCase
+from drlibre.booking.application.use_cases.complete_appointment import (
+    CompleteAppointmentUseCase,
+)
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
 from drlibre.booking.application.use_cases.list_patient_appointments import (
     ListPatientAppointmentsUseCase,
 )
+from drlibre.booking.application.use_cases.mark_no_show import MarkNoShowUseCase
 from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.application.use_cases.require_patient import RequirePatientUseCase
@@ -52,9 +61,11 @@ from drlibre.booking.application.use_cases.reschedule_appointment import (
 )
 from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
 from drlibre.booking.application.use_cases.send_reminders import SendRemindersUseCase
+from drlibre.booking.application.use_cases.status_change import StatusChange
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
+from drlibre.booking.application.use_cases.write_clinical_notes import WriteClinicalNotesUseCase
 from drlibre.booking.infrastructure.booking_slot_refresh import BookingSlotRefresh
 from drlibre.booking.infrastructure.code_issuer import HmacCodeIssuer
 from drlibre.booking.infrastructure.directory import OrganisationBookingDirectory
@@ -414,6 +425,10 @@ class Container:
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
+    check_in_appointment: CheckInAppointment
+    complete_appointment: CompleteAppointment
+    mark_no_show: MarkNoShow
+    write_clinical_notes: WriteClinicalNotes
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -660,6 +675,10 @@ def wire(a: Adapters) -> Container:
         cancel_appointment=booking.cancel_appointment,
         reschedule_appointment=booking.reschedule_appointment,
         send_reminders=booking.send_reminders,
+        check_in_appointment=booking.check_in_appointment,
+        complete_appointment=booking.complete_appointment,
+        mark_no_show=booking.mark_no_show,
+        write_clinical_notes=booking.write_clinical_notes,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -713,6 +732,10 @@ class _BookingUseCases:
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
+    check_in_appointment: CheckInAppointment
+    complete_appointment: CompleteAppointment
+    mark_no_show: MarkNoShow
+    write_clinical_notes: WriteClinicalNotes
 
 
 def _wire_booking(
@@ -731,6 +754,15 @@ def _wire_booking(
         patients=booking.patients,
         notices=booking.notices,
         holds=booking.holds,
+    )
+    status_change = StatusChange(
+        clock=a.clock,
+        uow=a.uow,
+        audit=a.audit,
+        directory=booking.directory,
+        appointments=booking.appointments,
+        locks=booking.locks,
+        slot_refresh=booking.slot_refresh,
     )
     return _BookingUseCases(
         book_appointment=BookAppointmentUseCase(
@@ -812,6 +844,17 @@ def _wire_booking(
             audit=a.audit,
             appointments=booking.appointments,
             notices=booking.notices,
+        ),
+        check_in_appointment=CheckInAppointmentUseCase(change=status_change),
+        complete_appointment=CompleteAppointmentUseCase(change=status_change),
+        mark_no_show=MarkNoShowUseCase(change=status_change),
+        write_clinical_notes=WriteClinicalNotesUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            directory=booking.directory,
+            appointments=booking.appointments,
+            locks=booking.locks,
         ),
     )
 

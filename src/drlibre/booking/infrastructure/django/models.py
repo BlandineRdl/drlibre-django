@@ -48,6 +48,8 @@ class AppointmentRecord(models.Model):
     reason = models.CharField(max_length=500, null=True)  # noqa: DJ001
     cancelled_at = models.DateTimeField(null=True)
     cancellation_reason = models.CharField(max_length=500, null=True)  # noqa: DJ001
+    # Seen by the appointment's clinician only.
+    clinical_notes = models.TextField(null=True)  # noqa: DJ001
     clinician_id: uuid.UUID
     appointment_type_id: uuid.UUID
     room_id: uuid.UUID | None

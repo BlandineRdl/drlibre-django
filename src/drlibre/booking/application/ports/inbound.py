@@ -5,16 +5,18 @@ from typing import Protocol
 from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
 from drlibre.booking.domain.appointment import (
     MAX_CANCELLATION_REASON,
+    MAX_CLINICAL_NOTES,
     Appointment,
     AppointmentStatus,
 )
-from drlibre.booking.domain.booking_rules import BookingRule, PatientAction
+from drlibre.booking.domain.booking_rules import BookingRule, ClinicianAction, PatientAction
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
 __all__ = [
     "MAX_CANCELLATION_REASON",
+    "MAX_CLINICAL_NOTES",
     "AgendaEntry",
     "AgendaFilter",
     "Appointment",
@@ -24,12 +26,16 @@ __all__ = [
     "BookedPeriod",
     "BookingRule",
     "CancelAppointment",
+    "CheckInAppointment",
+    "ClinicianAction",
+    "CompleteAppointment",
     "CreateHold",
     "ExpireHolds",
     "HeldPeriod",
     "HoldCreated",
     "HoldSummary",
     "ListPatientAppointments",
+    "MarkNoShow",
     "OpenHolds",
     "PatientAction",
     "PatientAppointments",
@@ -41,6 +47,7 @@ __all__ = [
     "VerifyHold",
     "ViewAppointment",
     "ViewHold",
+    "WriteClinicalNotes",
 ]
 
 
@@ -72,6 +79,30 @@ class CancelAppointment(Protocol):
 class RescheduleAppointment(Protocol):
     def execute(self, *, appointment_id: Id, patient_id: Id, start: datetime) -> Appointment:
         """Move the patient's own BOOKED appointment, end recomputed; a refusal writes nothing."""
+        ...
+
+
+class CheckInAppointment(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> Appointment:
+        """Mark the clinician's own BOOKED appointment arrived; notifies no one."""
+        ...
+
+
+class CompleteAppointment(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> Appointment:
+        """Mark the clinician's own CHECKED_IN appointment completed; notifies no one."""
+        ...
+
+
+class MarkNoShow(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> Appointment:
+        """Mark the clinician's own BOOKED appointment absent, freeing its slot; notifies no one."""
+        ...
+
+
+class WriteClinicalNotes(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id, text: str) -> Appointment:
+        """Store the clinician's notes on their own appointment; empty clears, too long refused."""
         ...
 
 

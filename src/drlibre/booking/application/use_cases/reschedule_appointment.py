@@ -63,6 +63,7 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
             )
             now = self._clock.now()
             broken = booking_rules.reschedule_violations(
+                for_patient=True,
                 current_start=current.start,
                 new_start=start,
                 now=now,

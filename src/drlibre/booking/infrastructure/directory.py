@@ -62,3 +62,7 @@ class OrganisationBookingDirectory(BookingDirectory):
             time_zone=hospital.time_zone,
             provider_name=member.full_name,
         )
+
+    def clinician_of_user(self, user_id: Id) -> Id | None:
+        profile = self._queries.clinician_profile_of(user_id)
+        return profile.id if profile else None

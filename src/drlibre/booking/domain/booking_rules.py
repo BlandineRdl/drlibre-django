@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from drlibre.booking.domain.appointment import Appointment
+from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
 from drlibre.shared_kernel.booking_policy import (
     BOOKING_LEAD_TIME,
     CANCELLATION_WINDOW,
@@ -18,6 +18,14 @@ class BookingRule(StrEnum):
 
 
 class PatientAction(StrEnum):
+    CANCEL = "cancel"
+    RESCHEDULE = "reschedule"
+
+
+class ClinicianAction(StrEnum):
+    CHECK_IN = "check_in"
+    COMPLETE = "complete"
+    NO_SHOW = "no_show"
     CANCEL = "cancel"
     RESCHEDULE = "reschedule"
 
@@ -53,13 +61,16 @@ def cancel_violations(*, start: datetime, now: datetime) -> tuple[BookingRule, .
 
 def reschedule_violations(
     *,
+    for_patient: bool,
     current_start: datetime,
     new_start: datetime,
     now: datetime,
     type_online: bool,
     is_free_slot: bool,
 ) -> tuple[BookingRule, ...]:
-    """Spec 5.3 rules a patient's reschedule breaks, in order; the open booking count is not one."""
+    """Spec 5.3 rules a reschedule breaks, in order; staff are bound only by availability."""
+    if not for_patient:
+        return () if is_free_slot else (BookingRule.OUTSIDE_AVAILABILITY,)
     broken = list(cancel_violations(start=current_start, now=now))
     if new_start < now + BOOKING_LEAD_TIME:
         broken.append(BookingRule.LEAD_TIME_TOO_SHORT)
@@ -81,4 +92,18 @@ def allowed_actions(
         allowed.add(PatientAction.CANCEL)
     if appointment.movable and type_online:
         allowed.add(PatientAction.RESCHEDULE)
+    return frozenset(allowed)
+
+
+def clinician_actions(appointment: Appointment) -> frozenset[ClinicianAction]:
+    """The changes the appointment's clinician may make in its current status."""
+    allowed = set[ClinicianAction]()
+    if appointment.status is AppointmentStatus.BOOKED:
+        allowed |= {ClinicianAction.CHECK_IN, ClinicianAction.NO_SHOW}
+    if appointment.status is AppointmentStatus.CHECKED_IN:
+        allowed.add(ClinicianAction.COMPLETE)
+    if appointment.cancellable:
+        allowed.add(ClinicianAction.CANCEL)
+    if appointment.movable:
+        allowed.add(ClinicianAction.RESCHEDULE)
     return frozenset(allowed)

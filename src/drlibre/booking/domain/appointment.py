@@ -9,6 +9,8 @@ from drlibre.shared_kernel.validation import invalid_field
 
 # A cancellation reason holds at most this many characters (spec §3.1).
 MAX_CANCELLATION_REASON = 500
+# Clinical notes hold at most this many characters (spec §3.1).
+MAX_CLINICAL_NOTES = 5000
 
 
 class AppointmentStatus(StrEnum):
@@ -39,6 +41,7 @@ class Appointment:
     reason: str | None = None
     cancelled_at: datetime | None = None
     cancellation_reason: str | None = None
+    clinical_notes: str | None = None
 
     @classmethod
     def book(
@@ -104,6 +107,30 @@ class Appointment:
         """The BOOKED appointment at the new start, its end recomputed from the duration."""
         self.require_movable()
         return dataclasses.replace(self, start=start, end=start + duration, room_id=room_id)
+
+    def checked_in(self) -> "Appointment":
+        """CHECKED_IN from BOOKED; invalid_transition with the current status otherwise."""
+        return self._advanced(AppointmentStatus.BOOKED, AppointmentStatus.CHECKED_IN)
+
+    def completed(self) -> "Appointment":
+        """COMPLETED from CHECKED_IN; invalid_transition with the current status otherwise."""
+        return self._advanced(AppointmentStatus.CHECKED_IN, AppointmentStatus.COMPLETED)
+
+    def no_show(self) -> "Appointment":
+        """NO_SHOW from BOOKED; invalid_transition with the current status otherwise."""
+        return self._advanced(AppointmentStatus.BOOKED, AppointmentStatus.NO_SHOW)
+
+    def with_notes(self, text: str) -> "Appointment":
+        """The stripped notes, None when empty; invalid_input beyond the limit, in any status."""
+        cleaned = text.strip()
+        if len(cleaned) > MAX_CLINICAL_NOTES:
+            raise invalid_field("clinical_notes", f"{MAX_CLINICAL_NOTES} caractères au plus.")
+        return dataclasses.replace(self, clinical_notes=cleaned or None)
+
+    def _advanced(self, source: AppointmentStatus, target: AppointmentStatus) -> "Appointment":
+        if self.status is not source:
+            raise self._refused_transition()
+        return dataclasses.replace(self, status=target)
 
     def _refused_transition(self) -> DomainError:
         return DomainError(

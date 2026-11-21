@@ -1,3 +1,5 @@
+import dataclasses
+
 from drlibre.booking.application.ports.inbound import Appointment, ViewAppointment
 from drlibre.booking.application.ports.outbound import Appointments
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -19,4 +21,6 @@ class ViewAppointmentUseCase(ViewAppointment):
         self._appointments = appointments
 
     def execute(self, *, appointment_id: Id, patient_id: Id) -> Appointment:
-        return own_appointment(self._appointments, appointment_id, patient_id)
+        # Clinical notes are the clinician's alone.
+        found = own_appointment(self._appointments, appointment_id, patient_id)
+        return dataclasses.replace(found, clinical_notes=None)

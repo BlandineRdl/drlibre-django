@@ -150,7 +150,12 @@ def nothing_changed(world: FakeWorld, scene: Scene) -> None:
     assert world.notifications.rows == []
     assert world.outbox.queued == []
     assert world.booking_slot_refresh.refreshed == []
-    changes = {"booking.appointment_cancelled", "booking.appointment_rescheduled"}
+    changes = {
+        "booking.appointment_cancelled",
+        "booking.appointment_rescheduled",
+        "booking.appointment_status_changed",
+        "booking.appointment_notes_written",
+    }
     assert not changes & set(world.audit.actions())
 
 
