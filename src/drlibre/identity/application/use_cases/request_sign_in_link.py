@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.identity.application.ports.inbound import RequestSignInLink
 from drlibre.identity.application.ports.outbound import (
@@ -11,10 +9,8 @@ from drlibre.identity.application.ports.outbound import (
 from drlibre.identity.domain.sign_in_link import LINKS_PER_EMAIL_PER_HOUR, SignInLink
 from drlibre.identity.domain.user import Email, Role
 from drlibre.shared_kernel.clock import Clock
-from drlibre.shared_kernel.rate_limit import RateLimiter
+from drlibre.shared_kernel.rate_limit import RateLimiter, within_hourly_limits
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
-
-HOURLY = timedelta(hours=1)
 
 
 class RequestSignInLinkUseCase(RequestSignInLink):
@@ -44,10 +40,14 @@ class RequestSignInLinkUseCase(RequestSignInLink):
     def execute(self, *, email: str, network: str) -> None:
         address = Email.parse(email)
         # Both counters move on every request, known address or not, so the limit reveals nothing.
-        within_limits = self._limiter.hit(
-            f"link:email:{address.value}", limit=LINKS_PER_EMAIL_PER_HOUR, window=HOURLY
-        ) and self._limiter.hit(f"link:network:{network}", limit=self._network_limit, window=HOURLY)
-        if not within_limits:
+        if not within_hourly_limits(
+            self._limiter,
+            kind="link",
+            email=address.value,
+            network=network,
+            per_email=LINKS_PER_EMAIL_PER_HOUR,
+            per_network=self._network_limit,
+        ):
             return
         patient = self._users.by_email(address)
         if patient is None or not patient.active or patient.role is not Role.PATIENT:

@@ -17,10 +17,9 @@ from drlibre.booking.domain.visitor_details import VisitorDetails
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
-from drlibre.shared_kernel.rate_limit import RateLimiter
+from drlibre.shared_kernel.rate_limit import RateLimiter, within_hourly_limits
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
 
-HOURLY = timedelta(hours=1)
 HOLDS_PER_EMAIL = 3
 TOO_MANY = "Trop de demandes, réessayez plus tard."
 
@@ -29,10 +28,14 @@ def refuse_over_limit(
     limiter: RateLimiter, *, kind: str, email: str, network: str, per_email: int, per_network: int
 ) -> None:
     """Count one request for the email and the network; too_many_requests past either limit."""
-    allowed = limiter.hit(f"{kind}:email:{email}", limit=per_email, window=HOURLY) and limiter.hit(
-        f"{kind}:network:{network}", limit=per_network, window=HOURLY
-    )
-    if not allowed:
+    if not within_hourly_limits(
+        limiter,
+        kind=kind,
+        email=email,
+        network=network,
+        per_email=per_email,
+        per_network=per_network,
+    ):
         raise DomainError(ErrorCode.RULE_VIOLATION, TOO_MANY, {"rules": ["too_many_requests"]})
 
 
