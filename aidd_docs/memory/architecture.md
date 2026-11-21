@@ -54,6 +54,7 @@
 - Emails are queued on commit by `CeleryEmailOutbox` (`send_task`, redacted reprs keep codes and link tokens out of worker logs; the request log keeps `path` only).
 - Rate-limit keys use `settings.RATE_LIMIT_PREFIX`; a code is stored as HMAC-SHA256 keyed by `SECRET_KEY`, a sign-in link token as sha256.
 - Web views catch `invalid_input`, `has_dependents` and `forbidden` to re-render their form or delete confirmation; other refusals become error pages through `DomainErrorPagesMiddleware` (rule 6-domain-errors).
+- The audit log is append-only in PostgreSQL: triggers refuse every `UPDATE`, `DELETE` and `TRUNCATE` on `audit_auditentryrecord` (migration `audit.0002`), ORM bulk calls and raw SQL included; the test database disables only the `TRUNCATE` trigger in `tests/conftest.py` so transactional tests can flush.
 - Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 
 ## Flow
