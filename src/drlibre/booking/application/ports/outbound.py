@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
-from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
+from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.booking.domain.booking_rules import ClinicianAction, PatientAction
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
@@ -496,4 +496,93 @@ class Waitlist(Protocol):
 
     def expiring_locked(self, now: datetime) -> tuple[ExpiringEntry, ...]:
         """Locked WAITING entries past latest, OFFERED ones whose offer starts by now; by id."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class AdminAppointmentFilter:
+    """Optional narrowing of every hospital's appointments; dates are the hospital's local days."""
+
+    start_date: date | None = None
+    end_date: date | None = None
+    department_id: Id | None = None
+    clinician_id: Id | None = None
+    status: AppointmentStatus | None = None
+    source: Source | None = None
+
+    @classmethod
+    def from_query(
+        cls,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        department: str | None = None,
+        clinician: str | None = None,
+        status: str | None = None,
+        source: str | None = None,
+    ) -> "AdminAppointmentFilter":
+        """Each unusable value falls back to no filter."""
+        return cls(
+            start_date=_date_or_none(start),
+            end_date=_date_or_none(end),
+            department_id=_id_or_none(department),
+            clinician_id=_id_or_none(clinician),
+            status=AppointmentStatus(status) if status in set(AppointmentStatus) else None,
+            source=Source(source) if source in set(Source) else None,
+        )
+
+
+def _date_or_none(raw: str | None) -> date | None:
+    try:
+        return date.fromisoformat(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def _id_or_none(raw: str | None) -> Id | None:
+    try:
+        return Id.parse(raw) if raw else None
+    except ValueError:
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class AdminAppointmentRow:
+    """An appointment with whom, where and what, in its hospital's time zone; never its notes."""
+
+    appointment: Appointment
+    patient_name: str
+    clinician_name: str
+    department: str
+    appointment_type: str
+    room: str | None
+    hospital_name: str
+    time_zone: str
+
+
+@dataclass(frozen=True, slots=True)
+class ExportRow:
+    """An exported appointment: ids, UTC instants and codes only, never a name or free text."""
+
+    id: Id
+    start: datetime
+    end: datetime
+    status: AppointmentStatus
+    source: Source
+    patient_id: Id
+    clinician_id: Id
+    department_id: Id
+    appointment_type_id: Id
+    room_id: Id | None
+
+
+class AdminAppointments(Protocol):
+    def page(
+        self, appointment_filter: AdminAppointmentFilter, request: PageRequest
+    ) -> Page[AdminAppointmentRow]:
+        """Every hospital's matching appointments, latest start first then id, with the total."""
+        ...
+
+    def all(self, appointment_filter: AdminAppointmentFilter) -> tuple[ExportRow, ...]:
+        """Every matching appointment, in the page's order."""
         ...

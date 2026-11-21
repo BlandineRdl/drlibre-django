@@ -9,8 +9,12 @@ from drlibre.booking.application.ports.outbound import (
     FreeSlots,
     ScheduleLocks,
     SlotRefresh,
+    Staff,
 )
-from drlibre.booking.application.use_cases.own_clinician_appointment import own_appointment_of
+from drlibre.booking.application.use_cases.actor_scope import (
+    actor_scope,
+    locked_scoped_appointment,
+)
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.domain import booking_rules
 from drlibre.shared_kernel.clock import Clock
@@ -28,6 +32,7 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
         audit: AuditLog,
         appointments: Appointments,
         directory: BookingDirectory,
+        staff: Staff,
         free_slots: FreeSlots,
         placement: Placement,
         locks: ScheduleLocks,
@@ -39,6 +44,7 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
         self._audit = audit
         self._appointments = appointments
         self._directory = directory
+        self._staff = staff
         self._free_slots = free_slots
         self._placement = placement
         self._locks = locks
@@ -47,12 +53,10 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
 
     def execute(self, *, appointment_id: Id, actor_id: Id, start: datetime) -> Appointment:
         with self._uow:
-            profile_id = self._directory.clinician_of_user(actor_id)
-            found = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
-            self._locks.lock_clinician(found.clinician_id)
-            self._locks.lock_patient(found.patient_id)
-            # Read again under the locks, so a change committed meanwhile is seen.
-            current = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
+            scope = actor_scope(self._directory, self._staff, actor_id)
+            current = locked_scoped_appointment(
+                scope, self._appointments, self._locks, appointment_id
+            )
             current.require_movable()
             kind = self._directory.appointment_type(current.appointment_type_id)
             clinician = self._directory.clinician(current.clinician_id)
@@ -69,7 +73,7 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
             )
             now = self._clock.now()
             broken = booking_rules.reschedule_violations(
-                for_patient=profile_id is None,
+                for_patient=scope.is_patient,
                 current_start=current.start,
                 new_start=start,
                 now=now,

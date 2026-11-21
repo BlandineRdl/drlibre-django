@@ -26,6 +26,8 @@ pytest_plugins = [
     "tests.use_cases.booking.steps_clinician_reads",
     "tests.use_cases.booking.steps_waitlist",
     "tests.use_cases.booking.steps_waitlist_offers",
+    "tests.use_cases.booking.steps_admin",
+    "tests.use_cases.booking.steps_admin_reads",
 ]
 
 

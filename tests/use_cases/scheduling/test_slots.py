@@ -68,6 +68,7 @@ def ask(world: FakeWorld, outcome: Outcome, clinician_id: Id | None, start: str,
         directory=world.scheduling_directory,
         queries=world.slots,
         holds=world.slot_holds,
+        rooms=world.room_bookings,
         computation=SlotComputation(
             directory=world.scheduling_directory,
             rules=world.availability_rules,

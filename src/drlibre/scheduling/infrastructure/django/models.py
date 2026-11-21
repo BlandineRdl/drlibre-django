@@ -2,8 +2,10 @@ import uuid
 
 from django.db import models
 
+from drlibre.persistence.records import TrackedRecord
 
-class AvailabilityRuleModel(models.Model):
+
+class AvailabilityRuleModel(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # A profile without appointments may be deleted (spec 10); its rules go with it.
     clinician = models.ForeignKey(
@@ -30,7 +32,7 @@ class AvailabilityRuleModel(models.Model):
         return f"{self.weekday} {self.start}-{self.end}"
 
 
-class TimeOffModel(models.Model):
+class TimeOffModel(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     clinician = models.ForeignKey(
         "organisation.ClinicianProfileRecord", on_delete=models.CASCADE, related_name="time_offs"
@@ -45,6 +47,7 @@ class TimeOffModel(models.Model):
 
 
 class SlotModel(models.Model):
+    # Derived cache, not a §3 record: no provenance columns.
     # Rebuilt per clinician by RefreshSlots; indexed for the department and clinician reads.
     clinician = models.ForeignKey(
         "organisation.ClinicianProfileRecord",

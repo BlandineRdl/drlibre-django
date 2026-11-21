@@ -12,9 +12,11 @@ from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
 from tests.fakes.appointment_history import InMemoryAppointmentHistory
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
+from tests.fakes.audit_queries import InMemoryAuditQueries
 from tests.fakes.booking import (
     FixedBookingDirectory,
     FixedCodeIssuer,
+    InMemoryAdminAppointments,
     InMemoryAppointmentQueries,
     InMemoryAppointments,
     InMemoryFreeSlots,
@@ -29,12 +31,14 @@ from tests.fakes.booking import (
     RecordingScheduleLocks,
     RecordingSlotRefresh,
 )
+from tests.fakes.booking_options import InMemoryBookingOptionQueries
 from tests.fakes.clinician_agenda import InMemoryClinicianAgenda
 from tests.fakes.clock import FixedClock
 from tests.fakes.database_probe import InMemoryDatabaseProbe
 from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
+from tests.fakes.journal_actors import InMemoryJournalActors
 from tests.fakes.notifications import InMemoryNotifications
 from tests.fakes.organisation import (
     InMemoryAppointmentTypes,
@@ -49,11 +53,13 @@ from tests.fakes.organisation import (
 )
 from tests.fakes.password_hasher import InMemoryPasswordHasher
 from tests.fakes.rate_limiter import InMemoryRateLimiter
+from tests.fakes.reporting import InMemoryActivityQueries, InMemoryAdmins
 from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
     InMemoryAvailabilityQueries,
     InMemoryAvailabilityRules,
     InMemoryClinicianAppointments,
+    InMemoryRoomBookings,
     InMemorySlotHolds,
     InMemorySlotStore,
     InMemoryTimeOffs,
@@ -101,6 +107,7 @@ class FakeWorld:
         self.clinician_appointments = InMemoryClinicianAppointments()
         self.slots = InMemorySlotStore()
         self.slot_holds = InMemorySlotHolds()
+        self.room_bookings = InMemoryRoomBookings()
         self.slot_refresh = InMemorySlotRefresh()
         self.availability_queries = InMemoryAvailabilityQueries(
             rules=self.availability_rules, time_offs=self.time_offs
@@ -108,6 +115,9 @@ class FakeWorld:
         self.booking_appointments = InMemoryAppointments()
         self.waitlist = InMemoryWaitlist(self.booking_appointments)
         self.waitlist_queries = InMemoryWaitlistQueries(self.waitlist, self.users)
+        self.booking_option_queries = InMemoryBookingOptionQueries()
+        self.admin_appointments = InMemoryAdminAppointments(self.booking_appointments, self.users)
+        self.audit_queries = InMemoryAuditQueries(self.audit)
         self.booking_queries = InMemoryAppointmentQueries(self.booking_appointments, self.waitlist)
         self.agenda = InMemoryPatientAgenda(self.booking_appointments)
         self.booking_directory = FixedBookingDirectory()
@@ -120,6 +130,7 @@ class FakeWorld:
         self.booking_slot_refresh = RecordingSlotRefresh()
         self.schedule_locks = RecordingScheduleLocks()
         self.patients = InMemoryPatients(self.users)
+        self.activity = InMemoryActivityQueries()
         self.clinician_agenda = InMemoryClinicianAgenda(
             appointments=self.booking_appointments,
             users=self.users,
@@ -192,8 +203,10 @@ class FakeWorld:
             ),
             appointments=self.appointments,
             actors=self.actors,
+            audit_queries=self.audit_queries,
             user_queries=self.user_queries,
             staff_lookup=self.user_queries,
+            patient_lookup=self.user_queries,
             profiles=self.profiles,
             staff=self.staff,
             staff_profiles=self.staff_profiles,
@@ -204,6 +217,7 @@ class FakeWorld:
             slot_store=self.slots,
             slot_queries=self.slots,
             slot_holds=self.slot_holds,
+            room_bookings=self.room_bookings,
             availability_queries=self.availability_queries,
             slot_refresh=self.slot_refresh,
             booking=BookingAdapters(
@@ -225,7 +239,9 @@ class FakeWorld:
                 history=InMemoryAppointmentHistory(self.audit),
                 waitlist=self.waitlist,
                 waitlist_queries=self.waitlist_queries,
+                booking_option_queries=self.booking_option_queries,
                 staff=InMemoryStaff(self.users),
+                admin_appointments=self.admin_appointments,
             ),
             links=self.links,
             link_notices=OutboxLinkNotices(
@@ -233,6 +249,9 @@ class FakeWorld:
             ),
             # Search is a read side tested on PostgreSQL: the real adapter, never reached by fakes.
             search_queries=SqlSearchQueries(),
+            activity_queries=self.activity,
+            admins=InMemoryAdmins(self.users),
+            journal_actors=InMemoryJournalActors(self.users),
             notifications=self.notifications,
             notify=self.notify,
             time_zone="Europe/Paris",

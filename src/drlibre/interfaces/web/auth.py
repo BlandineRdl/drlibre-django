@@ -4,14 +4,15 @@ from functools import wraps
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 
+from drlibre.bootstrap import act_as, stop_acting
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
-type View = Callable[..., HttpResponse]
+type View = Callable[..., HttpResponseBase]
 
 HOMES = {Role.ADMIN: "/console/", Role.CLINICIAN: "/workspace/", Role.PATIENT: "/portal/"}
 FORCED_CHANGE_PAGE = "/account/password"
@@ -59,7 +60,11 @@ class SessionMiddleware:
         token = session_token(request)
         identity = container().authenticate_session.execute(token=token) if token else None
         setattr(request, _ATTR, identity)
-        response = self.get_response(request)
+        acting = act_as(identity.user_id.value if identity else None)
+        try:
+            response = self.get_response(request)
+        finally:
+            stop_acting(acting)
         if token and identity is None and settings.SESSION_COOKIE_NAME not in response.cookies:
             clear_session_cookie(response)
         elif token and identity and identity.session_renewed:
@@ -80,7 +85,7 @@ def require_role(role: Role) -> Callable[[View], View]:
 
     def decorate(view: View) -> View:
         @wraps(view)
-        def guarded(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        def guarded(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponseBase:
             identity = identity_of(request)
             if identity is None:
                 return to_sign_in(request)
@@ -97,7 +102,7 @@ def require_role(role: Role) -> Callable[[View], View]:
 
 def require_password_holder(view: View) -> View:
     @wraps(view)
-    def guarded(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+    def guarded(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponseBase:
         identity = identity_of(request)
         if identity is None:
             return to_sign_in(request)

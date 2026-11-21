@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Réserver pour un patient{% endblock %}
+{% block timezone %}{% if view.time_zone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% else %}Heures affichées dans le fuseau de l'hôpital du praticien.{% endif %}{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<h1>Réserver pour un patient</h1>
+{% if view.refusal %}
+<div role="alert" class="error-summary" tabindex="-1" id="refusal" autofocus>
+  <p><strong>{{ view.refusal }}</strong></p>
+  {% if view.reasons %}<ul>{% for reason in view.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+<section aria-labelledby="patient-heading">
+  <h2 id="patient-heading">1. Patient</h2>
+  <search>
+  <form method="get" action="{{ view.action }}">
+    <label for="q">Nom ou email du patient</label>
+    <fieldset role="group">
+      <input type="search" id="q" name="q" value="{{ view.choice.search }}" autocomplete="off">
+      <button type="submit">Chercher</button>
+    </fieldset>
+  </form>
+  </search>
+</section>
+{% if view.searched %}
+<form method="get" action="{{ view.action }}">
+  <input type="hidden" name="q" value="{{ view.choice.search }}">
+  {% if view.patients %}
+  <fieldset>
+    <legend>Patient trouvé</legend>
+    {% for p in view.patients %}
+    <label><input type="radio" name="patient" value="{{ p.value }}"{% if p.selected %} checked{% endif %}> {{ p.label }}</label>
+    {% endfor %}
+  </fieldset>
+  {% else %}
+  <p>Aucun patient actif ne correspond.</p>
+  {% endif %}
+  <h2>2. Type de RDV</h2>
+  <label for="type">Type de RDV</label>
+  <select id="type" name="type">
+    <option value="">Choisir…</option>
+    {% for c in view.types %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+  </select>
+  {% if view.clinicians %}
+  <h2>3. Praticien</h2>
+  <label for="clinician">Praticien du département</label>
+  <select id="clinician" name="clinician">
+    <option value="">Choisir…</option>
+    {% for c in view.clinicians %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <button type="submit">Continuer</button>
+</form>
+{% endif %}
+{% if view.strip %}
+<section aria-labelledby="slots-heading">
+  <h2 id="slots-heading">4. Créneau et salle</h2>
+  <nav aria-label="Semaines" class="pagination">
+    {% if view.strip.previous_url %}<a href="{{ view.strip.previous_url }}">‹ Semaine précédente</a>{% endif %}
+    <h3>{{ view.strip.week_label }}</h3>
+    {% if view.strip.next_url %}<a href="{{ view.strip.next_url }}">Semaine suivante ›</a>{% endif %}
+  </nav>
+  {% if view.strip.empty_week_text %}<p>{{ view.strip.empty_week_text }}</p>{% endif %}
+  <form method="post" action="{{ view.action }}">
+    {% csrf_token %}
+    <input type="hidden" name="q" value="{{ view.choice.search }}">
+    <input type="hidden" name="patient" value="{{ view.choice.patient }}">
+    <input type="hidden" name="type" value="{{ view.choice.appointment_type }}">
+    <input type="hidden" name="clinician" value="{{ view.choice.clinician }}">
+    <input type="hidden" name="week" value="{{ view.strip.week_value }}">
+    <label for="room">Salle (facultatif)</label>
+    <select id="room" name="room">
+      <option value="">Salle par défaut ou attribuée</option>
+      {% for c in view.rooms %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+    </select>
+    <div class="week-strip">
+      {% for day in view.strip.days %}
+      <section aria-labelledby="day-{{ forloop.counter }}">
+        <h4 id="day-{{ forloop.counter }}">{{ day.label }}</h4>
+        {% if day.slots %}
+        <ul class="slot-list">
+          {% for slot in day.slots %}<li><button type="submit" name="start" value="{{ slot.value }}" class="outline secondary" aria-describedby="day-{{ forloop.parentloop.counter }}">Réserver à {{ slot.label }}</button></li>{% endfor %}
+        </ul>
+        {% else %}<p>{{ day.empty_text }}</p>{% endif %}
+      </section>
+      {% endfor %}
+    </div>
+  </form>
+</section>
+{% endif %}
+<p><a href="{{ view.cancel_url }}">Retour aux rendez-vous</a></p>
+{% endblock %}

@@ -5,7 +5,6 @@ from django.db import connection
 
 from drlibre.booking.application.ports.inbound import (
     WaitlistEntry,
-    WaitlistOption,
     WaitlistQueries,
     WaitlistRow,
     WaitlistStatus,
@@ -41,24 +40,6 @@ LEFT JOIN LATERAL (
 ) page ON true
 """
 
-_TYPES = """
-SELECT t.id, t.name || ' · ' || h.name AS label
-FROM organisation_appointmenttyperecord t
-JOIN organisation_departmentrecord d ON d.id = t.department_id
-JOIN organisation_hospitalrecord h ON h.id = d.hospital_id
-WHERE t.active AND h.active AND (NOT %(online_only)s OR t.bookable_online)
-ORDER BY label, t.id
-"""
-
-_CLINICIANS = """
-SELECT c.id, u.full_name || ' · ' || d.name AS label
-FROM organisation_clinicianprofilerecord c
-JOIN identity_userrecord u ON u.id = c.user_id
-JOIN organisation_departmentrecord d ON d.id = c.department_id
-WHERE u.active AND u.role = 'CLINICIAN'
-ORDER BY label, c.id
-"""
-
 
 def _fetch(sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
     with connection.cursor() as cursor:
@@ -92,10 +73,6 @@ def _row(row: dict[str, Any]) -> WaitlistRow:
     )
 
 
-def _options(sql: str, params: dict[str, Any]) -> tuple[WaitlistOption, ...]:
-    return tuple(WaitlistOption(Id(r["id"]), r["label"]) for r in _fetch(sql, params))
-
-
 class SqlWaitlistQueries(WaitlistQueries):
     """Reads booking, organisation and identity tables in one statement per call."""
 
@@ -108,9 +85,3 @@ class SqlWaitlistQueries(WaitlistQueries):
         rows = _fetch(_PAGE, params)
         found = tuple(_row(r) for r in rows if r["id"] is not None)
         return Page(found, rows[0]["total"], request.number)
-
-    def type_options(self, *, online_only: bool) -> tuple[WaitlistOption, ...]:
-        return _options(_TYPES, {"online_only": online_only})
-
-    def clinician_options(self) -> tuple[WaitlistOption, ...]:
-        return _options(_CLINICIANS, {})

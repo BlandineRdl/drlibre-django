@@ -138,6 +138,22 @@ def _type_inactive(world: SearchWorld, kind: str) -> None:
     world.types[kind].save()
 
 
+@given(parsers.parse('the type "{kind}" needs a room'))
+def _type_needs_room(world: SearchWorld, kind: str) -> None:
+    world.types[kind].needs_room = True
+    world.types[kind].save()
+
+
+@given(parsers.parse('the room "{name}" of "{department}"'))
+def _room(world: SearchWorld, name: str, department: str) -> None:
+    world.room(name, department)
+
+
+@given(parsers.parse('"{name}" has an appointment in "{room}" at "{start}"'))
+def _booked_in(world: SearchWorld, name: str, room: str, start: str) -> None:
+    world.booked_in(name, room, start)
+
+
 @given(parsers.parse('the clinician "{name}" of "{specialty}" in "{department}"'))
 def _clinician(world: SearchWorld, name: str, specialty: str, department: str) -> None:
     world.clinician(name, specialty, department)

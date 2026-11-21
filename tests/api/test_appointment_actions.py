@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -84,14 +85,11 @@ def test_a_patient_moves_through_the_api_to_a_free_slot_with_the_end_recomputed(
     assert taken.json()["details"]["rules"] == ["outside_availability"]
 
 
-@pytest.mark.parametrize("role", [Role.CLINICIAN, Role.ADMIN], ids=["no-profile", "admin"])
-def test_an_admin_or_a_stranger_cannot_change_a_patients_appointment(
-    client: Client, world: Bookable, role: Role
-) -> None:
-    """§14 : seuls le patient et son praticien agissent ; l'admin attend E7."""
+def test_a_stranger_cannot_change_a_patients_appointment(client: Client, world: Bookable) -> None:
+    """§14 : seuls le patient, son praticien et l'admin agissent."""
     appointment = booked(world, client)
     staff = Client()
-    staff.cookies[COOKIE] = stored_session(stored_user(role))
+    staff.cookies[COOKIE] = stored_session(stored_user(Role.CLINICIAN))
 
     refused = [
         post(staff, appointment, "cancel", {"reason": "x"}),
@@ -102,6 +100,54 @@ def test_an_admin_or_a_stranger_cannot_change_a_patients_appointment(
 
     assert [(r.status_code, r.json()["code"]) for r in refused] == [(403, "forbidden")] * 3
     assert anonymous.status_code == 401
+
+
+def test_the_admin_changes_the_status_of_any_appointment_through_the_api(
+    client: Client, world: Bookable
+) -> None:
+    """Story « l'admin annule ou change le statut » : check-in, complete et no-show par l'API."""
+    first = booked(world, client)
+    second = world.app().book_appointment.execute(
+        patient_id=first.patient_id,
+        appointment_type_id=world.scene.kind,
+        clinician_id=world.clinician,
+        start=SLOT_START + timedelta(minutes=30),
+    )
+    admin = Client()
+    admin.cookies[COOKIE] = stored_session(stored_user(Role.ADMIN))
+
+    statuses = [
+        post(admin, first, "check-in", {}),
+        post(admin, first, "complete", {}),
+        post(admin, second, "no-show", {}),
+    ]
+
+    assert [(r.status_code, r.json()["status"]) for r in statuses] == [
+        (200, "CHECKED_IN"),
+        (200, "COMPLETED"),
+        (200, "NO_SHOW"),
+    ]
+
+
+def test_the_admin_cancels_or_moves_any_appointment_through_the_api(
+    client: Client, world: Bookable
+) -> None:
+    """Stories « l'admin annule » et « l'admin déplace » : POST .../cancel et .../reschedule."""
+    moved_one = booked(world, client)
+    cancelled_one = world.app().book_appointment.execute(
+        patient_id=moved_one.patient_id,
+        appointment_type_id=world.scene.kind,
+        clinician_id=world.clinician,
+        start=SLOT_START + timedelta(minutes=30),
+    )
+    admin = Client()
+    admin.cookies[COOKIE] = stored_session(stored_user(Role.ADMIN))
+
+    moved = post(admin, moved_one, "reschedule", {"start": "2026-11-23T10:00:00Z"})
+    cancelled = post(admin, cancelled_one, "cancel", {"reason": "Fermeture"})
+
+    assert (moved.status_code, moved.json()["start"]) == (200, "2026-11-23T10:00:00+00:00")
+    assert (cancelled.status_code, cancelled.json()["status"]) == (200, "CANCELLED")
 
 
 def test_a_patient_cannot_name_another_patient_or_a_room_when_booking(

@@ -65,7 +65,7 @@ class ScheduleDependents(Protocol):
         ...
 
     def for_clinician_profile(self, profile_id: Id) -> tuple[Dependent, ...]:
-        """Return the appointments of the clinician holding the profile."""
+        """Return the appointments and waitlist entries of the clinician holding the profile."""
         ...
 
 

@@ -169,8 +169,8 @@ def test_booking_as_a_patient_needs_a_session_and_refuses_an_end_time(
     assert booked.json()["start"].startswith("2026-11-23T09:00")
 
 
-def test_a_signed_in_admin_cannot_book_through_the_api(client: Client, world: Bookable) -> None:
-    """Règle §7.1 : l'admin ne réserve pas par l'API avant E7 (forbidden)."""
+def test_a_signed_in_admin_must_name_the_patient_to_book(client: Client, world: Bookable) -> None:
+    """Story L'admin réserve un RDV pour un patient : l'admin nomme le patient (invalid_input)."""
     client.cookies[COOKIE] = stored_session(stored_user(Role.ADMIN))
 
     refused = post(
@@ -179,4 +179,5 @@ def test_a_signed_in_admin_cannot_book_through_the_api(client: Client, world: Bo
         {"type": str(world.scene.kind), "start": SLOT_START.isoformat()},
     )
 
-    assert refused.status_code == 403
+    assert refused.status_code == 400
+    assert refused.json()["details"]["fields"][0]["field"] == "patient"

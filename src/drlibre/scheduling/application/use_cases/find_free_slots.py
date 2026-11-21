@@ -1,8 +1,12 @@
+from bisect import bisect_left
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from drlibre.scheduling.application.ports.inbound import FindFreeSlots
 from drlibre.scheduling.application.ports.outbound import (
+    AppointmentType,
+    ClinicianSlot,
+    RoomBookings,
     SchedulingDirectory,
     SlotHolds,
     SlotQueries,
@@ -26,12 +30,14 @@ class FindFreeSlotsUseCase(FindFreeSlots):
         directory: SchedulingDirectory,
         queries: SlotQueries,
         holds: SlotHolds,
+        rooms: RoomBookings,
         computation: SlotComputation,
     ):
         self._clock = clock
         self._directory = directory
         self._queries = queries
         self._holds = holds
+        self._rooms = rooms
         self._computation = computation
 
     def execute(
@@ -72,8 +78,36 @@ class FindFreeSlotsUseCase(FindFreeSlots):
                 self._computation, ignoring_appointment, kind, clinicians, within, now
             ),
         )
+        found = self._with_free_room(found, kind, ignoring_appointment)
         by_start = {s.slot.start: s.slot for s in found}
         return tuple(by_start[at] for at in sorted(by_start))
+
+    def _with_free_room(
+        self, found: tuple[ClinicianSlot, ...], kind: AppointmentType, ignoring: Id | None
+    ) -> tuple[ClinicianSlot, ...]:
+        """Like placement, a slot of a type with a room needs one active room free all along."""
+        if not kind.needs_room or not found:
+            return found
+        rooms = self._directory.active_rooms(kind.department_id)
+        span = Period(min(s.slot.start for s in found), max(s.slot.end for s in found))
+        busy = sorted(
+            (
+                b
+                for b in (self._rooms.busy(rooms, within=span) if rooms else ())
+                if b.appointment_id != ignoring
+            ),
+            key=lambda b: b.period.start,
+        )
+        starts = [b.period.start for b in busy]
+        longest = max((b.period.end - b.period.start for b in busy), default=timedelta())
+
+        def taken(slot: Slot) -> int:
+            # Only bookings starting within `longest` before the slot can overlap it.
+            lo = bisect_left(starts, slot.start - longest)
+            near = busy[lo : bisect_left(starts, slot.end)]
+            return len({b.room_id for b in near if b.period.end > slot.start})
+
+        return tuple(s for s in found if taken(s.slot) < len(rooms))
 
 
 def _local_span(period: Period, tz: ZoneInfo) -> timedelta:

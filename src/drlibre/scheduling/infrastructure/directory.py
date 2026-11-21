@@ -46,6 +46,9 @@ class OrganisationSchedulingDirectory(SchedulingDirectory):
         room = self._queries.room(room_id)
         return Room(room.id, room.department_id, room.active) if room else None
 
+    def active_rooms(self, department_id: Id) -> tuple[Id, ...]:
+        return tuple(r.id for r in self._queries.department_rooms(department_id) if r.active)
+
     def _clinician(self, profile: ClinicianProfile) -> Clinician | None:
         time_zone = self._time_zone(profile.department_id)
         if time_zone is None:
@@ -68,4 +71,5 @@ def _type(kind: OrganisationType, time_zone: str) -> AppointmentType:
         kind.buffer_minutes,
         kind.active,
         time_zone,
+        kind.needs_room,
     )

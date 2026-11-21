@@ -74,14 +74,14 @@ def add_entry(request: HttpRequest) -> HttpResponse:
             error = refused
         else:
             return redirect(f"{CONSOLE_WAITLIST_URL}?done=added")
-    queries = container().waitlist_queries
+    options = container().booking_option_queries
     form = join_form(
         title="Inscrire un patient sur la liste d'attente",
         action=request.path,
         submit_label="Inscrire",
         specs=ADD_FIELDS,
-        types=queries.type_options(online_only=False),
-        clinicians=queries.clinician_options(),
+        types=options.type_options(online_only=False),
+        clinicians=options.clinician_options(),
         values=values,
         error=error,
         cancel_url=CONSOLE_WAITLIST_URL,

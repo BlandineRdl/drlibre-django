@@ -72,6 +72,31 @@ Feature: Chaque résultat montre ses prochaines disponibilités
       | 10      | 2026-11-23 09:20                           | never says "09:00"         | 08:20       |
       | -1      | 2026-11-23 09:00, 2026-11-23 09:20         | says "09:00"               | 08:00,08:20 |
 
+  Scenario: Règle §6.2 : un créneau dont toutes les salles du département sont prises n'est pas proposé
+    Given the type "Consultation cardio" needs a room
+    And the room "Box 1" of "Cardiologie"
+    And "Dr Alice Martin" is free at "2026-11-23 09:00, 09:20"
+    And "Dr Bruno Petit" has an appointment in "Box 1" at "2026-11-23 09:00"
+    When the visitor opens "/api/v1/search/providers"
+    Then "Dr Alice Martin" shows the next starts "2026-11-23 09:20"
+    When the visitor opens "/api/v1/search/hospitals"
+    Then "Hôpital Nord" shows the first start "2026-11-23 09:20"
+    When the visitor opens "/providers/[id:Dr Alice Martin]?week=2026-11-23"
+    Then the page never says "09:00"
+    When the visitor opens "/api/v1/slots?type=[type:Consultation cardio]&clinician=[id:Dr Alice Martin]&start=2026-11-23T00:00:00Z&end=2026-11-24T00:00:00Z"
+    Then the free slots start at "08:20" UTC
+
+  Scenario: Règle §6.2 : un créneau reste proposé tant qu'une salle active du département est libre
+    Given the type "Consultation cardio" needs a room
+    And the room "Box 1" of "Cardiologie"
+    And the room "Box 2" of "Cardiologie"
+    And "Dr Alice Martin" is free at "2026-11-23 09:00, 09:20"
+    And "Dr Bruno Petit" has an appointment in "Box 1" at "2026-11-23 09:00"
+    When the visitor opens "/api/v1/search/providers"
+    Then "Dr Alice Martin" shows the next starts "2026-11-23 09:00, 2026-11-23 09:20"
+    When the visitor opens "/api/v1/slots?type=[type:Consultation cardio]&clinician=[id:Dr Alice Martin]&start=2026-11-23T00:00:00Z&end=2026-11-24T00:00:00Z"
+    Then the free slots start at "08:00,08:20" UTC
+
   Scenario: Les heures sont dans le fuseau de l'hôpital, que la page nomme.
     Given the hospital "Hôpital Réunion" in "Saint-Denis" in the time zone "Indian/Reunion"
     And the department "Pédiatrie" of "Hôpital Réunion" offers "Consultation pédiatrie" of 30 minutes online

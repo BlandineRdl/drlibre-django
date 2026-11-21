@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Journal d'audit{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<h1>Journal d'audit</h1>
+<p>{{ view.zone_note }} Le journal est en lecture seule.</p>
+<search>
+<form method="get" action="/console/audit/">
+  <div class="grid">
+    <label for="actor">Acteur (email)<input id="actor" name="actor" type="email" autocomplete="off" value="{{ view.actor }}"></label>
+    <label for="entity_type">Entité
+      <select id="entity_type" name="entity_type">
+        <option value="">Toutes</option>
+        {% for c in view.entity_choices %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label for="from">Du<input id="from" name="from" type="date" value="{{ view.start }}"></label>
+    <label for="to">Au<input id="to" name="to" type="date" value="{{ view.end }}"></label>
+  </div>
+  <button type="submit">Filtrer</button>
+</form>
+</search>
+{% if view.rows %}
+<div class="overflow-auto" tabindex="0" role="region" aria-label="Entrées du journal d'audit">
+  <table>
+    <caption>Journal d'audit, plus récentes d'abord : {{ view.summary }}</caption>
+    <thead><tr>{% for header in view.headers %}<th scope="col">{{ header }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in view.rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>Aucune entrée pour ces filtres.</p>
+{% endif %}
+<nav aria-label="Pagination" class="pagination">
+  <p>{{ view.summary }}</p>
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Page précédente</a>{% endif %}
+  {% if view.next_url %}<a href="{{ view.next_url }}">Page suivante ›</a>{% endif %}
+</nav>
+{% endblock %}

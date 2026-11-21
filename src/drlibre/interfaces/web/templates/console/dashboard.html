@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<h1>Tableau de bord</h1>
+<nav aria-label="Période" class="section-nav">
+  <ul>
+    {% for link in view.ranges %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
+  </ul>
+</nav>
+<section aria-labelledby="figures">
+  <h2 id="figures">Indicateurs : {{ view.range_label }}</h2>
+  <dl class="tiles">
+    {% for tile in view.tiles %}<div><dt>{{ tile.label }}</dt><dd>{{ tile.value }}</dd></div>{% endfor %}
+  </dl>
+</section>
+<section aria-labelledby="per-day">
+  <h2 id="per-day">RDV par jour</h2>
+  <div class="overflow-auto" tabindex="0" role="region" aria-labelledby="per-day">
+    <table class="histogram">
+      <caption>RDV non annulés par jour local de l'hôpital : {{ view.range_label }}</caption>
+      <thead><tr><th scope="col">Jour</th><th scope="col">RDV</th></tr></thead>
+      <tbody>
+      {% for day in view.days %}
+        <tr><th scope="row">{{ day.day }}</th><td><span class="bar bar-{{ day.width }}" aria-hidden="true"></span> {{ day.count }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section aria-labelledby="busiest">
+  <h2 id="busiest">Praticiens les plus chargés</h2>
+  {% if view.busiest %}
+  <ol>{% for row in view.busiest %}<li>{{ row.name }} · {{ row.count }} RDV</li>{% endfor %}</ol>
+  {% else %}
+  <p>{{ view.no_busiest }}</p>
+  {% endif %}
+</section>
+{% endblock %}

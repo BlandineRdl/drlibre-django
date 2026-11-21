@@ -1,4 +1,6 @@
 from drlibre.identity.application.ports.inbound import (
+    PatientLookup,
+    PatientMatch,
     Role,
     StaffLookup,
     StaffMember,
@@ -14,7 +16,7 @@ def _member(user: User) -> StaffMember:
     return StaffMember(user.id, user.full_name, user.role, user.active)
 
 
-class InMemoryUserQueries(UserQueries, StaffLookup):
+class InMemoryUserQueries(UserQueries, StaffLookup, PatientLookup):
     """Reads straight from the in-memory users."""
 
     def __init__(self, users: InMemoryUsers) -> None:
@@ -49,3 +51,14 @@ class InMemoryUserQueries(UserQueries, StaffLookup):
     def named_like(self, text: str) -> frozenset[Id]:
         rows = self.users_store.rows.values()
         return frozenset(u.id for u in rows if text.lower() in u.full_name.lower())
+
+    def active_patients(self, text: str) -> tuple[PatientMatch, ...]:
+        needle = text.strip().lower()
+        found = (
+            u
+            for u in self._sorted()
+            if u.role is Role.PATIENT
+            and u.active
+            and (needle in u.full_name.lower() or needle in u.email.value)
+        )
+        return tuple(PatientMatch(u.id, u.full_name, u.email.value) for u in found)[:PAGE_SIZE]

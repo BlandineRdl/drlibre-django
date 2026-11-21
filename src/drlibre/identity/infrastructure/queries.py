@@ -1,6 +1,8 @@
 from django.db.models import Q
 
 from drlibre.identity.application.ports.inbound import (
+    PatientLookup,
+    PatientMatch,
     Role,
     StaffLookup,
     StaffMember,
@@ -17,7 +19,7 @@ def _member(record: UserRecord) -> StaffMember:
     return StaffMember(Id(record.id), record.full_name, Role(record.role), record.active)
 
 
-class DjangoUserQueries(UserQueries, StaffLookup):
+class DjangoUserQueries(UserQueries, StaffLookup, PatientLookup):
     def users(self, request: PageRequest) -> Page[User]:
         rows = UserRecord.objects.order_by("full_name", "email")
         if request.search:
@@ -48,3 +50,11 @@ class DjangoUserQueries(UserQueries, StaffLookup):
     def named_like(self, text: str) -> frozenset[Id]:
         ids = UserRecord.objects.filter(full_name__icontains=text).values_list("id", flat=True)
         return frozenset(Id(pk) for pk in ids)
+
+    def active_patients(self, text: str) -> tuple[PatientMatch, ...]:
+        needle = text.strip()
+        rows = UserRecord.objects.filter(role=Role.PATIENT.value, active=True).filter(
+            Q(full_name__icontains=needle) | Q(email__icontains=needle)
+        )
+        window = rows.order_by("full_name", "email")[:PAGE_SIZE]
+        return tuple(PatientMatch(Id(r.id), r.full_name, r.email) for r in window)

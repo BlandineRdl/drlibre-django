@@ -152,3 +152,18 @@ def test_booked_periods_come_back_with_their_status(scene: Scene) -> None:
     assert [(p.start, p.status) for p in found] == [
         (NOW + timedelta(days=1), AppointmentStatus.BOOKED)
     ]
+
+
+def test_a_room_is_busy_only_during_its_active_appointments(scene: Scene) -> None:
+    """Règle §6.2 : un créneau n'est montré que si une salle du département reste libre."""
+    assert scene.room is not None
+    active = book(scene, NOW + timedelta(days=1))
+    book(scene, NOW + timedelta(days=1, hours=1), status=AppointmentStatus.CANCELLED)
+    end = NOW + timedelta(days=2)
+
+    found = scene.queries.room_periods((scene.room,), start=NOW, end=end)
+
+    assert [(p.appointment_id, p.room_id, p.start) for p in found] == [
+        (active, scene.room, NOW + timedelta(days=1))
+    ]
+    assert scene.queries.room_periods((Id(),), start=NOW, end=end) == ()

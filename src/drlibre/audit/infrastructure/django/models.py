@@ -8,6 +8,7 @@ class AppendOnlyError(RuntimeError):
     pass
 
 
+# Append-only, so not a TrackedRecord: `at` and `actor_id` already are its spec §3 fields.
 class AuditEntryRecord(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     actor_id = models.UUIDField(null=True, db_index=True)

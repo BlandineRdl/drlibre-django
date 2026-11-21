@@ -2,8 +2,10 @@ import uuid
 
 from django.db import models
 
+from drlibre.persistence.records import TrackedRecord
 
-class HospitalRecord(models.Model):
+
+class HospitalRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=150, db_index=True)
     code = models.CharField(max_length=30, unique=True)
@@ -24,7 +26,7 @@ class HospitalRecord(models.Model):
         return self.code
 
 
-class SpecialtyRecord(models.Model):
+class SpecialtyRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=150, db_index=True)
     code = models.CharField(max_length=30, unique=True)
@@ -36,7 +38,7 @@ class SpecialtyRecord(models.Model):
         return self.code
 
 
-class DepartmentRecord(models.Model):
+class DepartmentRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hospital = models.ForeignKey(
         HospitalRecord, on_delete=models.PROTECT, related_name="departments"
@@ -51,7 +53,7 @@ class DepartmentRecord(models.Model):
         return self.code
 
 
-class RoomRecord(models.Model):
+class RoomRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     department = models.ForeignKey(DepartmentRecord, on_delete=models.PROTECT, related_name="rooms")
     name = models.CharField(max_length=150, db_index=True)
@@ -67,7 +69,7 @@ class RoomRecord(models.Model):
         return self.code
 
 
-class AppointmentTypeRecord(models.Model):
+class AppointmentTypeRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     department = models.ForeignKey(
         DepartmentRecord, on_delete=models.PROTECT, related_name="appointment_types"
@@ -87,7 +89,7 @@ class AppointmentTypeRecord(models.Model):
         return self.code
 
 
-class ClinicianProfileRecord(models.Model):
+class ClinicianProfileRecord(TrackedRecord):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # Identity owns users; contexts share no foreign key, only the id.
     user_id = models.UUIDField(unique=True)

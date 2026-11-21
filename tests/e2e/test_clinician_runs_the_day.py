@@ -50,10 +50,10 @@ def _free_starts(page: Page, base_url: str, *, kind: str, clinician: str, day: d
 
 
 def _free_day(page: Page, base_url: str, *, kind: str, clinician: str) -> date:
-    """The first weekday from three weeks ahead with room for three appointments."""
-    # Three weeks ahead keeps clear of the seeded day and of the patient journeys' weeks.
+    """The first weekday from six weeks ahead with room for three appointments."""
+    # Six weeks ahead keeps clear of the seeded day, the patient journeys' and the seeded waitlist.
     # Each run leaves a COMPLETED appointment, so a later run moves on once a day fills up.
-    day = date.today() + timedelta(days=21 - date.today().weekday())
+    day = date.today() + timedelta(days=42 - date.today().weekday())
     while len(_free_starts(page, base_url, kind=kind, clinician=clinician, day=day)) < 6:
         day += timedelta(days=3 if day.weekday() == 4 else 1)
     return day
@@ -79,12 +79,6 @@ def _book(
     return booked.json()["id"]
 
 
-def _patient_id(page: Page, base_url: str) -> str:
-    """The passwordless patient, from the seeded appointments of the clinician's agenda."""
-    rows = page.request.get(f"{base_url}/api/v1/appointments").json()["appointments"]
-    return next(r["patient"] for r in rows if r["patient_name"] == PATIENT_NAME)
-
-
 def _row(page: Page, appointment_id: str) -> Any:
     link = page.locator(f'a[href="/workspace/appointments/{appointment_id}"]')
     return page.locator("article.agenda-row", has=link)
@@ -107,13 +101,15 @@ def test_le_praticien_fait_avancer_annule_et_note_ses_rdv_sans_voir_ceux_d_un_au
     clinician = _id_in_link(admin, "Calendrier de Claire Martin")
     admin.goto(f"{base_url}/console/clinicians/?search=Bernard")
     other_clinician = _id_in_link(admin, "Calendrier de Hugo Bernard")
+    # By email: every visitor journey's patient shares the passwordless patient's name.
+    admin.goto(f"{base_url}/console/users/?search={PATIENT}")
+    patient = _id_in_link(admin, f"Modifier {PATIENT_NAME}")
     admin.context.close()
 
     page = browser.new_context(bypass_csp=True, locale="fr-FR").new_page()
     sign_in(page, base_url, CLINICIAN)
     expect(page).to_have_url(f"{base_url}/workspace/")
     check_accessible(page)
-    patient = _patient_id(page, base_url)
     day = _free_day(page, base_url, kind=kind, clinician=clinician)
     ids = [
         _book(page, base_url, kind=kind, clinician=clinician, patient=patient, day=day)
@@ -124,7 +120,7 @@ def test_le_praticien_fait_avancer_annule_et_note_ses_rdv_sans_voir_ceux_d_un_au
     sign_in(other, base_url, OTHER_CLINICIAN)
     # Booked before the cancel, so « RDV annulé » stays the patient's newest notification.
     # The last slot keeps clear of the patient's morning appointments with the demo clinician.
-    _book(
+    kept = _book(
         other, base_url, kind=kind, clinician=other_clinician, patient=patient, day=day, last=True
     )
 
@@ -199,3 +195,7 @@ def test_le_praticien_fait_avancer_annule_et_note_ses_rdv_sans_voir_ceux_d_un_au
     )
     portal.goto(f"{base_url}/portal/appointments")
     expect(portal.locator("main")).not_to_contain_text(NOTES)
+
+    # Free the other clinician's slot, so the patient's appointments never pile up across runs.
+    freed = _api(other, base_url, f"/appointments/{kept}/cancel", {"reason": CANCEL_REASON})
+    assert freed.ok, freed.text()

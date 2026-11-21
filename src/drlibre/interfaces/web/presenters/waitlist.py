@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from drlibre.booking.application.ports.inbound import (
-    WaitlistOption,
+    BookingOption,
     WaitlistRow,
     WaitlistStatus,
 )
@@ -168,7 +168,7 @@ def entry_card(row: WaitlistRow, now: datetime) -> EntryCardView:
     )
 
 
-def _choices(options: tuple[WaitlistOption, ...]) -> tuple[Choice, ...]:
+def _choices(options: tuple[BookingOption, ...]) -> tuple[Choice, ...]:
     return tuple(Choice(str(o.id), o.label) for o in options)
 
 
@@ -178,8 +178,8 @@ def join_form(
     action: str,
     submit_label: str,
     specs: tuple[FieldSpec, ...],
-    types: tuple[WaitlistOption, ...],
-    clinicians: tuple[WaitlistOption, ...],
+    types: tuple[BookingOption, ...],
+    clinicians: tuple[BookingOption, ...],
     values: Mapping[str, str],
     error: DomainError | None = None,
     cancel_url: str = "",

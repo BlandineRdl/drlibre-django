@@ -40,7 +40,9 @@ def fake() -> Known:
     department, user = Id(), Id()
     active = Clinician(Id(), department, "Europe/Paris", active=True)
     inactive = Clinician(Id(), department, "Europe/Paris", active=False)
-    kind = AppointmentType(Id(), department, 30, 0, active=True, time_zone="Europe/Paris")
+    kind = AppointmentType(
+        Id(), department, 30, 0, active=True, time_zone="Europe/Paris", needs_room=True
+    )
     room = Room(Id(), department, active=True)
     directory.clinicians = {active.id: active, inactive.id: inactive}
     directory.profile_of_user[user] = active.id
@@ -67,7 +69,9 @@ def real() -> Known:
         user.id,
         Clinician(active.id, department.id, "Europe/Paris", active=True),
         Clinician(inactive.id, department.id, "Europe/Paris", active=False),
-        AppointmentType(kind.id, department.id, 30, 0, active=True, time_zone="Europe/Paris"),
+        AppointmentType(
+            kind.id, department.id, 30, 0, True, "Europe/Paris", needs_room=kind.needs_room
+        ),
         Room(room.id, department.id, active=True),
     )
 
@@ -102,3 +106,5 @@ def test_types_and_rooms_of_the_department_are_read(known: Known) -> None:
     assert known.directory.appointment_types(known.department) == (known.kind,)
     assert known.directory.room(known.room.id) == known.room
     assert known.directory.room(Id()) is None
+    assert known.directory.active_rooms(known.department) == (known.room.id,)
+    assert known.directory.active_rooms(Id()) == ()

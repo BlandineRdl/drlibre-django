@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 from zoneinfo import ZoneInfo
 
@@ -12,15 +13,18 @@ from drlibre.booking.application.ports.outbound import (
     Appointments,
     BookingDirectory,
     ClinicianAgenda,
+    Staff,
+)
+from drlibre.booking.application.use_cases.actor_scope import (
+    ActorKind,
+    actor_scope,
+    scoped_appointment,
 )
 from drlibre.booking.application.use_cases.clinician_read_helpers import (
     time_zone_of,
     with_actions,
 )
-from drlibre.booking.application.use_cases.own_clinician_appointment import (
-    clinician_profile,
-    own_clinician_appointment,
-)
+from drlibre.booking.application.use_cases.own_clinician_appointment import CLINICIANS_ONLY
 from drlibre.booking.domain.appointment import Appointment
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -33,10 +37,12 @@ def _age(birth: date | None, today: date) -> int | None:
     return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
 
 
-def _actor(entry_actor: Id | None, appointment: Appointment, clinician_user: Id) -> HistoryActor:
+def _actor(
+    entry_actor: Id | None, appointment: Appointment, clinician_user: Id | None
+) -> HistoryActor:
     if entry_actor == appointment.patient_id:
         return HistoryActor.PATIENT
-    if entry_actor == clinician_user:
+    if clinician_user is not None and entry_actor == clinician_user:
         return HistoryActor.CLINICIAN
     return HistoryActor.STAFF
 
@@ -47,27 +53,36 @@ class ClinicianAppointmentUseCase(ClinicianAppointment):
         *,
         clock: Clock,
         directory: BookingDirectory,
+        staff: Staff,
         appointments: Appointments,
         agenda: ClinicianAgenda,
         history: AppointmentHistory,
     ) -> None:
         self._clock = clock
         self._directory = directory
+        self._staff = staff
         self._appointments = appointments
         self._agenda = agenda
         self._history = history
 
     def execute(self, *, actor_id: Id, appointment_id: Id) -> AppointmentFile:
-        profile_id = clinician_profile(self._directory, actor_id)
-        own_clinician_appointment(self._appointments, appointment_id, profile_id)
+        scope = actor_scope(self._directory, self._staff, actor_id)
+        if scope.is_patient:
+            raise DomainError(ErrorCode.FORBIDDEN, CLINICIANS_ONLY)
+        found = scoped_appointment(scope, self._appointments, appointment_id)
         entry = self._agenda.detail(appointment_id)
         if entry is None:
             raise DomainError(ErrorCode.NOT_FOUND, "Rendez-vous introuvable.")
-        time_zone = time_zone_of(self._directory, profile_id)
+        is_admin = scope.kind is ActorKind.ADMIN
+        if is_admin:
+            # Clinical notes stay the clinician's alone (spec 3.1).
+            entry = replace(entry, appointment=replace(entry.appointment, clinical_notes=None))
+        time_zone = time_zone_of(self._directory, found.clinician_id)
         today = self._clock.now().astimezone(ZoneInfo(time_zone)).date()
-        # The guard proved the actor is the appointment's clinician user.
+        # A clinician passed the guard as the appointment's clinician user.
+        clinician_user = None if is_admin else actor_id
         history = tuple(
-            HistoryLine(h.action, _actor(h.actor_id, entry.appointment, actor_id), h.at)
+            HistoryLine(h.action, _actor(h.actor_id, entry.appointment, clinician_user), h.at)
             for h in self._history.entries_of(appointment_id)
         )
         return AppointmentFile(

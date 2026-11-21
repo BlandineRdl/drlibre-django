@@ -29,7 +29,6 @@ from tests.fakes.booking import (
     InMemoryAppointments,
     InMemoryWaitlist,
     InMemoryWaitlistQueries,
-    WaitlistClinician,
     WaitlistType,
 )
 from tests.fakes.users import InMemoryUsers
@@ -43,8 +42,8 @@ class Scene:
     queries: WaitlistQueries
     waitlist: Waitlist
     appointments: Appointments
-    add_kind: Callable[..., Id]
-    add_clinician: Callable[..., Id]
+    add_kind: Callable[[str], Id]
+    add_clinician: Callable[[str], Id]
     add_patient: Callable[[str], Id]
 
 
@@ -54,15 +53,14 @@ def fake_scene() -> Scene:
     waitlist = InMemoryWaitlist(appointments)
     queries = InMemoryWaitlistQueries(waitlist, users)
 
-    def add_kind(name: str, *, online: bool = True, active: bool = True) -> Id:
+    def add_kind(name: str) -> Id:
         kind = Id()
-        hospital = f"Hôpital {name}"
-        queries.types[kind] = WaitlistType(name, hospital, "Europe/Paris", online, active)
+        queries.types[kind] = WaitlistType(name, f"Hôpital {name}", "Europe/Paris")
         return kind
 
-    def add_clinician(name: str, *, active: bool = True) -> Id:
+    def add_clinician(name: str) -> Id:
         clinician = Id()
-        queries.clinicians[clinician] = WaitlistClinician(name, "Cardiologie", active)
+        queries.clinicians[clinician] = name
         return clinician
 
     def add_patient(name: str) -> Id:
@@ -79,19 +77,17 @@ def real_scene() -> Scene:
     department = build.department(hospital.id)
     DjangoDepartments().save(department)
 
-    def add_kind(name: str, *, online: bool = True, active: bool = True) -> Id:
-        own = dataclasses.replace(build.hospital(name=f"Hôpital {name}"), active=active)
+    def add_kind(name: str) -> Id:
+        own = build.hospital(name=f"Hôpital {name}")
         DjangoHospitals().save(own)
         place = build.department(own.id)
         DjangoDepartments().save(place)
-        kind = dataclasses.replace(
-            build.appointment_type(place.id), name=name, bookable_online=online
-        )
+        kind = dataclasses.replace(build.appointment_type(place.id), name=name)
         DjangoAppointmentTypes().save(kind)
         return kind.id
 
-    def add_clinician(name: str, *, active: bool = True) -> Id:
-        user = dataclasses.replace(stored_user(Role.CLINICIAN), full_name=name, active=active)
+    def add_clinician(name: str) -> Id:
+        user = dataclasses.replace(stored_user(Role.CLINICIAN), full_name=name)
         DjangoUsers().save(user)
         return stored_profile(department, user_id=user.id).id
 
@@ -200,34 +196,6 @@ def test_the_admin_list_filters_by_status_and_ignores_an_unusable_one(scene: Sce
     assert scene.queries.page("BOOKED", PageRequest()).total == 0
 
 
-def test_type_choices_are_active_types_named_with_their_hospital(scene: Scene) -> None:
-    """Décision du plan : le patient ne choisit qu'un type réservable en ligne."""
-    online = scene.add_kind("Bilan")
-    offline = scene.add_kind("Contrôle", online=False)
-    scene.add_kind("Ancien", active=False)
-
-    patient_choices = scene.queries.type_options(online_only=True)
-    admin_choices = scene.queries.type_options(online_only=False)
-
-    assert [(o.id, o.label) for o in patient_choices] == [(online, "Bilan · Hôpital Bilan")]
-    assert [o.id for o in admin_choices] == [online, offline]
-
-
-def test_clinician_choices_are_active_clinicians_named_with_their_department(
-    scene: Scene,
-) -> None:
-    claire = scene.add_clinician("Claire Petit")
-    scene.add_clinician("Jean Parti", active=False)
-    anne = scene.add_clinician("Anne Blanc")
-
-    choices = scene.queries.clinician_options()
-
-    assert [(o.id, o.label) for o in choices] == [
-        (anne, "Anne Blanc · Cardiologie"),
-        (claire, "Claire Petit · Cardiologie"),
-    ]
-
-
 @pytest.mark.integration
 @pytest.mark.django_db
 def test_each_waitlist_read_is_one_query(django_assert_num_queries: DjangoAssertNumQueries) -> None:
@@ -239,8 +207,6 @@ def test_each_waitlist_read_is_one_query(django_assert_num_queries: DjangoAssert
     for read in (
         lambda: queries.own_entries(patient),
         lambda: queries.page("WAITING", PageRequest()),
-        lambda: queries.type_options(online_only=True),
-        queries.clinician_options,
     ):
         with django_assert_num_queries(1):
             read()

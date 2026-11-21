@@ -5,7 +5,8 @@ from drlibre.booking.application.ports.inbound import (
     BookAppointmentAsCaller,
     BookForPatient,
 )
-from drlibre.booking.application.ports.outbound import BookingDirectory
+from drlibre.booking.application.ports.outbound import BookingDirectory, Staff
+from drlibre.booking.application.use_cases.actor_scope import actor_scope
 from drlibre.booking.domain.appointment import Appointment
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -17,10 +18,12 @@ class BookAppointmentAsCallerUseCase(BookAppointmentAsCaller):
         self,
         *,
         directory: BookingDirectory,
+        staff: Staff,
         book_appointment: BookAppointment,
         book_for_patient: BookForPatient,
     ) -> None:
         self._directory = directory
+        self._staff = staff
         self._book_appointment = book_appointment
         self._book_for_patient = book_for_patient
 
@@ -34,7 +37,7 @@ class BookAppointmentAsCallerUseCase(BookAppointmentAsCaller):
         patient_id: Id | None = None,
         room_id: Id | None = None,
     ) -> Appointment:
-        if self._directory.clinician_of_user(actor_id) is not None:
+        if not actor_scope(self._directory, self._staff, actor_id).is_patient:
             if patient_id is None:
                 raise invalid_field("patient", "Indiquez le patient.")
             return self._book_for_patient.execute(

@@ -4,11 +4,14 @@ from enum import StrEnum
 from typing import Protocol
 
 from drlibre.booking.application.ports.outbound import (
+    AdminAppointmentFilter,
+    AdminAppointmentRow,
     AgendaEntry,
     AgendaFilter,
     ClinicianEntry,
     ClinicianFilter,
     ClinicianPatient,
+    ExportRow,
     RoomBooking,
     RoomLabel,
 )
@@ -17,6 +20,7 @@ from drlibre.booking.domain.appointment import (
     MAX_CLINICAL_NOTES,
     Appointment,
     AppointmentStatus,
+    Source,
 )
 from drlibre.booking.domain.booking_rules import BookingRule, ClinicianAction, PatientAction
 from drlibre.booking.domain.waitlist import WaitlistEntry, WaitlistStatus
@@ -29,6 +33,8 @@ __all__ = [
     "MAX_CANCELLATION_REASON",
     "MAX_CLINICAL_NOTES",
     "AcceptWaitlistOffer",
+    "AdminAppointmentFilter",
+    "AdminAppointmentRow",
     "AgendaEntry",
     "AgendaFilter",
     "AgendaHour",
@@ -61,12 +67,15 @@ __all__ = [
     "DepartmentRoomsDay",
     "ExpireHolds",
     "ExpireWaitlist",
+    "ExportAppointments",
+    "ExportRow",
     "HeldPeriod",
     "HistoryActor",
     "HistoryLine",
     "HoldCreated",
     "HoldSummary",
     "JoinWaitlist",
+    "ListAllAppointments",
     "ListAppointmentsAsCaller",
     "ListClinicianAppointments",
     "ListPatientAppointments",
@@ -81,13 +90,14 @@ __all__ = [
     "RoomBooking",
     "RoomLabel",
     "RoomsDayView",
+    "RunReminders",
     "SendReminders",
+    "Source",
     "VerifiedBooking",
     "VerifyHold",
     "ViewAppointment",
     "ViewHold",
     "WaitlistEntry",
-    "WaitlistOption",
     "WaitlistQueries",
     "WaitlistRow",
     "WaitlistStatus",
@@ -239,6 +249,28 @@ class SendReminders(Protocol):
         ...
 
 
+class RunReminders(Protocol):
+    def execute(self, *, actor_id: Id) -> int:
+        """The reminder job run on an admin's demand; forbidden for anyone else."""
+        ...
+
+
+class ListAllAppointments(Protocol):
+    def execute(
+        self, *, actor_id: Id, appointment_filter: AdminAppointmentFilter, request: PageRequest
+    ) -> Page[AdminAppointmentRow]:
+        """Every hospital's matching appointments, 20 a page, latest first; admins only."""
+        ...
+
+
+class ExportAppointments(Protocol):
+    def execute(
+        self, *, actor_id: Id, appointment_filter: AdminAppointmentFilter
+    ) -> tuple[ExportRow, ...]:
+        """Every matching appointment, the count audited; forbidden for anyone but an admin."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class HeldPeriod:
     hold_id: Id
@@ -263,6 +295,14 @@ class BookedPeriod:
     status: AppointmentStatus
 
 
+@dataclass(frozen=True, slots=True)
+class RoomPeriod:
+    appointment_id: Id
+    room_id: Id
+    start: datetime
+    end: datetime
+
+
 class AppointmentQueries(Protocol):
     def periods_of(
         self, clinician_id: Id, *, start: datetime, end: datetime
@@ -270,8 +310,14 @@ class AppointmentQueries(Protocol):
         """The clinician's appointments overlapping the range, whatever their status."""
         ...
 
+    def room_periods(
+        self, room_ids: tuple[Id, ...], *, start: datetime, end: datetime
+    ) -> tuple[RoomPeriod, ...]:
+        """Active appointments held in these rooms overlapping the range."""
+        ...
+
     def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
-        """Appointments of the type, labelled by their start, never a person."""
+        """Appointments then waitlist entries of the type, labelled by a date, never a person."""
         ...
 
     def dependents_of_room(self, room_id: Id) -> tuple[Dependent, ...]:
@@ -279,7 +325,7 @@ class AppointmentQueries(Protocol):
         ...
 
     def dependents_of_clinician(self, clinician_id: Id) -> tuple[Dependent, ...]:
-        """Appointments of the clinician profile, labelled by their start, never a person."""
+        """Appointments then waitlist entries of the clinician profile, labelled by a date."""
         ...
 
     def active_upcoming_for_clinician_user(
@@ -289,7 +335,7 @@ class AppointmentQueries(Protocol):
         ...
 
     def any_for_user(self, user_id: Id) -> tuple[Dependent, ...]:
-        """Appointments where the user is the patient, or the clinician through their profile."""
+        """The user's appointments as patient or clinician, then their waitlist entries."""
         ...
 
 
@@ -394,7 +440,7 @@ class HistoryLine:
 
 @dataclass(frozen=True, slots=True)
 class AppointmentFile:
-    """One appointment as its clinician sees it, notes, allowed actions and history included."""
+    """One appointment as staff see it: allowed actions and history, notes for its clinician."""
 
     entry: ClinicianEntry
     time_zone: str
@@ -404,7 +450,7 @@ class AppointmentFile:
 
 class ClinicianAppointment(Protocol):
     def execute(self, *, actor_id: Id, appointment_id: Id) -> AppointmentFile:
-        """The clinician's own appointment; not_found when absent, forbidden for another's."""
+        """A clinician's own appointment, or any for an admin without notes; else forbidden."""
         ...
 
 
@@ -471,13 +517,16 @@ class ExpireWaitlist(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class AppointmentsQuery:
-    """Optional narrowing of the caller's appointments; the range bounds the start, end excluded."""
+    """Optional narrowing of the caller's appointments; an admin's range covers whole days."""
 
     clinician_id: Id | None = None
     patient_id: Id | None = None
     status: AppointmentStatus | None = None
     start: datetime | None = None
     end: datetime | None = None
+    department_id: Id | None = None
+    source: Source | None = None
+    page: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -488,8 +537,8 @@ class ClinicianAppointments:
 class ListAppointmentsAsCaller(Protocol):
     def execute(
         self, *, actor_id: Id, query: AppointmentsQuery
-    ) -> PatientAppointments | ClinicianAppointments:
-        """Clinicians get their own calendar, patients their own list; forbidden for other staff."""
+    ) -> PatientAppointments | ClinicianAppointments | Page[AdminAppointmentRow]:
+        """Own calendar for clinicians, every hospital's page for admins, own list for patients."""
         ...
 
 
@@ -506,12 +555,6 @@ class WaitlistRow:
     offered_start: datetime | None
 
 
-@dataclass(frozen=True, slots=True)
-class WaitlistOption:
-    id: Id
-    label: str
-
-
 class WaitlistQueries(Protocol):
     def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
         """The patient's entries, newest first."""
@@ -521,10 +564,32 @@ class WaitlistQueries(Protocol):
         """Entries of every hospital, oldest first, 20 a page; an unknown status lists all."""
         ...
 
-    def type_options(self, *, online_only: bool) -> tuple[WaitlistOption, ...]:
+
+@dataclass(frozen=True, slots=True)
+class BookingOption:
+    id: Id
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class BookingOptions:
+    """Who and where a type can be booked with; empty for an unknown type."""
+
+    clinicians: tuple[BookingOption, ...]
+    rooms: tuple[BookingOption, ...]
+
+
+class BookingOptionQueries(Protocol):
+    """Picklists of the booking and waitlist forms, one statement per list."""
+
+    def type_options(self, *, online_only: bool) -> tuple[BookingOption, ...]:
         """Active types of active hospitals, labelled with their hospital, by label."""
         ...
 
-    def clinician_options(self) -> tuple[WaitlistOption, ...]:
+    def clinician_options(self) -> tuple[BookingOption, ...]:
         """Active clinicians labelled with their department, by label."""
+        ...
+
+    def booking_options(self, appointment_type_id: Id) -> BookingOptions:
+        """The type's department's active clinicians, as labelled above, and active rooms."""
         ...

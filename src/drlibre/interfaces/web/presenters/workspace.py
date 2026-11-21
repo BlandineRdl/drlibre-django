@@ -304,7 +304,7 @@ def _when(entry: ClinicianEntry, zone: str) -> str:
     return f"{long_day(start.date())}, {_hours(entry, zone)}"
 
 
-def _facts(file: AppointmentFile) -> tuple[FactView, ...]:
+def appointment_facts(file: AppointmentFile) -> tuple[FactView, ...]:
     entry, zone = file.entry, file.time_zone
     a = entry.appointment
     age = NONE if file.patient_age is None else f"{file.patient_age} ans"
@@ -347,7 +347,7 @@ def appointment_page(
         notice=NOTICES.get(notice, ""),
         refusal=refusal_text(refusal) if refusal else "",
         reasons=rule_reasons(refusal),
-        facts=_facts(file),
+        facts=appointment_facts(file),
         buttons=_buttons(entry, label),
         cancel_url=_cancel_url(entry),
         notes=build_form(
@@ -399,7 +399,7 @@ def cancel_page(
     return CancelPage(
         heading=f"Annuler le rendez-vous de {file.entry.patient_name}",
         time_zone=file.time_zone,
-        facts=_facts(file),
+        facts=appointment_facts(file),
         form=form,
     )
 

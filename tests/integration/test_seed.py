@@ -1,16 +1,20 @@
+import uuid
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.apps import apps
 
 from drlibre.audit.infrastructure.django.models import AuditEntryRecord
-from drlibre.booking.infrastructure.django.models import AppointmentRecord
+from drlibre.booking.infrastructure.django.models import AppointmentRecord, WaitlistEntryRecord
 from drlibre.bootstrap.container import container
 from drlibre.identity.infrastructure.django.models import UserRecord
 from drlibre.organisation.infrastructure.django.models import (
     AppointmentTypeRecord,
     ClinicianProfileRecord,
 )
+from drlibre.reporting.domain.dashboard import Range, Ratio
+from drlibre.scheduling.infrastructure.django.models import AvailabilityRuleModel, TimeOffModel
 from drlibre.shared_kernel.ids import Id
 from scripts import seed
 
@@ -134,3 +138,97 @@ def test_the_demo_clinician_is_named_once_with_an_honorific_title_even_after_a_r
     user.refresh_from_db()
     profile.refresh_from_db()
     assert (user.full_name, profile.title) == ("Claire Martin", "Dr")
+
+
+def test_the_demo_seed_fills_the_past_week_in_every_closed_status_and_source_once() -> None:
+    """Epic E7: the dashboard shows non-zero figures on the demo, a reseed adds nothing."""
+    seed.main()
+    seed.main()
+    now = datetime.now(UTC)
+    past = AppointmentRecord.objects.filter(
+        start__gte=now - timedelta(days=seed.PAST_DAYS + 1), start__lt=now
+    )
+    rows = list(past.values_list("id", "status", "source"))
+
+    assert len({r[0] for r in rows}) == len(rows)
+    assert {"COMPLETED", "CANCELLED", "NO_SHOW"} <= {r[1] for r in rows}
+    assert {"ONLINE", "ROUND_ROBIN", "STAFF"} <= {r[2] for r in rows}
+    waiting = WaitlistEntryRecord.objects.filter(status="WAITING")
+    assert waiting.values("patient_id").distinct().count() == 2
+    assert waiting.count() == 2
+
+
+def test_the_demo_seed_holds_an_appointment_in_every_status() -> None:
+    """Epic E7 Success Evidence: the seed holds appointments in every status, once."""
+    seed.main()
+    seed.main()
+
+    statuses = set(AppointmentRecord.objects.values_list("status", flat=True))
+    checked_in = AppointmentRecord.objects.filter(status="CHECKED_IN")
+
+    assert statuses == {"BOOKED", "CHECKED_IN", "COMPLETED", "CANCELLED", "NO_SHOW"}
+    assert checked_in.count() == 1
+
+
+def _zones() -> dict[uuid.UUID, ZoneInfo]:
+    profiles = ClinicianProfileRecord.objects.values_list("id", "department__hospital__time_zone")
+    return {profile: ZoneInfo(zone) for profile, zone in profiles}
+
+
+def _days_ago(start: datetime, now: datetime, zone: ZoneInfo) -> int:
+    return (now.astimezone(zone).date() - start.astimezone(zone).date()).days
+
+
+def _available_minutes(period: Range, now: datetime, zones: dict[uuid.UUID, ZoneInfo]) -> int:
+    active = set(
+        UserRecord.objects.filter(role="CLINICIAN", active=True).values_list("id", flat=True)
+    )
+    total = 0.0
+    for profile in ClinicianProfileRecord.objects.filter(user_id__in=active):
+        zone = zones[profile.id]
+        off = list(TimeOffModel.objects.filter(clinician_id=profile.id))
+        for day in period.days(now.astimezone(zone).date()):
+            for rule in AvailabilityRuleModel.objects.filter(clinician_id=profile.id):
+                # Weekday 0 is Sunday in scheduling.
+                if day.isoweekday() % 7 != rule.weekday or day < rule.valid_from:
+                    continue
+                if rule.valid_to is not None and day > rule.valid_to:
+                    continue
+                start = datetime.combine(day, rule.start, tzinfo=zone)
+                end = datetime.combine(day, rule.end, tzinfo=zone)
+                total += (end - start).total_seconds()
+                for t in off:
+                    total -= max(0.0, (min(end, t.end) - max(start, t.start)).total_seconds())
+    return int(total // 60)
+
+
+def test_each_dashboard_figure_on_the_seed_matches_its_definition() -> None:
+    """Spec §13: each figure recomputed from the seeded rows equals the dashboard's."""
+    seed.main()
+    admin = UserRecord.objects.get(email=seed.ADMIN_EMAIL)
+    period = Range.WEEK
+
+    shown = container().view_dashboard.execute(actor_id=Id(admin.id), period=period)
+    now = datetime.now(UTC)
+    zones = _zones()
+    in_range = [
+        a
+        for a in AppointmentRecord.objects.all()
+        if 0 <= _days_ago(a.start, now, zones[a.clinician_id]) < period.length
+    ]
+    kept = [a for a in in_range if a.status != "CANCELLED"]
+    users = UserRecord.objects.filter(role="CLINICIAN", active=True).values_list("id", flat=True)
+    profiles = ClinicianProfileRecord.objects.filter(user_id__in=list(users))
+    working = set(profiles.values_list("id", flat=True))
+    active = [a for a in kept if a.status != "NO_SHOW" and a.clinician_id in working]
+    minutes = int(sum((a.end - a.start).total_seconds() for a in active) // 60)
+    online = [a for a in kept if a.source in ("ONLINE", "ROUND_ROBIN")]
+    no_shows = [a for a in kept if a.status == "NO_SHOW"]
+    waiting = WaitlistEntryRecord.objects.filter(status__in=("WAITING", "OFFERED")).count()
+
+    assert shown.appointments == len(kept) > 0
+    assert shown.cancellations == len(in_range) - len(kept) > 0
+    assert shown.utilisation == Ratio(minutes, _available_minutes(period, now, zones))
+    assert shown.no_show_rate == Ratio(len(no_shows), len(kept))
+    assert shown.online_share == Ratio(len(online), len(kept))
+    assert shown.waitlist_size == waiting > 0

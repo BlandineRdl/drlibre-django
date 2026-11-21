@@ -15,7 +15,10 @@ django.setup()
 import structlog  # noqa: E402
 from django.db import transaction  # noqa: E402
 
-from drlibre.booking.infrastructure.django.models import AppointmentRecord  # noqa: E402
+from drlibre.booking.infrastructure.django.models import (  # noqa: E402
+    AppointmentRecord,
+    WaitlistEntryRecord,
+)
 from drlibre.bootstrap.container import Container, container  # noqa: E402
 from drlibre.identity.infrastructure.django.models import UserRecord  # noqa: E402
 from drlibre.organisation.application.ports.inbound import SaveRecord  # noqa: E402
@@ -126,6 +129,16 @@ TYPES = (
         "buffer_minutes": "10",
         "colour": "#8E24AA",
     },
+    # Booked by staff only, so the console books what a patient cannot book online.
+    {
+        "code": "HNORD-ECHO",
+        "name": "Échocardiographie",
+        "department": "HNORD-CARD",
+        "duration_minutes": "30",
+        "buffer_minutes": "0",
+        "colour": "#B71C1C",
+        "bookable_online": "",
+    },
 )
 ADMIN_EMAIL = "admin@drlibre.localhost"
 CLINICIAN_EMAIL = "clinicien@drlibre.localhost"
@@ -186,10 +199,10 @@ def seed_referential(app: Container) -> None:
         _upsert(app.save_room, q.rooms, fields, actor=actor)
     for kind in TYPES:
         fields = {
-            **kind,
-            "department_id": str(departments[kind["department"]]),
             "needs_room": "on",
             "bookable_online": "on",
+            **kind,
+            "department_id": str(departments[kind["department"]]),
         }
         _upsert(app.save_appointment_type, q.appointment_types, fields, actor=actor)
 
@@ -349,6 +362,109 @@ def seed_demo_appointments(app: Container) -> None:
             return
         app.book_appointment_as_caller.execute(
             actor_id=clinician, patient_id=patient, appointment_type_id=kind, start=slots[0].start
+        )
+
+
+PAST_DAYS = 7
+# Status and source cycles of the past appointments, so every dashboard figure is non-zero.
+PAST_STATUSES = ("COMPLETED", "CANCELLED", "COMPLETED", "NO_SHOW", "COMPLETED")
+PAST_SOURCES = ("ONLINE", "ROUND_ROBIN", "STAFF")
+# Local hour of each demo clinician's past appointment, so no patient is booked twice at once.
+PAST_HOURS = ((CLINICIAN_EMAIL, "HNORD-C101", 11), (SECOND_CLINICIAN_EMAIL, "HNORD-C102", 16))
+# Local hour of the demo clinician's appointment checked in this morning.
+CHECKED_IN_HOUR = 8
+_PAST_NAMESPACE = uuid.UUID("6f1c2a4e-7b1d-4c55-9a8e-2d3f5b6c7a80")
+
+
+def seed_past_appointments(app: Container) -> None:
+    """Past week appointments in every closed status and source, one checked in today; once."""
+    kind = AppointmentTypeRecord.objects.filter(code="HNORD-CONSULT").first()
+    found = (_user_id(app, e) for e in ("patient@drlibre.localhost", VISITOR_EMAIL))
+    patients = [p for p in found if p is not None]
+    if kind is None or len(patients) < 2:
+        return
+    today = datetime.now(UTC).astimezone(DEMO_ZONE).date()
+    rows: list[AppointmentRecord] = []
+    touched: set[Id] = set()
+    for back in range(1, PAST_DAYS + 1):
+        day = today - timedelta(days=back)
+        if day.weekday() >= 5:
+            continue
+        for n, (email, room, hour) in enumerate(PAST_HOURS):
+            clinician = _user_id(app, email)
+            profile = app.reference_queries.clinician_profile_of(clinician) if clinician else None
+            if profile is None:
+                continue
+            start = datetime.combine(day, time(hour), tzinfo=DEMO_ZONE)
+            # The start fixes the id, status and source, so a reseed inserts nothing new.
+            key = 2 * day.toordinal() + n
+            status = PAST_STATUSES[key % len(PAST_STATUSES)]
+            cancelled = status == "CANCELLED"
+            rows.append(
+                AppointmentRecord(
+                    id=uuid.uuid5(_PAST_NAMESPACE, f"{email}/{start.isoformat()}"),
+                    patient_id=patients[key % 2].value,
+                    clinician_id=profile.id.value,
+                    appointment_type=kind,
+                    room=RoomRecord.objects.filter(code=room).first(),
+                    start=start,
+                    end=start + timedelta(minutes=kind.duration_minutes),
+                    status=status,
+                    source=PAST_SOURCES[key % len(PAST_SOURCES)],
+                    cancelled_at=start - timedelta(days=1) if cancelled else None,
+                    cancellation_reason="Empêchement" if cancelled else None,
+                )
+            )
+            touched.add(profile.id)
+    clinician = _user_id(app, CLINICIAN_EMAIL)
+    profile = app.reference_queries.clinician_profile_of(clinician) if clinician else None
+    if profile is not None:
+        start = datetime.combine(today, time(CHECKED_IN_HOUR), tzinfo=DEMO_ZONE)
+        rows.append(
+            AppointmentRecord(
+                id=uuid.uuid5(_PAST_NAMESPACE, f"{CLINICIAN_EMAIL}/{start.isoformat()}"),
+                patient_id=patients[0].value,
+                clinician_id=profile.id.value,
+                appointment_type=kind,
+                room=RoomRecord.objects.filter(code=PAST_HOURS[0][1]).first(),
+                start=start,
+                end=start + timedelta(minutes=kind.duration_minutes),
+                status="CHECKED_IN",
+                source="STAFF",
+            )
+        )
+        touched.add(profile.id)
+    # Demo data like the load seed, so unaudited; a clash with an existing row keeps that row.
+    AppointmentRecord.objects.bulk_create(rows, ignore_conflicts=True)
+    if touched:
+        # The container exposes RefreshSlots only as the horizon job over every clinician.
+        app.extend_slot_horizon.execute()
+
+
+# Far enough ahead that no journey's cancellation offers these entries a slot.
+WAITLIST_WEEKS_AHEAD = 9
+
+
+def seed_waitlist(app: Container) -> None:
+    """Two patients waiting for a demo cardiology slot, joined once."""
+    kind = _by_code(app.reference_queries.appointment_types, "HNORD-CONSULT")
+    first = datetime.now(UTC).astimezone(DEMO_ZONE).date() + timedelta(weeks=WAITLIST_WEEKS_AHEAD)
+    for email in ("patient@drlibre.localhost", VISITOR_EMAIL):
+        patient = _user_id(app, email)
+        if kind is None or patient is None:
+            continue
+        joined = WaitlistEntryRecord.objects.filter(
+            patient_id=patient.value, earliest__date__gte=first - timedelta(days=1)
+        )
+        if joined.exists():
+            continue
+        app.join_waitlist.execute(
+            actor_id=patient,
+            appointment_type_id=kind,
+            clinician_id=None,
+            from_date=first,
+            to_date=first + timedelta(days=6),
+            patient_email=None,
         )
 
 
@@ -541,6 +657,8 @@ SEEDERS: list[Callable[[Container], None]] = [
     seed_availability,
     seed_passwordless_patient,
     seed_demo_appointments,
+    seed_past_appointments,
+    seed_waitlist,
 ]
 
 
