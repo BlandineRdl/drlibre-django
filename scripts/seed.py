@@ -13,14 +13,21 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
 
 import structlog  # noqa: E402
+from django.contrib.auth.hashers import make_password  # noqa: E402
 from django.db import transaction  # noqa: E402
 
+from drlibre.audit.infrastructure.django.models import AuditEntryRecord  # noqa: E402
 from drlibre.booking.infrastructure.django.models import (  # noqa: E402
     AppointmentRecord,
     WaitlistEntryRecord,
 )
 from drlibre.bootstrap.container import Container, container  # noqa: E402
 from drlibre.identity.infrastructure.django.models import UserRecord  # noqa: E402
+from drlibre.notifications.domain.notification import (  # noqa: E402
+    AppointmentEvent,
+    Notification,
+)
+from drlibre.notifications.infrastructure.django.models import NotificationRecord  # noqa: E402
 from drlibre.organisation.application.ports.inbound import SaveRecord  # noqa: E402
 from drlibre.organisation.infrastructure.django.models import (  # noqa: E402
     AppointmentTypeRecord,
@@ -522,6 +529,58 @@ def _load_appointments(
     return rows
 
 
+def _load_audit(
+    appointments: list[AppointmentRecord], rng: random.Random, now: datetime
+) -> list[AuditEntryRecord]:
+    """One booking entry per load appointment over the past 35 days, without personal data."""
+    return [
+        AuditEntryRecord(
+            action="booking.appointment_booked",
+            entity_type="appointment",
+            entity_id=row.id,
+            metadata={
+                "clinician_id": str(row.clinician_id),
+                "appointment_type_id": str(row.appointment_type_id),
+                "room_id": str(row.room_id),
+                "source": row.source,
+            },
+            at=now - timedelta(seconds=rng.randrange(35 * 86400)),
+        )
+        for row in appointments
+    ]
+
+
+def _load_notifications(
+    appointments: list[AppointmentRecord], now: datetime
+) -> list[NotificationRecord]:
+    """Booking's « RDV réservé » notice for each future BOOKED load appointment."""
+    rows = []
+    for row in appointments:
+        if row.status != "BOOKED" or row.start <= now:
+            continue
+        notice = Notification.for_event(
+            event=AppointmentEvent.BOOKED,
+            recipient_id=Id(row.patient_id),
+            appointment_id=Id(row.id),
+            start=row.start,
+            zone_name=LOAD_TIME_ZONE.key,
+            at=now,
+        )
+        rows.append(
+            NotificationRecord(
+                recipient_id=row.patient_id,
+                kind=notice.kind.value,
+                title=notice.title,
+                body=notice.body,
+                appointment_id=row.id,
+                created_at=now,
+                updated_at=now,
+                time_zone=notice.time_zone,
+            )
+        )
+    return rows
+
+
 def seed_load(app: Container) -> None:
     """Load volume with no room, clinician or patient overlap; skipped when already there."""
     # To reseed a load set, empty the database: `docker compose down -v`, then `up` again.
@@ -529,7 +588,7 @@ def seed_load(app: Container) -> None:
         return
     now = datetime.now(UTC)
     stamp = {"created_at": now, "updated_at": now}
-    rng = random.Random(2026)  # noqa: S311
+    rng = random.Random(2026)  # noqa: S311  # nosec B311
     specialties = {
         code: SpecialtyRecord.objects.get_or_create(
             code=code, defaults={"name": code.title(), "active": True, **stamp}
@@ -597,6 +656,8 @@ def seed_load(app: Container) -> None:
     appointments: list[AppointmentRecord] = []
     taken: set[tuple[uuid.UUID, datetime]] = set()
     today = now.astimezone(LOAD_TIME_ZONE).date()
+    # One hash for every load clinician: 200 hashes would slow the seed.
+    password_hash = make_password(DEMO_PASSWORD)
     for n in range(LOAD_CLINICIANS):
         department = departments[n % len(departments)]
         user = UserRecord.objects.create(
@@ -605,6 +666,7 @@ def seed_load(app: Container) -> None:
             role="CLINICIAN",
             active=True,
             email_verified_at=now,
+            password_hash=password_hash,
             **stamp,
         )
         # One room per clinician of a department, so seeded appointments never share a room.
@@ -645,6 +707,10 @@ def seed_load(app: Container) -> None:
         kind = AppointmentTypeRecord.objects.get(code=f"{department.code}-T")
         appointments += _load_appointments(profile, kind, room.id, patients, taken, rng, now)
     AppointmentRecord.objects.bulk_create(appointments, batch_size=_BATCH)
+    AuditEntryRecord.objects.bulk_create(_load_audit(appointments, rng, now), batch_size=_BATCH)
+    NotificationRecord.objects.bulk_create(
+        _load_notifications(appointments, now), batch_size=_BATCH
+    )
     app.extend_slot_horizon.execute()
     logger.info("seed_load_done", appointments=len(appointments), patients=len(patients))
 
