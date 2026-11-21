@@ -3,11 +3,8 @@ from typing import Any
 from celery import Celery, current_app
 from django.db import transaction
 
+from drlibre.notifications.application.email_task import REDACTED, SEND_EMAIL_TASK
 from drlibre.notifications.application.ports.outbound import EmailMessage, EmailOutbox
-
-SEND_EMAIL_TASK = "drlibre.send_email"
-# Worker logs print these instead of the arguments, which hold codes and sign-in links.
-REDACTED = "[redacted]"
 
 
 class CeleryEmailOutbox(EmailOutbox):

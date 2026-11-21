@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
+from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME, SLOT_HORIZON_DAYS
 
-HORIZON = timedelta(days=90)
+HORIZON = timedelta(days=SLOT_HORIZON_DAYS)
 
 
 @dataclass(frozen=True, slots=True)

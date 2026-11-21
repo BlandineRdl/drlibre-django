@@ -5,12 +5,10 @@ import structlog
 from celery import shared_task
 
 from drlibre.bootstrap.container import container
+from drlibre.notifications.application.email_task import REDACTED, SEND_EMAIL_TASK
 from drlibre.notifications.application.ports.outbound import EmailMessage
 
 logger = structlog.get_logger(__name__)
-
-# Same text as the outbox sends: worker logs print it instead of codes and sign-in links.
-REDACTED = "[redacted]"
 
 
 @shared_task(name="drlibre.heartbeat")
@@ -29,7 +27,7 @@ def extend_slot_horizon() -> None:
 
 
 @shared_task(
-    name="drlibre.send_email",
+    name=SEND_EMAIL_TASK,
     autoretry_for=(smtplib.SMTPException, OSError),
     retry_backoff=True,
     max_retries=5,

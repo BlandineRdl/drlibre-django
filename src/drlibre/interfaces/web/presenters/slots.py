@@ -2,10 +2,11 @@ from datetime import date, datetime
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
+from drlibre.shared_kernel.booking_policy import SLOT_HORIZON_DAYS
 from drlibre.shared_kernel.ids import Id
 
 BOOKING_URL = "/booking/new"
-NO_AVAILABILITY = "Aucune disponibilité dans les 90 prochains jours"
+NO_AVAILABILITY = f"Aucune disponibilité dans les {SLOT_HORIZON_DAYS} prochains jours"
 DAYS = ("lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim.")
 
 
