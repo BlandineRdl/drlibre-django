@@ -1,6 +1,6 @@
 ---
 objective: "Un patient connecté, avec ou sans mot de passe, retrouve, déplace et annule ses RDV dans les règles, et reçoit une notification in-app et un email pour chaque changement et chaque rappel planifié."
-status: in-progress
+status: implemented
 ---
 
 # Plan: E4 - Le patient gère ses rendez-vous et reste informé

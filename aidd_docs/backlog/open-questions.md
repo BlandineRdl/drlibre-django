@@ -29,12 +29,13 @@ Restée ouverte après la revue E3.
 - Les créneaux de la recherche et de `GET /slots` ignorent les salles (§5.1), alors que §6.2 dit « les créneaux affichés sont exactement ceux que la réservation accepterait » : un créneau affiché peut échouer en `no_room_available` à la réservation (reproduction : un type avec salle, toutes les salles du département prises à cette heure, le créneau reste listé). Compter la capacité des salles dans les créneaux (lecture plus coûteuse, p95 à re-prouver) ou accepter l'écart et le documenter en §6.2 ?
 
 ## E4 Portail patient et notifications
-- Le patient peut-il annuler un RDV `CHECKED_IN` ?
-- `not_found` ou `forbidden` quand un patient vise le RDV ou l'entrée d'un autre patient ?
-- Quel code pour le déplacement d'un RDV qui n'est pas `BOOKED` : `invalid_transition` ?
-- Que contient le `.ics`, et le motif en est-il exclu ?
-- `GET /appointments` pour le personnel est-il livré par E4 ou par E6 et E7 ?
-- À quelle fréquence tourne le job de rappel ?
+Tranchées au plan E4 (`aidd_docs/tasks/2026_11/2026_11_21_e4-portail-patient-notifications/plan.md`, Decisions).
+- Le patient peut-il annuler un RDV `CHECKED_IN` ? → Oui, comme `BOOKED`, règle des 24 h comprise ; `COMPLETED`, `CANCELLED`, `NO_SHOW` donnent `invalid_transition` avec le statut actuel.
+- `not_found` ou `forbidden` quand un patient vise le RDV ou l'entrée d'un autre patient ? → `forbidden` ; un id inconnu donne `not_found`.
+- Quel code pour le déplacement d'un RDV qui n'est pas `BOOKED` : `invalid_transition` ? → Oui, avec le statut actuel, vérifié avant les règles.
+- Que contient le `.ics`, et le motif en est-il exclu ? → UID, début et fin UTC, type et praticien, hôpital et adresse ; jamais le motif.
+- `GET /appointments` pour le personnel est-il livré par E4 ou par E6 et E7 ? → Par E6 et E7 : en E4, la liste, l'annulation et le déplacement servent le patient seul, le personnel reçoit `forbidden`.
+- À quelle fréquence tourne le job de rappel ? → Toutes les 15 minutes : le rappel part entre 24 h et 23 h 45 avant le RDV, une seule fois par RDV.
 
 ## E5 Liste d'attente
 - Un patient peut-il s'inscrire pour un type non réservable en ligne ?
