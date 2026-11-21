@@ -31,3 +31,31 @@
 - Migration 0002 adds exclusion constraints over existing rows; the load seed's hourly starts avoid overlaps, but a hand-made overlapping active pair in an old volume would fail the migration — a migrate on a copied E3 volume would settle it
 - Notifications page shows `created_at` in `settings.TIME_ZONE` while bodies use the hospital zone — equal for the demo data; a non-Paris hospital would show both
 - `FindFreeWeek` as a scheduling use case is thin but keeps week policy out of the view; not judged over-engineering
+
+## Round 2
+- Diff: `9819088...3ecbee2`
+- Uncommitted changes: no
+- Axes: code, relevancy
+- Verdict: changes-requested, because the lead-time fix makes the reschedule page fail on Sunday from 22:00 local
+
+### Criteria
+- [x] Week strip starts at now + 120 min — `find_free_week.py:37`, `tests/api/test_portal_pages.py:133` passes
+- [x] « Déplacer » only for a type bookable online — `booking_rules.py:85`, `patient_agenda.py:15`, contract `tests/contracts/test_patient_agenda.py:126` (fake and SQL), page scenario `le_patient_deplace_un_rendez_vous.feature:136` (exact action set, `conftest.py:1206`)
+- [x] Unlisted appointment → `not_found` — `views/portal.py:60-63`, scenario `feature:141` answers 404
+- [x] Birth date « today » in `settings.TIME_ZONE` — `update_profile.py:27`, scenario `le_patient_met_a_jour_son_profil.feature:26`
+- [x] Rule 6-domain-errors and `architecture.md` list inline booking refusals — both rule copies and memory amended
+- Run: targeted 83 passed; `uv run pytest -q` 941 passed, 8 deselected
+- Out of the diff: week dedupe, conftest split (deferred)
+
+### Assumptions
+- `FindFreeWeek` serves only the reschedule strip — holds, sole caller `views/portal.py:133`
+- `allowed_actions` has one caller, so the keyword-only `type_online` breaks none — holds, `list_patient_appointments.py:32`
+- `Period` accepts `start >= end` — finding, it raises `invalid_input` at `scheduling/domain/slot.py:15`
+
+### Findings
+- `src/drlibre/scheduling/application/use_cases/find_free_week.py:37` : when `now + 120 min >= window.end` (current week, Sunday 22:00–24:00 in the type's zone), `FindFreeSlots` builds `Period(start, end)` with `end <= start` and raises `invalid_input`, proof `scheduling/domain/slot.py:15` and `find_free_slots.py:46`; the week is reached by default (appointment in the current week) or by « ‹ Semaine précédente » (`week.py:35`), and `views/portal.py:133` calls it outside the `try`, so GET and POST both end on an error page → return the week with no slots when `start >= window.end`, plus one test at Sunday 22:30 Paris — 🟡 major
+- `src/drlibre/booking/application/use_cases/create_hold.py:94` : the booking hold still checks the birth date against the UTC date, the same rule the profile now checks in local time; between local midnight and 01:00/02:00 a visitor born today is refused while the profile accepts it → pass the zone as in `UpdateProfileUseCase` — 🟢 minor (outside the diff, incoherence the fix creates)
+- `tests/use_cases/booking/conftest.py:1182` : « the agenda no longer lists the appointment » swaps the fake's `appointments`, a state no real adapter reaches (same table); the scenario guards a defensive branch only → acceptable, or drop scenario and branch together if the join cannot lose a row — 🟢 minor
+
+### Limits
+- Whether `SqlPatientAgenda` can drop a row `view_appointment` finds (inner joins on clinician, user, type, hospital, department) — FK constraints on those columns would settle it; if all are non-null FKs the new `not_found` branch is dead code

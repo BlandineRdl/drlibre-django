@@ -749,6 +749,7 @@ def _wire_booking(
             limiter=booking.limiter,
             notices=booking.notices,
             network_hourly_limit=booking.network_hourly_limit,
+            time_zone=a.time_zone,
         ),
         verify_hold=VerifyHoldUseCase(
             clock=a.clock,

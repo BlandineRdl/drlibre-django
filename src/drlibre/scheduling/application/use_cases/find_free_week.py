@@ -30,13 +30,18 @@ class FindFreeWeekUseCase(FindFreeWeek):
             raise DomainError(ErrorCode.NOT_FOUND, "Type de RDV introuvable.")
         now = self._clock.now()
         window = Week.within_horizon(asked=week, now=now, time_zone=kind.time_zone)
-        slots = self._find_free_slots.execute(
-            appointment_type_id=appointment_type_id,
-            clinician_id=clinician_id,
-            # Like search, offer only slots the lead time rule accepts.
-            start=max(window.start, now + BOOKING_LEAD_TIME),
-            end=window.end,
-            ignoring_appointment=ignoring_appointment,
+        # Like search, offer only slots the lead time rule accepts.
+        start = max(window.start, now + BOOKING_LEAD_TIME)
+        slots = (
+            self._find_free_slots.execute(
+                appointment_type_id=appointment_type_id,
+                clinician_id=clinician_id,
+                start=start,
+                end=window.end,
+                ignoring_appointment=ignoring_appointment,
+            )
+            if start < window.end
+            else ()
         )
         return FreeWeek(
             monday=window.monday,

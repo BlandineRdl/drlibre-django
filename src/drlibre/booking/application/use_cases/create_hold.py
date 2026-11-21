@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.booking.application.ports.inbound import CreateHold, HoldCreated
@@ -56,6 +57,7 @@ class CreateHoldUseCase(CreateHold):
         limiter: RateLimiter,
         notices: BookingNotices,
         network_hourly_limit: int,
+        time_zone: str,
     ) -> None:
         self._clock = clock
         self._uow = uow
@@ -68,6 +70,7 @@ class CreateHoldUseCase(CreateHold):
         self._limiter = limiter
         self._notices = notices
         self._network_limit = network_hourly_limit
+        self._zone = ZoneInfo(time_zone)
 
     def execute(
         self,
@@ -91,7 +94,7 @@ class CreateHoldUseCase(CreateHold):
             phone=phone,
             reason=reason,
             accepted_terms=accepted_terms,
-            today=at.date(),
+            today=at.astimezone(self._zone).date(),
         )
         refuse_over_limit(
             self._limiter,

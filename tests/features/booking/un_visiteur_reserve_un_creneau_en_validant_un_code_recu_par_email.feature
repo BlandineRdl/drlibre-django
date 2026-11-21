@@ -30,6 +30,12 @@ Feature: Un visiteur réserve un créneau en validant un code reçu par email
     And the refusal names the field "birth_date"
     And no hold was created
 
+  Scenario: Le visiteur saisit nom complet, date de naissance, email, téléphone facultatif, motif facultatif, et accepte les conditions et la notice de confidentialité (né aujourd'hui, juste après minuit à Paris)
+    Given the clock is "2026-11-20 23:30"
+    And the visitor types birth_date "2026-11-21"
+    When the visitor asks to hold "A" at "2026-11-23 09:00"
+    Then the hold is on "A"
+
   Scenario: L'envoi de ces informations crée une réservation provisoire de 10 minutes sur le créneau et envoie par email un code à 6 chiffres
     When the visitor asks to hold "A" at "2026-11-23 09:00"
     Then the hold expires at "2026-11-20 10:10"

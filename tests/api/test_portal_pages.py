@@ -1,7 +1,7 @@
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.conf import settings
@@ -140,6 +140,21 @@ def test_the_week_strip_offers_only_slots_starting_at_least_120_minutes_ahead(
 
     assert 'name="start" value="2026-11-23T08:00:00Z"' not in strip
     assert 'name="start" value="2026-11-23T08:30:00Z"' in strip
+
+
+def test_late_on_sunday_the_current_week_offers_no_slot_and_leads_to_the_next_week(
+    portal: Portal,
+) -> None:
+    """Story « déplace » : dimanche 22:30 à Paris, semaine en cours vide, la suivante s'ouvre."""
+    use_container(portal.world.app(at=datetime(2026, 11, 22, 21, 30, tzinfo=UTC)))
+
+    current = portal.client.get(f"{portal.base}/reschedule?week=2026-11-16")
+
+    assert current.status_code == 200
+    assert "Aucun créneau libre cette semaine." in page(current)
+    assert f"{portal.base}/reschedule?week={WEEK}" in page(current)
+    following = page(portal.client.get(f"{portal.base}/reschedule?week={WEEK}"))
+    assert "Semaine du lun. 23/11 au dim. 29/11" in following
 
 
 def test_a_refused_move_shows_the_strip_again_with_the_broken_rule(portal: Portal) -> None:
