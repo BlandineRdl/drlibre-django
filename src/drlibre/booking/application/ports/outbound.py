@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
-from drlibre.booking.domain.appointment import Appointment
+from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
+from drlibre.booking.domain.booking_rules import PatientAction
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
 from drlibre.shared_kernel.ids import Id
@@ -284,4 +285,37 @@ class PatientAccounts(Protocol):
 class PatientSessions(Protocol):
     def open(self, *, patient_id: Id, user_agent: str) -> OpenedSession:
         """A 24 hour session, never extended, for the patient."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class AgendaFilter:
+    """Optional narrowing of a patient's agenda; the range bounds the start, end excluded."""
+
+    clinician_id: Id | None = None
+    status: AppointmentStatus | None = None
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AgendaEntry:
+    """An appointment with whom, where and what, as the patient's lists show it."""
+
+    appointment: Appointment
+    clinician_name: str
+    clinician_title: str
+    specialty: str
+    hospital_name: str
+    hospital_address: str
+    time_zone: str
+    department: str
+    room: str | None
+    appointment_type: str
+    allowed_actions: frozenset[PatientAction] = frozenset()
+
+
+class PatientAgenda(Protocol):
+    def entries(self, patient_id: Id, agenda_filter: AgendaFilter) -> tuple[AgendaEntry, ...]:
+        """The patient's appointments matching the filter, by start, actions left empty."""
         ...

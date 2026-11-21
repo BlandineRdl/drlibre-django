@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Lecture des RDV du patient, `GET /appointments`, profil

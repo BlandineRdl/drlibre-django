@@ -11,6 +11,7 @@ from drlibre.shared_kernel.validation import FieldErrors, invalid_field
 PASSWORD_MIN_LENGTH = 10
 PASSWORD_MAX_LENGTH = 72
 _EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+_PHONE = re.compile(r"[0-9 +()\-]{7,20}")
 
 
 class Role(StrEnum):
@@ -65,6 +66,32 @@ class UserDetails:
             parsed_role = Role.PATIENT
         errors.raise_if_any()
         return cls(name, parsed_email, parsed_role, active)
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileDetails:
+    """Phone and birth date a user edits on their profile; None clears the value."""
+
+    phone: str | None
+    birth_date: date | None
+
+    @classmethod
+    def parse(cls, *, phone: str, birth_date: str, today: date) -> "ProfileDetails":
+        errors = FieldErrors()
+        phone_value = phone.strip() or None
+        if phone_value is not None and not _PHONE.fullmatch(phone_value):
+            errors.add("phone", "De 7 à 20 caractères parmi chiffres, espaces et + ( ) -.")
+        birth_value = None
+        if raw_birth := birth_date.strip():
+            try:
+                birth_value = date.fromisoformat(raw_birth)
+            except ValueError:
+                errors.add("birth_date", "Saisissez une date réelle.")
+            else:
+                if birth_value > today:
+                    errors.add("birth_date", "La date de naissance ne peut pas être future.")
+        errors.raise_if_any()
+        return cls(phone_value, birth_value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +166,11 @@ class User:
             role=details.role,
             active=details.active,
             updated_at=at,
+        )
+
+    def with_profile(self, *, profile: ProfileDetails, at: datetime) -> "User":
+        return dataclasses.replace(
+            self, phone=profile.phone, birth_date=profile.birth_date, updated_at=at
         )
 
     def with_password(self, *, password_hash: str, at: datetime) -> "User":

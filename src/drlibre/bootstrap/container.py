@@ -11,6 +11,7 @@ from drlibre.booking.application.ports.inbound import (
     CancelAppointment,
     CreateHold,
     ExpireHolds,
+    ListPatientAppointments,
     OpenHolds,
     RequirePatient,
     RescheduleAppointment,
@@ -29,6 +30,7 @@ from drlibre.booking.application.ports.outbound import (
     CodeIssuer,
     FreeSlots,
     Holds,
+    PatientAgenda,
     Patients,
     RoundRobinLedger,
     ScheduleLocks,
@@ -39,6 +41,9 @@ from drlibre.booking.application.use_cases.book_appointment import BookAppointme
 from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.list_patient_appointments import (
+    ListPatientAppointmentsUseCase,
+)
 from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.application.use_cases.require_patient import RequirePatientUseCase
@@ -59,6 +64,7 @@ from drlibre.booking.infrastructure.identity_patients import (
     IdentityPatientSessions,
 )
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
+from drlibre.booking.infrastructure.patient_agenda import SqlPatientAgenda
 from drlibre.booking.infrastructure.patients import IdentityPatients
 from drlibre.booking.infrastructure.queries import DjangoBookingQueries
 from drlibre.booking.infrastructure.repositories import (
@@ -83,6 +89,7 @@ from drlibre.identity.application.ports.inbound import (
     SignIn,
     SignOut,
     StaffLookup,
+    UpdateProfile,
     UserQueries,
     UseSignInLink,
 )
@@ -111,6 +118,7 @@ from drlibre.identity.application.use_cases.request_sign_in_link import RequestS
 from drlibre.identity.application.use_cases.save_user import SaveUserUseCase
 from drlibre.identity.application.use_cases.sign_in import SignInUseCase
 from drlibre.identity.application.use_cases.sign_out import SignOutUseCase
+from drlibre.identity.application.use_cases.update_profile import UpdateProfileUseCase
 from drlibre.identity.application.use_cases.use_sign_in_link import UseSignInLinkUseCase
 from drlibre.identity.infrastructure.audit_actors import AuditLogActors
 from drlibre.identity.infrastructure.failed_sign_ins import RedisFailedSignIns
@@ -298,6 +306,7 @@ class BookingAdapters:
     codes: VerificationCodes
     issuer: CodeIssuer
     limiter: RateLimiter
+    agenda: PatientAgenda
     network_hourly_limit: int = 20
 
 
@@ -357,6 +366,7 @@ class Container:
     sign_out: SignOut
     authenticate_session: AuthenticateSession
     change_password: ChangePassword
+    update_profile: UpdateProfile
     save_hospital: SaveHospital
     delete_hospital: DeleteHospital
     save_specialty: SaveSpecialty
@@ -392,6 +402,7 @@ class Container:
     open_holds: OpenHolds
     view_hold: ViewHold
     view_appointment: ViewAppointment
+    list_patient_appointments: ListPatientAppointments
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
@@ -464,6 +475,7 @@ def wire(a: Adapters) -> Container:
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
         ),
+        update_profile=UpdateProfileUseCase(clock=clock, uow=uow, audit=audit, users=a.users),
         save_hospital=SaveHospitalUseCase(
             clock=clock,
             uow=uow,
@@ -631,6 +643,7 @@ def wire(a: Adapters) -> Container:
         open_holds=booking.open_holds,
         view_hold=booking.view_hold,
         view_appointment=booking.view_appointment,
+        list_patient_appointments=booking.list_patient_appointments,
         cancel_appointment=booking.cancel_appointment,
         reschedule_appointment=booking.reschedule_appointment,
         send_reminders=booking.send_reminders,
@@ -683,6 +696,7 @@ class _BookingUseCases:
     open_holds: OpenHolds
     view_hold: ViewHold
     view_appointment: ViewAppointment
+    list_patient_appointments: ListPatientAppointments
     cancel_appointment: CancelAppointment
     reschedule_appointment: RescheduleAppointment
     send_reminders: SendReminders
@@ -754,6 +768,9 @@ def _wire_booking(
         open_holds=booking.open_holds,
         view_hold=ViewHoldUseCase(clock=a.clock, holds=booking.holds),
         view_appointment=ViewAppointmentUseCase(appointments=booking.appointments),
+        list_patient_appointments=ListPatientAppointmentsUseCase(
+            clock=a.clock, patients=booking.patients, agenda=booking.agenda
+        ),
         cancel_appointment=CancelAppointmentUseCase(
             clock=a.clock,
             uow=a.uow,
@@ -889,6 +906,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             codes=DjangoVerificationCodes(),
             issuer=HmacCodeIssuer(key=settings.SECRET_KEY),
             limiter=RedisRateLimiter(prefix=settings.RATE_LIMIT_PREFIX),
+            agenda=SqlPatientAgenda(),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),

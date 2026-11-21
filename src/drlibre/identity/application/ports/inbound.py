@@ -21,6 +21,7 @@ __all__ = [
     "SignedIn",
     "StaffLookup",
     "StaffMember",
+    "UpdateProfile",
     "UseSignInLink",
     "User",
     "UserQueries",
@@ -144,4 +145,10 @@ class RequestSignInLink(Protocol):
 class UseSignInLink(Protocol):
     def execute(self, *, token: str, user_agent: str) -> SignedIn:
         """Consume the link and open a 24 hour session; unauthenticated if it is unusable."""
+        ...
+
+
+class UpdateProfile(Protocol):
+    def execute(self, *, user_id: Id, phone: str, birth_date: str) -> None:
+        """Set or clear (empty) the user's phone and ISO birth date; invalid_input per field."""
         ...

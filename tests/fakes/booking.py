@@ -1,8 +1,11 @@
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from drlibre.booking.application.ports.inbound import AppointmentQueries, BookedPeriod
 from drlibre.booking.application.ports.outbound import (
+    AgendaEntry,
+    AgendaFilter,
     Appointments,
     BookableClinician,
     BookableType,
@@ -11,6 +14,7 @@ from drlibre.booking.application.ports.outbound import (
     FreeSlots,
     Holds,
     IssuedCode,
+    PatientAgenda,
     Patients,
     RoundRobinLedger,
     ScheduleLocks,
@@ -354,3 +358,56 @@ class InMemoryAppointmentQueries(AppointmentQueries):
     def _of(self, keep: Callable[[Appointment], bool]) -> tuple[Dependent, ...]:
         found = sorted((a for a in self.appointments.rows if keep(a)), key=lambda a: a.start)
         return tuple(Dependent("appointment", a.id, "Rendez-vous") for a in found)
+
+
+@dataclass(frozen=True, slots=True)
+class AgendaClinician:
+    """What the agenda names about a clinician: who, and the hospital and department."""
+
+    name: str = "Dr Martin"
+    title: str = "Dr"
+    specialty: str = "Cardiologie"
+    hospital_name: str = "Hôpital Nord"
+    hospital_address: str = "1 rue de la Paix, 59000 Lille"
+    time_zone: str = "Europe/Paris"
+    department: str = "Cardiologie"
+
+
+class InMemoryPatientAgenda(PatientAgenda):
+    """Joins the in-memory appointments to `clinicians` and to `labels` naming types and rooms."""
+
+    def __init__(self, appointments: InMemoryAppointments) -> None:
+        self.appointments = appointments
+        self.clinicians: dict[Id, AgendaClinician] = {}
+        self.labels: dict[Id, str] = {}
+
+    def entries(self, patient_id: Id, agenda_filter: AgendaFilter) -> tuple[AgendaEntry, ...]:
+        f = agenda_filter
+        rows = sorted(
+            (
+                a
+                for a in self.appointments.rows
+                if a.patient_id == patient_id
+                and f.clinician_id in (None, a.clinician_id)
+                and f.status in (None, a.status)
+                and (f.start is None or a.start >= f.start)
+                and (f.end is None or a.start < f.end)
+            ),
+            key=lambda a: a.start,
+        )
+        return tuple(self._entry(a) for a in rows)
+
+    def _entry(self, appointment: Appointment) -> AgendaEntry:
+        who = self.clinicians.get(appointment.clinician_id, AgendaClinician())
+        return AgendaEntry(
+            appointment=appointment,
+            clinician_name=who.name,
+            clinician_title=who.title,
+            specialty=who.specialty,
+            hospital_name=who.hospital_name,
+            hospital_address=who.hospital_address,
+            time_zone=who.time_zone,
+            department=who.department,
+            room=self.labels.get(appointment.room_id) if appointment.room_id else None,
+            appointment_type=self.labels.get(appointment.appointment_type_id, ""),
+        )

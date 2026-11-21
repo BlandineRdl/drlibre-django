@@ -58,6 +58,7 @@ Feature: Le patient annule un rendez-vous
     When the patient cancels it giving the reason "  Empêchement professionnel  "
     Then the appointment is cancelled now for the reason "Empêchement professionnel"
     And the slots of "A" were refreshed
+    And the appointment has left the upcoming appointments for the past ones
 
     Examples:
       | case    | status     |

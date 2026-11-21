@@ -2,12 +2,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
+from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
 __all__ = [
+    "AgendaEntry",
+    "AgendaFilter",
     "Appointment",
     "AppointmentQueries",
     "AppointmentStatus",
@@ -19,7 +22,9 @@ __all__ = [
     "HeldPeriod",
     "HoldCreated",
     "HoldSummary",
+    "ListPatientAppointments",
     "OpenHolds",
+    "PatientAppointments",
     "RequirePatient",
     "RescheduleAppointment",
     "ResendCode",
@@ -198,4 +203,18 @@ class ViewHold(Protocol):
 class ViewAppointment(Protocol):
     def execute(self, *, appointment_id: Id, patient_id: Id) -> Appointment:
         """The patient's own appointment; not_found when absent, forbidden for another patient."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class PatientAppointments:
+    """Upcoming soonest first, past latest first."""
+
+    upcoming: tuple[AgendaEntry, ...]
+    past: tuple[AgendaEntry, ...]
+
+
+class ListPatientAppointments(Protocol):
+    def execute(self, *, patient_id: Id, agenda_filter: AgendaFilter) -> PatientAppointments:
+        """The patient's own appointments with their allowed actions; forbidden for staff."""
         ...

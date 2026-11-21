@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from drlibre.booking.application.ports.inbound import HoldCreated, VerifiedBooking
+from drlibre.booking.application.ports.inbound import AgendaFilter, HoldCreated, VerifiedBooking
 from drlibre.booking.domain import booking_rules
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.identity.domain.session import hash_token
@@ -956,6 +956,15 @@ def cancelled_now(world: FakeWorld, scene: Scene, reason: str) -> None:
     assert stored.status is AppointmentStatus.CANCELLED
     assert stored.cancelled_at == world.clock.now()
     assert stored.cancellation_reason == reason
+
+
+@then("the appointment has left the upcoming appointments for the past ones")
+def joined_past(world: FakeWorld, scene: Scene) -> None:
+    listed = world.app.list_patient_appointments.execute(
+        patient_id=scene.patient, agenda_filter=AgendaFilter()
+    )
+    assert mine(scene).id in [e.appointment.id for e in listed.past]
+    assert mine(scene).id not in [e.appointment.id for e in listed.upcoming]
 
 
 @then(

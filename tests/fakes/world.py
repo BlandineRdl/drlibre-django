@@ -15,6 +15,7 @@ from tests.fakes.booking import (
     InMemoryAppointments,
     InMemoryFreeSlots,
     InMemoryHolds,
+    InMemoryPatientAgenda,
     InMemoryPatients,
     InMemoryRoundRobinLedger,
     InMemoryVerificationCodes,
@@ -98,6 +99,7 @@ class FakeWorld:
         )
         self.booking_appointments = InMemoryAppointments()
         self.booking_queries = InMemoryAppointmentQueries(self.booking_appointments)
+        self.agenda = InMemoryPatientAgenda(self.booking_appointments)
         self.booking_directory = FixedBookingDirectory()
         self.holds = InMemoryHolds()
         self.codes = InMemoryVerificationCodes()
@@ -199,6 +201,7 @@ class FakeWorld:
                 codes=self.codes,
                 issuer=self.issuer,
                 limiter=self.limiter,
+                agenda=self.agenda,
             ),
             links=self.links,
             link_notices=OutboxLinkNotices(
