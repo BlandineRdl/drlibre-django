@@ -52,7 +52,9 @@ class SameOriginMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        if request.method not in _SAFE_METHODS and _is_cross_origin(request):
+        # FHIR ignores the session cookie, so a cross-origin call carries no ambient credential.
+        fhir = request.path.startswith("/fhir/")
+        if not fhir and request.method not in _SAFE_METHODS and _is_cross_origin(request):
             return _forbidden(request)
         return self.get_response(request)
 

@@ -17,7 +17,7 @@ def not_found(request: HttpRequest, exception: Exception | None = None) -> HttpR
 
 
 class DomainErrorPagesMiddleware:
-    """Render a refusal a web view did not handle as its error page; the API has its own handler."""
+    """Render a refusal a web view did not handle as its error page; API and FHIR own theirs."""
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
@@ -26,7 +26,7 @@ class DomainErrorPagesMiddleware:
         return self.get_response(request)
 
     def process_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse | None:
-        if not isinstance(exception, DomainError) or request.path.startswith("/api/"):
+        if not isinstance(exception, DomainError) or request.path.startswith(("/api/", "/fhir/")):
             return None
         template = _PAGES.get(exception.code, "errors/403.html")
         context = {"message": exception.message}
