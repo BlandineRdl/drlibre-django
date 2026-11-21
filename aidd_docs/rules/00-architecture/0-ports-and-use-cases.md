@@ -8,8 +8,12 @@
 
 ## Use cases
 - Name a use case `<Port>UseCase`, place it in `application/use_cases/<snake_name>.py`, inherit its inbound port explicitly and expose one `execute()` method.
+- A port with several read methods is a `*Queries` port implemented in `infrastructure/`; never a `*UseCase`.
+- A use case keeps exactly one `execute()`; split it before adding a second public method.
 - Inject clock and outbound ports through `__init__` into private `_attributes`; never instantiate an adapter inside a use case.
 
 ## Adapters and wiring
-- An adapter inherits its outbound port explicitly and is named after its technology, such as `DjangoDatabaseProbe` or `SmtpMailer`.
+- An adapter inherits its port explicitly; a technology adapter is named after its technology, such as `DjangoDatabaseProbe` or `SmtpMailer`.
+- A cross-context adapter is named after the context it reaches, such as `BookingSlotRefresh` or `ScheduleAndBookingDependents`.
+- Two classes never share a name, even in different contexts.
 - Wire adapters to use cases only in `bootstrap/container.py`, with keyword arguments; interfaces reach use cases only through `container()`.
