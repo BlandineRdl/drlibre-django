@@ -275,6 +275,7 @@ def _load_appointments(
     kind: AppointmentTypeRecord,
     room_id: Any,
     patients: list[uuid.UUID],
+    taken: set[tuple[uuid.UUID, datetime]],
     rng: random.Random,
     now: datetime,
 ) -> list[AppointmentRecord]:
@@ -291,9 +292,13 @@ def _load_appointments(
         status = rng.choice(
             ("COMPLETED",) * 8 + ("CANCELLED", "NO_SHOW") if past else ("BOOKED", "CONFIRMED")
         )
+        patient = rng.choice(patients)
+        while (patient, start) in taken:
+            patient = rng.choice(patients)
+        taken.add((patient, start))
         rows.append(
             AppointmentRecord(
-                patient_id=rng.choice(patients),
+                patient_id=patient,
                 clinician=clinician,
                 appointment_type=kind,
                 room_id=room_id,
@@ -307,7 +312,8 @@ def _load_appointments(
 
 
 def seed_load(app: Container) -> None:
-    """10 hospitals, 200 clinicians, 5k patients, 50k appointments; skipped when already there."""
+    """Load volume with no room, clinician or patient overlap; skipped when already there."""
+    # To reseed a load set, empty the database: `docker compose down -v`, then `up` again.
     if AppointmentRecord.objects.filter(clinician__department__code__startswith="LOAD-").exists():
         return
     now = datetime.now(UTC)
@@ -346,18 +352,6 @@ def seed_load(app: Container) -> None:
                     **stamp,
                 },
             )
-            RoomRecord.objects.get_or_create(
-                code=f"{department.code}-R",
-                defaults={
-                    "department": department,
-                    "name": "Consultation",
-                    "floor": "0",
-                    "capacity": 1,
-                    "equipment": [],
-                    "active": True,
-                    **stamp,
-                },
-            )
             AppointmentTypeRecord.objects.get_or_create(
                 code=f"{department.code}-T",
                 defaults={
@@ -390,6 +384,7 @@ def seed_load(app: Container) -> None:
         batch_size=_BATCH,
     )
     appointments: list[AppointmentRecord] = []
+    taken: set[tuple[uuid.UUID, datetime]] = set()
     today = now.astimezone(LOAD_TIME_ZONE).date()
     for n in range(LOAD_CLINICIANS):
         department = departments[n % len(departments)]
@@ -401,7 +396,19 @@ def seed_load(app: Container) -> None:
             email_verified_at=now,
             **stamp,
         )
-        room = RoomRecord.objects.get(code=f"{department.code}-R")
+        # One room per clinician of a department, so seeded appointments never share a room.
+        room, _ = RoomRecord.objects.get_or_create(
+            code=f"{department.code}-R{n // len(departments)}",
+            defaults={
+                "department": department,
+                "name": "Consultation",
+                "floor": "0",
+                "capacity": 1,
+                "equipment": [],
+                "active": True,
+                **stamp,
+            },
+        )
         profile = ClinicianProfileRecord.objects.create(
             user_id=user.id,
             department=department,
@@ -425,7 +432,7 @@ def seed_load(app: Container) -> None:
             for start, end in ((9, 12), (14, 17))
         )
         kind = AppointmentTypeRecord.objects.get(code=f"{department.code}-T")
-        appointments += _load_appointments(profile, kind, room.id, patients, rng, now)
+        appointments += _load_appointments(profile, kind, room.id, patients, taken, rng, now)
     AppointmentRecord.objects.bulk_create(appointments, batch_size=_BATCH)
     app.extend_slot_horizon.execute()
     logger.info("seed_load_done", appointments=len(appointments), patients=len(patients))

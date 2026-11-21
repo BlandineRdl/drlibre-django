@@ -40,10 +40,22 @@ def mailpit_code(email: str, wait: float = 10) -> str | None:
     return None
 
 
-def _expected_refusal(response: Any) -> None:
-    """A slot taken meanwhile is a business refusal (409), not a failure of the server."""
-    if response.status_code in (201, 409):
+def _failure_code(response: Any) -> str:
+    """The error code of the standard body, else the bare HTTP status."""
+    try:
+        return str(response.json()["code"])
+    except (ValueError, KeyError, TypeError):
+        return f"http_{response.status_code}"
+
+
+def _count(response: Any, name: str, *, ok: bool) -> bool:
+    """Count a real success under its endpoint; a refusal apart, by error code, never as success."""
+    if ok:
         response.success()
+    else:
+        response.request_meta["name"] = f"{name} refused"
+        response.failure(_failure_code(response))
+    return ok
 
 
 class Visitor(HttpUser):
@@ -135,18 +147,21 @@ class Visitor(HttpUser):
             name="booking hold",
             catch_response=True,
         ) as held:
-            _expected_refusal(held)
-        code = mailpit_code(email) if held.status_code == 201 else None
+            created = _count(held, "booking hold", ok=held.status_code == 201)
+        code = mailpit_code(email) if created else None
         if code is None:
             return
-        verified = self.client.post(
+        with self.client.post(
             f"{API}/booking/holds/{held.json()['hold_id']}/verify",
             json={"code": code},
             name="booking verify",
-        )
-        if verified.status_code != 200:
-            return
-        # The verified visitor now holds a session cookie: book another slot signed in.
+            catch_response=True,
+        ) as verified:
+            booked = verified.status_code == 200 and "appointment" in verified.text
+            if not _count(verified, "booking verify", ok=booked):
+                self.client.cookies.clear()
+                return
+        # The verified visitor now holds a session cookie: <redacted>
         if picked := self._slot():
             provider, start = picked
             with self.client.post(
@@ -158,6 +173,6 @@ class Visitor(HttpUser):
                 },
                 name="signed-in booking",
                 catch_response=True,
-            ) as booked:
-                _expected_refusal(booked)
+            ) as signed:
+                _count(signed, "signed-in booking", ok=signed.status_code == 201)
         self.client.cookies.clear()

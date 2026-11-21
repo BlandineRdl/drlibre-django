@@ -24,6 +24,10 @@ Tranchées au plan E3 (`aidd_docs/tasks/2026_11/2026_11_21_e3-reservation-sans-c
 - En « premier disponible », le visiteur voit-il le praticien choisi avant de saisir le code ? → Oui : la page du code nomme le praticien choisi à la création de la réservation.
 - Page praticien : quelle semaine par défaut, navigation au-delà de 90 jours ? → Semaine courante dans le fuseau de l'hôpital, `?week=`, navigation limitée à l'horizon de 90 jours. Page hôpital : prochains créneaux du plus court type en ligne actif de chaque département.
 
+## E3 suivi
+Restée ouverte après la revue E3.
+- Les créneaux de la recherche et de `GET /slots` ignorent les salles (§5.1), alors que §6.2 dit « les créneaux affichés sont exactement ceux que la réservation accepterait » : un créneau affiché peut échouer en `no_room_available` à la réservation (reproduction : un type avec salle, toutes les salles du département prises à cette heure, le créneau reste listé). Compter la capacité des salles dans les créneaux (lecture plus coûteuse, p95 à re-prouver) ou accepter l'écart et le documenter en §6.2 ?
+
 ## E4 Portail patient et notifications
 - Le patient peut-il annuler un RDV `CHECKED_IN` ?
 - `not_found` ou `forbidden` quand un patient vise le RDV ou l'entrée d'un autre patient ?
