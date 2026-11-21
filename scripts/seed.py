@@ -284,6 +284,45 @@ def seed_passwordless_patient(app: Container) -> None:
     )
 
 
+DEMO_APPOINTMENTS = 3
+DEMO_ZONE = ZoneInfo("Europe/Paris")
+
+
+def _next_working_day(now: datetime) -> datetime:
+    """Local midnight of the next Monday to Friday after today, in the demo hospital zone."""
+    day = now.astimezone(DEMO_ZONE).date() + timedelta(days=1)
+    while day.weekday() >= 5:
+        day += timedelta(days=1)
+    return datetime.combine(day, time(), tzinfo=DEMO_ZONE)
+
+
+def seed_demo_appointments(app: Container) -> None:
+    """A few BOOKED appointments of the passwordless patient on the demo clinician's next day."""
+    clinician = _user_id(app, "clinicien@drlibre.localhost")
+    patient = _user_id(app, VISITOR_EMAIL)
+    q = app.reference_queries
+    profile = q.clinician_profile_of(clinician) if clinician else None
+    kind = _by_code(q.appointment_types, "HNORD-CONSULT")
+    if clinician is None or patient is None or profile is None or kind is None:
+        return
+    start = _next_working_day(datetime.now(UTC))
+    end = start + timedelta(days=1)
+    seeded = AppointmentRecord.objects.filter(
+        patient_id=patient.value, clinician_id=profile.id.value, start__gte=start, start__lt=end
+    )
+    if seeded.exists():
+        return
+    for _ in range(DEMO_APPOINTMENTS):
+        slots = app.find_free_slots.execute(
+            appointment_type_id=kind, clinician_id=profile.id, start=start, end=end
+        )
+        if not slots:
+            return
+        app.book_for_patient.execute(
+            actor_id=clinician, patient_id=patient, appointment_type_id=kind, start=slots[0].start
+        )
+
+
 # Load size, bulk inserts through the ORM: 50k rows through the use cases would take hours.
 LOAD_HOSPITALS = 8
 LOAD_DEPARTMENTS_PER_HOSPITAL = 2
@@ -472,6 +511,7 @@ SEEDERS: list[Callable[[Container], None]] = [
     seed_clinician_profile,
     seed_availability,
     seed_passwordless_patient,
+    seed_demo_appointments,
 ]
 
 

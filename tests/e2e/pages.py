@@ -89,6 +89,8 @@ def read_code(to: str) -> str:
 
 def read_link(to: str) -> str:
     body = read_mail(to, "Votre lien de connexion")
-    match = re.search(r"https?://\S+/sign-in/link\?token=\S+", body)
+    match = re.search(r"https?://[^/\s]+(/sign-in/link\?token=\S+)", body)
     assert match, "no sign-in link in the email"
-    return match.group(0)
+    # A stack on other ports still mails PUBLIC_BASE_URL links: E2E_BASE_URL rebases them.
+    base = os.environ.get("E2E_BASE_URL")
+    return f"{base}{match.group(1)}" if base else match.group(0)

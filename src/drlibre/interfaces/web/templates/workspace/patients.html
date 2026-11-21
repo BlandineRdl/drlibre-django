@@ -11,9 +11,9 @@
   </div>
 </form>
 {% if view.rows %}
-<div class="overflow-auto">
+<div class="overflow-auto" role="region" aria-labelledby="patients-caption" tabindex="0">
   <table>
-    <caption>Patients ayant un rendez-vous avec vous, heure locale ({{ view.time_zone }})</caption>
+    <caption id="patients-caption">Patients ayant un rendez-vous avec vous, heure locale ({{ view.time_zone }})</caption>
     <thead><tr><th scope="col">Nom</th><th scope="col">Téléphone</th><th scope="col">Dernière visite</th><th scope="col">Prochaine visite</th></tr></thead>
     <tbody>
     {% for row in view.rows %}<tr><th scope="row">{{ row.name }}</th><td>{{ row.phone }}</td><td>{{ row.last_visit }}</td><td>{{ row.next_visit }}</td></tr>{% endfor %}

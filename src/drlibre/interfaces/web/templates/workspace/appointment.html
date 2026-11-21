@@ -35,9 +35,9 @@
 <section aria-labelledby="history-heading">
   <h2 id="history-heading">Historique</h2>
   {% if view.history %}
-  <div class="overflow-auto">
+  <div class="overflow-auto" role="region" aria-labelledby="history-caption" tabindex="0">
     <table>
-      <caption>Historique du rendez-vous, heure locale ({{ view.time_zone }})</caption>
+      <caption id="history-caption">Historique du rendez-vous, heure locale ({{ view.time_zone }})</caption>
       <thead><tr><th scope="col">Heure</th><th scope="col">Action</th><th scope="col">Par</th></tr></thead>
       <tbody>{% for line in view.history %}<tr><td>{{ line.at }}</td><td>{{ line.action }}</td><td>{{ line.actor }}</td></tr>{% endfor %}</tbody>
     </table>

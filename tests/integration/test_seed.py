@@ -65,6 +65,21 @@ def test_the_demo_clinician_has_free_slots_after_the_seed() -> None:
     assert slots
 
 
+def test_the_demo_clinician_sees_the_seeded_appointments_on_the_next_working_day() -> None:
+    """Epic E6: the seed books the passwordless patient on the demo clinician's next day, once."""
+    seed.main()
+    seed.main()
+    user = UserRecord.objects.get(email="clinicien@drlibre.localhost")
+    day = seed._next_working_day(datetime.now(UTC)).date()
+
+    view = container().clinician_day.execute(actor_id=Id(user.id), day=day)
+
+    entries = [e for hour in view.hours for e in hour.entries]
+    assert len(entries) == seed.DEMO_APPOINTMENTS
+    assert {e.patient_name for e in entries} == {"Victor Visiteur"}
+    assert {e.appointment.status.value for e in entries} == {"BOOKED"}
+
+
 def test_the_load_seed_never_double_books_a_room_a_clinician_or_a_patient(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
