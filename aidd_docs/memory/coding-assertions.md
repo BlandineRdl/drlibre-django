@@ -10,4 +10,5 @@
 - `docker compose up -d` then `uv run pytest`: the full suite; `-m "not integration"` skips tests needing PostgreSQL or Mailpit.
 - `curl -i localhost:8000/api/v1/health`: 200 with an `x-correlation-id` header.
 - `docker compose up -d --build`, `uv run playwright install chromium` once, then `uv run pytest -m e2e`: the Playwright journey against `localhost:8000`, axe-core at 375 and 1440 px; excluded from the default run and CI.
+- `./scripts/load-run.sh`: Locust search and booking p95 on the load seed, in its own compose project removed at exit.
 - pre-commit `--all-files` only lints tracked files: run `uv run ruff check .` and `uv run ruff format --check .` before new files are staged.
