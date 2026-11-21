@@ -281,7 +281,8 @@ def slots_without_session(fake_container: Container, outcome: Outcome, name: str
         "end": "2026-11-24T00:00:00+01:00",
     }
     response = Client().get("/api/v1/slots", query)
-    outcome.answer = (response.status_code, response.json()["code"])
+    body = response.json()
+    outcome.answer = (response.status_code, "slots" if "slots" in body else body["code"])
 
 
 @when(parsers.parse('the department\'s slots are asked from "{start}" to "{end}"'))

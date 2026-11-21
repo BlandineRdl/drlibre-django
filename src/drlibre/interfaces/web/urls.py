@@ -6,11 +6,16 @@ from drlibre.interfaces.web.views import (
     console_clinicians,
     console_reference,
     console_users,
+    public,
+    search,
     workspace_availability,
 )
 
 urlpatterns: list[URLPattern | URLResolver] = [
-    path("", auth.home),
+    path("", search.home),
+    path("providers/<uuid:record_id>", public.provider),
+    path("hospitals/<uuid:record_id>", public.hospital),
+    path("specialties/<uuid:record_id>", public.specialty),
     path("sign-in", auth.sign_in),
     path("sign-in/link", auth.use_link),
     path("sign-in/link/request", auth.request_link),

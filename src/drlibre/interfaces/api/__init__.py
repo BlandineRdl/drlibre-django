@@ -4,6 +4,8 @@ from ninja.errors import ValidationError
 
 from drlibre.interfaces.api.auth import router as auth_router
 from drlibre.interfaces.api.health import router as health_router
+from drlibre.interfaces.api.public import router as public_router
+from drlibre.interfaces.api.search import router as search_router
 from drlibre.interfaces.api.slots import router as slots_router
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
@@ -11,6 +13,8 @@ api = NinjaAPI(title="DrLibre API", version="1", urls_namespace="api-v1")
 api.add_router("/", health_router)
 api.add_router("/", auth_router)
 api.add_router("/", slots_router)
+api.add_router("/", search_router)
+api.add_router("/", public_router)
 
 
 @api.exception_handler(DomainError)

@@ -20,14 +20,16 @@ def slots_url(kind: Id | str, start: datetime, end: datetime) -> str:
     return f"/api/v1/slots?{urlencode(query)}"
 
 
-def test_without_a_session_slots_answer_unauthenticated(client: Client) -> None:
-    """§14 : GET /slots est réservé aux personnes connectées."""
+def test_without_a_session_slots_answer_publicly(client: Client) -> None:
+    """Story pages publiques : GET /slots répond sans session."""
+    kind = build.appointment_type(stored_department().id)
+    DjangoAppointmentTypes().save(kind)
     start = datetime(2026, 12, 1, tzinfo=UTC)
 
-    response = client.get(slots_url(Id(), start, start + timedelta(days=1)))
+    response = client.get(slots_url(kind.id, start, start + timedelta(days=1)))
 
-    assert response.status_code == 401
-    assert response.json()["code"] == "unauthenticated"
+    assert response.status_code == 200
+    assert response.json() == {"slots": []}
 
 
 def test_a_range_over_31_days_is_refused_as_invalid(admin_client: Client) -> None:

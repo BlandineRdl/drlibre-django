@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Rechercher un praticien, un hôpital ou une spécialité{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+<h1>Trouvez un rendez-vous</h1>
+<search>
+<form method="get" action="/" id="search-form">
+  <input type="hidden" name="list" value="{{ view.kind }}">
+  <input type="hidden" name="lat" id="geo-lat" value="{{ view.latitude }}">
+  <input type="hidden" name="lon" id="geo-lon" value="{{ view.longitude }}">
+  <label for="q">Rechercher un praticien, un lieu, une spécialité…</label>
+  <fieldset role="group">
+    <input type="search" id="q" name="q" value="{{ view.text }}" autocomplete="off">
+    <button type="submit">Rechercher</button>
+  </fieldset>
+  <details class="filters"{% if view.has_filters %} open{% endif %}>
+    <summary>Filtres</summary>
+    <div class="filter-grid">
+      {% for select in view.selects %}
+      <div>
+        <label for="f-{{ select.name }}">{{ select.label }}</label>
+        <select id="f-{{ select.name }}" name="{{ select.name }}">
+          {% for o in select.options %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+      <div>
+        <label for="f-city">Ville</label>
+        <input type="text" id="f-city" name="city" value="{{ view.city }}" autocomplete="off">
+      </div>
+      <div>
+        <label for="f-from">À partir du</label>
+        <input type="date" id="f-from" name="from" value="{{ view.from_date }}">
+      </div>
+    </div>
+  </details>
+  <div class="filter-grid">
+    <div>
+      <label for="f-sort">Trier par</label>
+      <select id="f-sort" name="sort">
+        {% for o in view.sorts %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="f-size">Résultats par page</label>
+      <select id="f-size" name="size">
+        {% for o in view.pagination.sizes %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="actions">
+    <button type="submit">Appliquer</button>
+    <button type="button" id="geo-button" class="secondary outline" hidden>Trier par distance</button>
+  </div>
+  <p id="geo-status" role="status"></p>
+</form>
+</search>
+<nav aria-label="Type de résultat">
+  <ul class="tabs">
+    {% for tab in view.tabs %}<li><a href="{{ tab.url }}"{% if tab.current %} aria-current="page"{% endif %}>{{ tab.label }}</a></li>{% endfor %}
+  </ul>
+</nav>
+<h2>{{ view.heading }}</h2>
+{% if view.results %}
+<div class="results">
+  {% for result in view.results %}{% include "search/_result.html" %}{% endfor %}
+</div>
+{% else %}
+<p>{{ view.empty_text }}</p>
+{% endif %}
+{% include "search/_pagination.html" with pagination=view.pagination %}
+{% endblock %}
+{% block scripts %}<script src="{% static 'drlibre-geo.js' %}" defer></script>{% endblock %}

@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.bootstrap.container import Adapters, BookingAdapters, Container, wire
 from drlibre.identity.infrastructure.outbox_link_notices import OutboxLinkNotices
+from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
 from tests.fakes.booking import (
@@ -195,4 +196,6 @@ class FakeWorld:
             link_notices=OutboxLinkNotices(
                 outbox=self.outbox, public_base_url="http://localhost:8000"
             ),
+            # Search is a read side tested on PostgreSQL: the real adapter, never reached by fakes.
+            search_queries=SqlSearchQueries(),
         )

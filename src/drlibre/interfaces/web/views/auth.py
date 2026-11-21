@@ -8,7 +8,6 @@ from drlibre.interfaces.web.auth import (
     HOMES,
     clear_session_cookie,
     current_identity,
-    identity_of,
     require_password_holder,
     session_token,
     set_session_cookie,
@@ -23,12 +22,6 @@ from drlibre.interfaces.web.presenters.auth import (
     sign_in_form,
 )
 from drlibre.shared_kernel.errors import DomainError
-
-
-@require_http_methods(["GET"])
-def home(request: HttpRequest) -> HttpResponse:
-    identity = identity_of(request)
-    return redirect(HOMES[identity.role] if identity else "/sign-in")
 
 
 def _safe_next(request: HttpRequest, raw: str, home_path: str) -> str:

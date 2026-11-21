@@ -1,7 +1,8 @@
-{% if shell.signed_in %}
 <ul>
+  <li><a href="/">Rechercher</a></li>
+  {% if shell.signed_in %}
+  <li><a href="{{ shell.home_url }}">Mon espace</a></li>
   {% if shell.is_clinician %}
-  <li><a href="/workspace/">Mon espace</a></li>
   <li><a href="/workspace/availability/">Mes plages</a></li>
   <li><a href="/workspace/time-off/">Mes absences</a></li>
   {% endif %}
@@ -12,5 +13,7 @@
       <button type="submit" class="secondary outline">Déconnexion</button>
     </form>
   </li>
+  {% else %}
+  <li><a href="/sign-in">Se connecter</a></li>
+  {% endif %}
 </ul>
-{% endif %}

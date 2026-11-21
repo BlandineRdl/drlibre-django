@@ -1,0 +1,15 @@
+<article>
+  <header>
+    <h3><a href="{{ result.url }}">{{ result.title }}</a></h3>
+    {% for line in result.lines %}<p class="result-line">{{ line }}</p>{% endfor %}
+  </header>
+  {% if result.slots %}
+  <p class="result-line"><strong>{{ result.slots_heading }}</strong></p>
+  <ul class="slot-list">
+    {% for slot in result.slots %}<li><a href="{{ slot.url }}" role="button" class="outline secondary">{{ slot.label }}</a></li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>{{ result.empty_text }}</p>
+  {% endif %}
+  <footer><a href="{{ result.all_times_url }}">{{ result.all_times_label }} →</a></footer>
+</article>

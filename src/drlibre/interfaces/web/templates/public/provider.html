@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ view.name }}{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>{{ view.name }}</h1>
+  {% for line in view.lines %}<p>{{ line }}</p>{% endfor %}
+</hgroup>
+{% if view.bio %}<p>{{ view.bio }}</p>{% endif %}
+<form method="get">
+  <input type="hidden" name="week" value="{{ view.week_value }}">
+  <label for="type">Type de rendez-vous</label>
+  <fieldset role="group">
+    <select id="type" name="type">
+      {% for o in view.types %}<option value="{{ o.value }}"{% if o.selected %} selected{% endif %}>{{ o.label }}</option>{% endfor %}
+    </select>
+    <button type="submit">Afficher</button>
+  </fieldset>
+</form>
+<nav aria-label="Semaines" class="pagination">
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Semaine précédente</a>{% endif %}
+  <h2>{{ view.week_label }}</h2>
+  {% if view.next_url %}<a href="{{ view.next_url }}">Semaine suivante ›</a>{% endif %}
+</nav>
+{% if view.empty_week_text %}<p>{{ view.empty_week_text }}</p>{% endif %}
+<div class="week-strip">
+  {% for day in view.days %}
+  <section aria-label="{{ day.label }}">
+    <h3>{{ day.label }}</h3>
+    {% if day.slots %}
+    <ul class="slot-list">
+      {% for slot in day.slots %}<li><a href="{{ slot.url }}" role="button" class="outline secondary">{{ slot.label }}</a></li>{% endfor %}
+    </ul>
+    {% else %}<p>{{ day.empty_text }}</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

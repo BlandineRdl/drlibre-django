@@ -5,17 +5,10 @@ from ninja import Query, Router, Schema
 from pydantic import AwareDatetime, ConfigDict
 
 from drlibre.bootstrap.container import container
-from drlibre.identity.application.ports.inbound import Identity
-from drlibre.interfaces.web.auth import current_identity
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.validation import invalid_field
 
 router = Router(tags=["slots"])
-
-
-def signed_in(request: HttpRequest) -> Identity:
-    """Session cookie auth; without one, unauthenticated before the query is read."""
-    return current_identity(request)
 
 
 class SlotsQuery(Schema):
@@ -36,7 +29,7 @@ class SlotsOut(Schema):
     slots: list[SlotOut]
 
 
-@router.get("/slots", response=SlotsOut, auth=signed_in)
+@router.get("/slots", response=SlotsOut)
 def free_slots(request: HttpRequest, query: Query[SlotsQuery]) -> SlotsOut:
     # Ninja drops unknown query keys before the schema, so extra="forbid" alone misses them.
     unknown = sorted(set(request.GET) - set(SlotsQuery.model_fields))

@@ -101,7 +101,7 @@ allow_indirect_imports = true
 [[tool.importlinter.contracts]]
 name = "Each context layers infrastructure over application over domain"
 type = "layers"
-containers = ["drlibre.audit", "drlibre.booking", "drlibre.health", "drlibre.identity", "drlibre.notifications", "drlibre.organisation", "drlibre.scheduling"]
+containers = ["drlibre.audit", "drlibre.booking", "drlibre.health", "drlibre.identity", "drlibre.notifications", "drlibre.organisation", "drlibre.scheduling", "drlibre.search"]
 layers = ["infrastructure", "application", "(domain)"]
 
 [[tool.importlinter.contracts]]
@@ -127,6 +127,20 @@ name = "Booking's core reaches identity, notifications, organisation and schedul
 type = "forbidden"
 source_modules = ["drlibre.booking.domain", "drlibre.booking.application"]
 forbidden_modules = [
+    "drlibre.identity",
+    "drlibre.notifications",
+    "drlibre.organisation",
+    "drlibre.scheduling",
+]
+
+[[tool.importlinter.contracts]]
+name = "Search's core imports no other context"
+type = "forbidden"
+source_modules = ["drlibre.search.domain", "drlibre.search.application"]
+forbidden_modules = [
+    "drlibre.audit",
+    "drlibre.booking",
+    "drlibre.health",
     "drlibre.identity",
     "drlibre.notifications",
     "drlibre.organisation",

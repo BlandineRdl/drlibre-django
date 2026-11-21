@@ -222,6 +222,26 @@ from drlibre.scheduling.infrastructure.repositories import (
 )
 from drlibre.scheduling.infrastructure.slot_queries import DjangoSlotQueries
 from drlibre.scheduling.infrastructure.slot_store import DjangoSlotStore
+from drlibre.search.application.ports.inbound import (
+    CountSearchResults,
+    ListFilterOptions,
+    SearchHospitals,
+    SearchProviders,
+    SearchSpecialties,
+    ViewHospitalPage,
+    ViewProviderPage,
+    ViewSpecialtyPage,
+)
+from drlibre.search.application.ports.outbound import SearchQueries
+from drlibre.search.application.use_cases.count_search_results import CountSearchResultsUseCase
+from drlibre.search.application.use_cases.list_filter_options import ListFilterOptionsUseCase
+from drlibre.search.application.use_cases.search_hospitals import SearchHospitalsUseCase
+from drlibre.search.application.use_cases.search_providers import SearchProvidersUseCase
+from drlibre.search.application.use_cases.search_specialties import SearchSpecialtiesUseCase
+from drlibre.search.application.use_cases.view_hospital_page import ViewHospitalPageUseCase
+from drlibre.search.application.use_cases.view_provider_page import ViewProviderPageUseCase
+from drlibre.search.application.use_cases.view_specialty_page import ViewSpecialtyPageUseCase
+from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.rate_limit import RateLimiter
 from drlibre.shared_kernel.system_clock import SystemClock
@@ -288,6 +308,7 @@ class Adapters:
     booking: BookingAdapters
     links: SignInLinks
     link_notices: LinkNotices
+    search_queries: SearchQueries
     # None wires organisation to scheduling's own RefreshSlots.
     slot_refresh: SlotRefresh | None = None
 
@@ -336,6 +357,14 @@ class Container:
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
     use_sign_in_link: UseSignInLink
+    search_providers: SearchProviders
+    search_hospitals: SearchHospitals
+    search_specialties: SearchSpecialties
+    count_search_results: CountSearchResults
+    list_filter_options: ListFilterOptions
+    view_provider_page: ViewProviderPage
+    view_hospital_page: ViewHospitalPage
+    view_specialty_page: ViewSpecialtyPage
 
 
 def wire(a: Adapters) -> Container:
@@ -565,6 +594,14 @@ def wire(a: Adapters) -> Container:
             links=a.links,
             tokens=a.tokens,
         ),
+        search_providers=SearchProvidersUseCase(clock=clock, queries=a.search_queries),
+        search_hospitals=SearchHospitalsUseCase(clock=clock, queries=a.search_queries),
+        search_specialties=SearchSpecialtiesUseCase(clock=clock, queries=a.search_queries),
+        count_search_results=CountSearchResultsUseCase(clock=clock, queries=a.search_queries),
+        list_filter_options=ListFilterOptionsUseCase(queries=a.search_queries),
+        view_provider_page=ViewProviderPageUseCase(clock=clock, queries=a.search_queries),
+        view_hospital_page=ViewHospitalPageUseCase(clock=clock, queries=a.search_queries),
+        view_specialty_page=ViewSpecialtyPageUseCase(clock=clock, queries=a.search_queries),
     )
 
 
@@ -736,6 +773,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         link_notices=OutboxLinkNotices(
             outbox=CeleryEmailOutbox(), public_base_url=settings.PUBLIC_BASE_URL
         ),
+        search_queries=SqlSearchQueries(),
     )
 
 

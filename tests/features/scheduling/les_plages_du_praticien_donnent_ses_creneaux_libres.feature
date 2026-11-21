@@ -13,9 +13,9 @@ Feature: Les plages du praticien donnent ses créneaux libres
     When the slots of "A" are asked from "2026-11-23 00:00" to "2026-11-24 00:00"
     Then the slots start at "09:00, 09:30"
 
-  Scenario: GET /slots prend un type, un praticien et une période ; sans session, il répond unauthenticated (sans session)
+  Scenario: GET /slots prend un type, un praticien et une période ; sans session, il répond (E3 ouvre cette route : 200 sans session)
     When the slots of "A" are asked through the API without a session
-    Then the API answers 401 "unauthenticated"
+    Then the API answers 200 "slots"
 
   Scenario: Pour chaque jour local de la période, chaque plage valable ce jour-là propose un début à son heure de début puis à chaque pas, tant que le début plus la durée du type ne dépasse pas sa fin ; chaque créneau dure la durée du type
     Given "A" has a rule on weekday 1 from "09:00" to "12:00" every 15 minutes

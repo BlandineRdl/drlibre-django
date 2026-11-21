@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ view.name }}{% endblock %}
+{% block content %}
+<h1>{{ view.name }}</h1>
+<h2>Praticiens</h2>
+{% if view.providers %}
+<div class="results">
+  {% for result in view.providers %}{% include "search/_result.html" %}{% endfor %}
+</div>
+{% else %}<p>{{ view.empty_text }}</p>{% endif %}
+{% include "search/_pagination.html" with pagination=view.pagination %}
+{% endblock %}
