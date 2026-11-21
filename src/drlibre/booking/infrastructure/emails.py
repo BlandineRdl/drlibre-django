@@ -2,8 +2,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from drlibre.booking.application.ports.outbound import Venue
-from drlibre.booking.domain.verification_code import CODE_LIFETIME
 from drlibre.notifications.application.ports.outbound import EmailMessage
+from drlibre.shared_kernel.booking_policy import CODE_LIFETIME
 
 
 def code_email(*, to: str, code: str) -> EmailMessage:

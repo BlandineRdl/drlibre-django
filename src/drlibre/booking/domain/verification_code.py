@@ -1,11 +1,11 @@
 import dataclasses
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
 
+from drlibre.shared_kernel.booking_policy import CODE_LIFETIME
 from drlibre.shared_kernel.ids import Id
 
-CODE_LIFETIME = timedelta(minutes=10)
 MAX_ATTEMPTS = 5
 
 

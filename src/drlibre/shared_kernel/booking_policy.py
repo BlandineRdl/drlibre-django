@@ -8,3 +8,9 @@ ALTERNATIVES_WINDOW = timedelta(days=14)
 
 # Slots are stored, and availabilities searched, this many days ahead.
 SLOT_HORIZON_DAYS = 90
+
+# A booking verification code stays valid this long.
+CODE_LIFETIME = timedelta(minutes=10)
+
+# A sign-in link stays valid this long.
+LINK_LIFETIME = timedelta(minutes=15)

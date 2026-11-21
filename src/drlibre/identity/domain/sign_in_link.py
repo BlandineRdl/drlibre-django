@@ -1,11 +1,11 @@
 import dataclasses
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from drlibre.identity.domain.session import hash_token
+from drlibre.shared_kernel.booking_policy import LINK_LIFETIME
 from drlibre.shared_kernel.ids import Id
 
-LINK_LIFETIME = timedelta(minutes=15)
 LINKS_PER_EMAIL_PER_HOUR = 3
 
 

@@ -12,6 +12,7 @@ from drlibre.interfaces.web.presenters.slots import (
     slot_label,
 )
 from drlibre.scheduling.application.ports.inbound import Slot
+from drlibre.shared_kernel.booking_policy import CODE_LIFETIME
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
@@ -42,7 +43,7 @@ CODE_FIELDS = (
         "code",
         "Code reçu par email",
         autocomplete="one-time-code",
-        help="6 chiffres, valables 10 minutes.",
+        help=f"6 chiffres, valables {int(CODE_LIFETIME.total_seconds() // 60)} minutes.",
     ),
 )
 

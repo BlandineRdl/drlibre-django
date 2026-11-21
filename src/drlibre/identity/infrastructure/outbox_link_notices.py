@@ -1,8 +1,8 @@
 from urllib.parse import urlencode
 
 from drlibre.identity.application.ports.outbound import LinkNotices
-from drlibre.identity.domain.sign_in_link import LINK_LIFETIME
 from drlibre.notifications.application.ports.outbound import EmailMessage, EmailOutbox
+from drlibre.shared_kernel.booking_policy import LINK_LIFETIME
 
 
 def link_email(*, to: str, url: str) -> EmailMessage:

@@ -3,7 +3,8 @@
 - Never decide a role, lead time, window or limit in a view, router, presenter or template.
 - Call one use case and map its result or its `DomainError`.
 - Enforce each rule once, in a use case or the domain.
-- Declare each policy constant once in `shared_kernel/booking_policy.py`.
+- Declare each policy constant shared across contexts or layers once in `shared_kernel/booking_policy.py`.
+- Keep a constant used only inside one context's core in that core.
 - Never repeat a policy number as a literal, in code or in text.
 - Format display text from the policy constants, such as the lead time in hours.
 - Pass a window computed by a use case to the template; never recompute it in a view.

@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_form
+from drlibre.shared_kernel.booking_policy import LINK_LIFETIME
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 SIGN_IN_FIELDS = (
@@ -11,7 +12,8 @@ SIGN_IN_FIELDS = (
 LINK_FIELDS = (FieldSpec("link_email", "Email", kind="email", autocomplete="email"),)
 LINK_SENT_MESSAGE = (
     "Si cette adresse est celle d'un compte patient, "
-    "un lien de connexion valable 15 minutes vient d'être envoyé."
+    f"un lien de connexion valable {int(LINK_LIFETIME.total_seconds() // 60)} minutes "
+    "vient d'être envoyé."
 )
 NO_LINK_MESSAGE = "Ce lien n'est pas valable. Demandez-en un nouveau."
 PASSWORD_FIELDS = (
