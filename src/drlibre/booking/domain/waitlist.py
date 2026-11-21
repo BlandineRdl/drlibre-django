@@ -95,6 +95,15 @@ class WaitlistEntry:
         """OFFERED and the offered start still at least the booking lead time ahead."""
         return self.status is WaitlistStatus.OFFERED and offered_start >= now + BOOKING_LEAD_TIME
 
+    def acceptable_by_staff(self, offered_start: datetime, now: datetime) -> bool:
+        """OFFERED and the offered start still ahead."""
+        return self.status is WaitlistStatus.OFFERED and offered_start > now
+
+    @property
+    def offerable(self) -> bool:
+        """Only a WAITING entry receives a manual offer."""
+        return self.status is WaitlistStatus.WAITING
+
     def _require(self, status: WaitlistStatus) -> None:
         if self.status is not status:
             raise DomainError(

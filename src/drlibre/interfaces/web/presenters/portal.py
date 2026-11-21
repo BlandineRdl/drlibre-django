@@ -15,7 +15,11 @@ from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_f
 from drlibre.interfaces.web.presenters.slots import day_label, local, slot_instant
 from drlibre.notifications.application.ports.inbound import Notification, NotificationKind
 from drlibre.scheduling.application.ports.inbound import FreeWeek
-from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME, CANCELLATION_WINDOW
+from drlibre.shared_kernel.booking_policy import (
+    BOOKING_LEAD_TIME,
+    CANCELLATION_WINDOW,
+    MAX_OPEN_ONLINE,
+)
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.pagination import Page
 
@@ -40,6 +44,7 @@ RULE_LABELS = {
     BookingRule.LEAD_TIME_TOO_SHORT: f"le nouveau créneau commence dans moins de {_MINUTES} min",
     BookingRule.TYPE_NOT_BOOKABLE_ONLINE: "ce type de rendez-vous ne se réserve pas en ligne",
     BookingRule.OUTSIDE_AVAILABILITY: "ce créneau n'est pas libre",
+    BookingRule.TOO_MANY_OPEN_BOOKINGS: f"vous avez déjà {MAX_OPEN_ONLINE} réservations en ligne",
 }
 KIND_LABELS = {
     NotificationKind.SCHEDULE_CHANGED: "Changement de planning",
@@ -49,6 +54,7 @@ KIND_LABELS = {
 NOTICES = {
     "cancelled": "Le rendez-vous est annulé.",
     "moved": "Le rendez-vous est déplacé.",
+    "booked": "Le créneau proposé est réservé.",
     "saved": "Votre profil est enregistré.",
 }
 REASON_FIELD = (

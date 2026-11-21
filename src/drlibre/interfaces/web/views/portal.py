@@ -28,6 +28,13 @@ from drlibre.interfaces.web.presenters.portal import (
     profile_values,
     reschedule_page,
 )
+from drlibre.interfaces.web.presenters.waitlist import (
+    JOIN_FIELDS,
+    WAITLIST_URL,
+    join_form,
+    join_input,
+    waitlist_page,
+)
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import PageRequest
@@ -214,3 +221,64 @@ def profile(request: HttpRequest) -> HttpResponse:
         view = profile_page(user, values, has_password=identity.has_password, error=error)
         return render(request, "portal/profile.html", {"view": view}, status=400)
     return redirect(f"{PROFILE_URL}?done=saved")
+
+
+def _waitlist_page(
+    request: HttpRequest,
+    values: dict[str, str],
+    *,
+    form_error: DomainError | None = None,
+    error: DomainError | None = None,
+) -> HttpResponse:
+    c = container()
+    form = join_form(
+        title="S'inscrire",
+        action=WAITLIST_URL,
+        submit_label="S'inscrire",
+        specs=JOIN_FIELDS,
+        types=c.waitlist_queries.type_options(online_only=True),
+        clinicians=c.waitlist_queries.clinician_options(),
+        values=values,
+        error=form_error,
+    )
+    view = waitlist_page(
+        c.waitlist_queries.own_entries(current_identity(request).user_id),
+        form,
+        c.clock.now(),
+        notice=request.GET.get("done", ""),
+        error=error,
+    )
+    refused = form_error or error
+    status = refused.code.http_status if refused else 200
+    return _private(render(request, "portal/waitlist.html", {"view": view}, status=status))
+
+
+@require_http_methods(["GET", "POST"])
+@require_role(Role.PATIENT)
+def waitlist(request: HttpRequest) -> HttpResponse:
+    if request.method == "GET":
+        return _waitlist_page(request, {})
+    values = {spec.name: request.POST.get(spec.name, "") for spec in JOIN_FIELDS}
+    try:
+        container().join_waitlist.execute(
+            actor_id=current_identity(request).user_id, patient_email=None, **join_input(values)
+        )
+    except DomainError as error:
+        if error.code not in _INLINE | {ErrorCode.NOT_FOUND}:
+            raise
+        return _waitlist_page(request, values, form_error=error)
+    return redirect(f"{WAITLIST_URL}?done=joined")
+
+
+@require_POST
+@require_role(Role.PATIENT)
+def accept_offer(request: HttpRequest, entry_id: UUID) -> HttpResponse:
+    try:
+        container().accept_waitlist_offer.execute(
+            actor_id=current_identity(request).user_id, entry_id=Id(entry_id)
+        )
+    except DomainError as error:
+        if error.code not in _INLINE:
+            raise
+        return _waitlist_page(request, {}, error=error)
+    return redirect(f"{APPOINTMENTS_URL}?done=booked")
