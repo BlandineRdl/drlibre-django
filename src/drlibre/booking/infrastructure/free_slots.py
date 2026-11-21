@@ -19,12 +19,14 @@ class SchedulingFreeSlots(FreeSlots):
         start: datetime,
         *,
         ignoring_hold: Id | None,
+        ignoring_appointment: Id | None = None,
     ) -> bool:
         return self._is_slot_free.execute(
             clinician_id=clinician_id,
             appointment_type_id=appointment_type_id,
             start=start,
             ignoring_hold=ignoring_hold,
+            ignoring_appointment=ignoring_appointment,
         )
 
     def candidates_at(self, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:

@@ -10,15 +10,19 @@ from drlibre.booking.domain.appointment import Source
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.visitor_details import VisitorDetails
 from drlibre.booking.infrastructure.free_slots import SchedulingFreeSlots
+from drlibre.booking.infrastructure.queries import DjangoBookingQueries
 from drlibre.booking.infrastructure.repositories import DjangoHolds
 from drlibre.identity.infrastructure.queries import DjangoUserQueries
 from drlibre.organisation.infrastructure.queries import DjangoReferenceQueries
 from drlibre.scheduling.application.ports.outbound import StoredSlot
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
 from drlibre.scheduling.application.use_cases.free_clinicians_at import FreeCliniciansAtUseCase
 from drlibre.scheduling.application.use_cases.is_slot_free import IsSlotFreeUseCase
 from drlibre.scheduling.domain.slot import Slot
+from drlibre.scheduling.infrastructure.booking_appointments import BookingClinicianAppointments
 from drlibre.scheduling.infrastructure.booking_holds import BookingSlotHolds
 from drlibre.scheduling.infrastructure.directory import OrganisationSchedulingDirectory
+from drlibre.scheduling.infrastructure.repositories import DjangoAvailabilityRules, DjangoTimeOffs
 from drlibre.scheduling.infrastructure.slot_queries import DjangoSlotQueries
 from drlibre.scheduling.infrastructure.slot_store import DjangoSlotStore
 from drlibre.shared_kernel.ids import Id
@@ -101,7 +105,15 @@ def scene(request: pytest.FixtureRequest) -> Scene:
         "queries": DjangoSlotQueries(),
         "holds": BookingSlotHolds(OpenHoldsUseCase(holds=DjangoHolds())),
     }
-    real = SchedulingFreeSlots(IsSlotFreeUseCase(**ports), FreeCliniciansAtUseCase(**ports))
+    computation = SlotComputation(
+        directory=ports["directory"],
+        rules=DjangoAvailabilityRules(),
+        time_offs=DjangoTimeOffs(),
+        appointments=BookingClinicianAppointments(DjangoBookingQueries()),
+    )
+    real = SchedulingFreeSlots(
+        IsSlotFreeUseCase(**ports, computation=computation), FreeCliniciansAtUseCase(**ports)
+    )
     return Scene(real, first, second, stored.kind, list_stored, store_hold)
 
 

@@ -7,7 +7,8 @@ from drlibre.scheduling.application.ports.outbound import (
     SlotHolds,
     SlotQueries,
 )
-from drlibre.scheduling.application.use_cases.open_slots import open_slots
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
+from drlibre.scheduling.application.use_cases.open_slots import computed_without, open_slots
 from drlibre.scheduling.domain.slot import Period, Slot
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -25,14 +26,22 @@ class FindFreeSlotsUseCase(FindFreeSlots):
         directory: SchedulingDirectory,
         queries: SlotQueries,
         holds: SlotHolds,
+        computation: SlotComputation,
     ):
         self._clock = clock
         self._directory = directory
         self._queries = queries
         self._holds = holds
+        self._computation = computation
 
     def execute(
-        self, *, appointment_type_id: Id, clinician_id: Id | None, start: datetime, end: datetime
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id | None,
+        start: datetime,
+        end: datetime,
+        ignoring_appointment: Id | None = None,
     ) -> tuple[Slot, ...]:
         within = Period(start, end)
         kind = self._directory.appointment_type(appointment_type_id)
@@ -51,13 +60,17 @@ class FindFreeSlotsUseCase(FindFreeSlots):
             ):
                 raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
             clinicians = (clinician.id,)
+        now = self._clock.now()
         found = open_slots(
             queries=self._queries,
             holds=self._holds,
             kind=kind,
             clinicians=clinicians,
             within=within,
-            now=self._clock.now(),
+            now=now,
+            computed=computed_without(
+                self._computation, ignoring_appointment, kind, clinicians, within, now
+            ),
         )
         by_start = {s.slot.start: s.slot for s in found}
         return tuple(by_start[at] for at in sorted(by_start))

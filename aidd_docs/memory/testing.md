@@ -21,4 +21,5 @@
 - Time comes from the `Clock` port; test data comes from hand-written builders.
 - Unowned services are tested through their real adapter in integration.
 - Inside a transaction `pg_stat_activity` is a frozen snapshot: call `pg_stat_clear_snapshot()` before each read.
+- pytest-bdd silently replaces a `Scenario Outline` by another of the same name: keep scenario names unique.
 - Mutation testing with mutmut measures test quality instead of coverage.

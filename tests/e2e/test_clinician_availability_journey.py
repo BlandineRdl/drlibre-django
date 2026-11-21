@@ -55,7 +55,7 @@ def test_demo_clinician_publishes_a_rule_and_a_time_off_and_free_slots_follow(
     admin.goto(f"{base_url}/console/appointment-types/?search=HNORD-CONSULT")
     kind = _id_in_link(admin, "Modifier Consultation de cardiologie")
     admin.goto(f"{base_url}/console/clinicians/?search=Martin")
-    clinician = _id_in_link(admin, "Calendrier de Dr Claire Martin")
+    clinician = _id_in_link(admin, "Calendrier de Claire Martin")
 
     page = browser.new_context(bypass_csp=True, locale="fr-FR").new_page()
     sign_in(page, base_url, "clinicien@drlibre.localhost")
@@ -95,7 +95,7 @@ def test_demo_clinician_publishes_a_rule_and_a_time_off_and_free_slots_follow(
 
     admin.goto(f"{base_url}/console/clinicians/?search=Martin")
     expect(admin.get_by_role("cell", name="Sam 08:00-10:00")).to_be_visible()
-    admin.get_by_role("link", name="Calendrier de Dr Claire Martin").click()
+    admin.get_by_role("link", name="Calendrier de Claire Martin").click()
     admin.goto(f"{admin.url}?week={saturday}")
     grid = admin.get_by_role("region", name=f"Semaine du {saturday - timedelta(days=5):%d/%m/%Y}")
     expect(grid.get_by_role("cell", name="Absence")).to_have_count(2)

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ view.form.title }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+<h1>{{ view.form.title }}</h1>
+{% include "portal/_card.html" with card=view.appointment heading_level="h2" %}
+<p>L'annulation est définitive.</p>
+{% include "_form.html" with form=view.form %}
+{% endblock %}

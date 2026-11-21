@@ -33,6 +33,6 @@
   {% endfor %}
   <div class="actions">
     <button type="submit">{{ form.submit_label }}</button>
-    {% if form.cancel_url %}<a href="{{ form.cancel_url }}">Annuler</a>{% endif %}
+    {% if form.cancel_url %}<a href="{{ form.cancel_url }}">{{ form.cancel_label }}</a>{% endif %}
   </div>
 </form>

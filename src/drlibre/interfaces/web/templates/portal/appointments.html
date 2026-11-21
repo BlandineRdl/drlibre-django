@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Mes rendez-vous{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+<h1>Mes rendez-vous</h1>
+{% if view.notice %}<p role="status" class="notice">{{ view.notice }}</p>{% endif %}
+<section aria-labelledby="upcoming-heading">
+  <h2 id="upcoming-heading">À venir</h2>
+  {% for card in view.upcoming %}
+  {% include "portal/_card.html" with card=card with_actions=True %}
+  {% empty %}
+  <p>{{ view.no_upcoming_text }} <a href="{{ view.book_url }}">Prendre un RDV</a></p>
+  {% endfor %}
+</section>
+<section aria-labelledby="past-heading">
+  <h2 id="past-heading">Passés</h2>
+  {% for card in view.past %}
+  {% include "portal/_card.html" with card=card with_actions=True %}
+  {% empty %}
+  <p>{{ view.no_past_text }}</p>
+  {% endfor %}
+</section>
+{% endblock %}

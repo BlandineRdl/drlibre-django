@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
-from drlibre.booking.domain.appointment import Appointment
+from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
+from drlibre.booking.domain.booking_rules import PatientAction
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
 from drlibre.shared_kernel.ids import Id
@@ -51,17 +52,31 @@ class OpenedSession:
 
 class Appointments(Protocol):
     def add(self, appointment: Appointment) -> None:
-        """Store the appointment."""
+        """Store the appointment; an active overlap of its clinician or patient is a conflict."""
+        ...
+
+    def save(self, appointment: Appointment) -> None:
+        """Replace the stored appointment; an absent id is refused as not found."""
         ...
 
     def get(self, appointment_id: Id) -> Appointment | None:
         """The stored appointment, whatever its status."""
         ...
 
+    def booked_starting(self, after: datetime, until: datetime) -> tuple[Appointment, ...]:
+        """BOOKED appointments starting after the first instant, up to the second, by start."""
+        ...
+
     def conflicting_resources(
-        self, *, clinician_id: Id, patient_id: Id, start: datetime, end: datetime
+        self,
+        *,
+        clinician_id: Id,
+        patient_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
     ) -> tuple[str, ...]:
-        """Names ("clinician", "patient") having an active appointment overlapping the range."""
+        """Names ("clinician", "patient") with another active appointment overlapping the range."""
         ...
 
     def clinician_busy(self, clinician_id: Id, start: datetime, end: datetime) -> bool:
@@ -72,8 +87,14 @@ class Appointments(Protocol):
         """Future active ONLINE or ROUND_ROBIN appointments of the patient."""
         ...
 
-    def busy_rooms(self, room_ids: tuple[Id, ...], start: datetime, end: datetime) -> frozenset[Id]:
-        """The given rooms used by an active appointment overlapping the range."""
+    def busy_rooms(
+        self,
+        room_ids: tuple[Id, ...],
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
+    ) -> frozenset[Id]:
+        """The given rooms used by an active appointment, other than the excluded one, in range."""
         ...
 
 
@@ -103,8 +124,9 @@ class FreeSlots(Protocol):
         start: datetime,
         *,
         ignoring_hold: Id | None,
+        ignoring_appointment: Id | None = None,
     ) -> bool:
-        """Whether the start is exactly one of the clinician's free slots for the type."""
+        """Whether the start is one of the clinician's free slots, the ignored appointment freed."""
         ...
 
     def candidates_at(self, appointment_type_id: Id, start: datetime) -> tuple[Id, ...]:
@@ -161,6 +183,26 @@ class BookingNotices(Protocol):
 
     def confirmed(self, appointment: Appointment) -> None:
         """Queue the confirmation for the patient, sent once the unit of work commits."""
+        ...
+
+    def booked(self, appointment: Appointment) -> None:
+        """Write the patient's « RDV réservé » notification in the unit of work; no email."""
+        ...
+
+    def rescheduled(self, appointment: Appointment) -> None:
+        """Write the patient's « RDV déplacé » notification and queue its email."""
+        ...
+
+    def cancelled(self, appointment: Appointment) -> None:
+        """Write the patient's « RDV annulé » notification and queue its email."""
+        ...
+
+    def reminded(self, appointment: Appointment) -> bool:
+        """Write the reminder and queue its email; False, doing nothing, when already reminded."""
+        ...
+
+    def already_reminded(self, appointment_ids: frozenset[Id]) -> frozenset[Id]:
+        """Those of the appointments whose reminder is already written."""
         ...
 
 
@@ -247,4 +289,38 @@ class PatientAccounts(Protocol):
 class PatientSessions(Protocol):
     def open(self, *, patient_id: Id, user_agent: str) -> OpenedSession:
         """A 24 hour session, never extended, for the patient."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class AgendaFilter:
+    """Optional narrowing of a patient's agenda; the range bounds the start, end excluded."""
+
+    clinician_id: Id | None = None
+    status: AppointmentStatus | None = None
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AgendaEntry:
+    """An appointment with whom, where and what, as the patient's lists show it."""
+
+    appointment: Appointment
+    clinician_name: str
+    clinician_title: str
+    specialty: str
+    hospital_name: str
+    hospital_address: str
+    time_zone: str
+    department: str
+    room: str | None
+    appointment_type: str
+    bookable_online: bool
+    allowed_actions: frozenset[PatientAction] = frozenset()
+
+
+class PatientAgenda(Protocol):
+    def entries(self, patient_id: Id, agenda_filter: AgendaFilter) -> tuple[AgendaEntry, ...]:
+        """The patient's appointments matching the filter, by start, actions left empty."""
         ...

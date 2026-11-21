@@ -31,7 +31,7 @@ repos:
         pass_filenames: false
       - id: python-doctor
         name: python-doctor
-        entry: uv run python-doctor . --min-score 90 --no-cache --score
+        entry: scripts/python_doctor_index.sh --min-score 90 --no-cache --score
         language: system
         types: [python]
         pass_filenames: false

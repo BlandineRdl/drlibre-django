@@ -1,5 +1,6 @@
 from collections.abc import Mapping
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Protocol
 
 from drlibre.scheduling.domain.availability_rule import WEEKDAYS, AvailabilityRule
@@ -16,7 +17,9 @@ __all__ = [
     "DeleteTimeOff",
     "ExtendSlotHorizon",
     "FindFreeSlots",
+    "FindFreeWeek",
     "FreeCliniciansAt",
+    "FreeWeek",
     "IsSlotFree",
     "NextBookableSlots",
     "RecordTimeOff",
@@ -30,9 +33,39 @@ __all__ = [
 
 class FindFreeSlots(Protocol):
     def execute(
-        self, *, appointment_type_id: Id, clinician_id: Id | None, start: datetime, end: datetime
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id | None,
+        start: datetime,
+        end: datetime,
+        ignoring_appointment: Id | None = None,
     ) -> tuple[Slot, ...]:
-        """Sorted free slots; invalid_input over 31 days, not_found for a bad type or clinician."""
+        """Sorted free slots, the ignored appointment's time freed; invalid_input over 31 days."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class FreeWeek:
+    """One Monday-to-Sunday week of free slots, its neighbours None outside the horizon."""
+
+    monday: date
+    previous_monday: date | None
+    next_monday: date | None
+    time_zone: str
+    slots: tuple[Slot, ...]
+
+
+class FindFreeWeek(Protocol):
+    def execute(
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id,
+        week: date | None,
+        ignoring_appointment: Id | None = None,
+    ) -> FreeWeek:
+        """Free slots of the asked week, else the current one; not_found if type unknown."""
         ...
 
 
@@ -50,8 +83,9 @@ class IsSlotFree(Protocol):
         appointment_type_id: Id,
         start: datetime,
         ignoring_hold: Id | None,
+        ignoring_appointment: Id | None = None,
     ) -> bool:
-        """Whether the start is a free, unheld slot of the active clinician for the active type."""
+        """Whether the start is a free, unheld slot of the active clinician, appointment ignored."""
         ...
 
 

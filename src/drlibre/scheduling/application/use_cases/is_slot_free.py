@@ -6,6 +6,7 @@ from drlibre.scheduling.application.ports.outbound import (
     SlotHolds,
     SlotQueries,
 )
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
 from drlibre.scheduling.application.use_cases.open_slots import clinicians_free_at
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.ids import Id
@@ -19,11 +20,13 @@ class IsSlotFreeUseCase(IsSlotFree):
         directory: SchedulingDirectory,
         queries: SlotQueries,
         holds: SlotHolds,
+        computation: SlotComputation,
     ) -> None:
         self._clock = clock
         self._directory = directory
         self._queries = queries
         self._holds = holds
+        self._computation = computation
 
     def execute(
         self,
@@ -32,6 +35,7 @@ class IsSlotFreeUseCase(IsSlotFree):
         appointment_type_id: Id,
         start: datetime,
         ignoring_hold: Id | None,
+        ignoring_appointment: Id | None = None,
     ) -> bool:
         clinician = self._directory.clinician(clinician_id)
         kind = self._directory.appointment_type(appointment_type_id)
@@ -45,5 +49,7 @@ class IsSlotFreeUseCase(IsSlotFree):
             start=start,
             now=self._clock.now(),
             ignoring_hold=ignoring_hold,
+            computation=self._computation,
+            ignoring_appointment=ignoring_appointment,
         )
         return bool(free)

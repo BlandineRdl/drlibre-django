@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from drlibre.booking.domain.booking_rules import MAX_OPEN_ONLINE
 from drlibre.booking.domain.verification_code import MAX_ATTEMPTS, VerificationCode
 from drlibre.booking.infrastructure.django.models import AppointmentRecord
 from drlibre.booking.infrastructure.repositories import (
@@ -13,6 +12,7 @@ from drlibre.booking.infrastructure.repositories import (
 )
 from drlibre.bootstrap.container import wire
 from drlibre.identity.domain.user import Role
+from drlibre.shared_kernel.booking_policy import MAX_OPEN_ONLINE
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from tests.builders import stored_user

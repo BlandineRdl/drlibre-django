@@ -2,25 +2,41 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
+from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
+from drlibre.booking.domain.appointment import (
+    MAX_CANCELLATION_REASON,
+    Appointment,
+    AppointmentStatus,
+)
+from drlibre.booking.domain.booking_rules import BookingRule, PatientAction
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
 __all__ = [
+    "MAX_CANCELLATION_REASON",
+    "AgendaEntry",
+    "AgendaFilter",
     "Appointment",
     "AppointmentQueries",
     "AppointmentStatus",
     "BookAppointment",
     "BookedPeriod",
+    "BookingRule",
+    "CancelAppointment",
     "CreateHold",
     "ExpireHolds",
     "HeldPeriod",
     "HoldCreated",
     "HoldSummary",
+    "ListPatientAppointments",
     "OpenHolds",
+    "PatientAction",
+    "PatientAppointments",
     "RequirePatient",
+    "RescheduleAppointment",
     "ResendCode",
+    "SendReminders",
     "VerifiedBooking",
     "VerifyHold",
     "ViewAppointment",
@@ -44,6 +60,18 @@ class BookAppointment(Protocol):
         start: datetime,
     ) -> Appointment:
         """Book for the signed-in patient, any clinician if none named; refused writes nothing."""
+        ...
+
+
+class CancelAppointment(Protocol):
+    def execute(self, *, appointment_id: Id, patient_id: Id, reason: str) -> Appointment:
+        """Cancel the patient's own appointment for a reason; a refusal writes or sends nothing."""
+        ...
+
+
+class RescheduleAppointment(Protocol):
+    def execute(self, *, appointment_id: Id, patient_id: Id, start: datetime) -> Appointment:
+        """Move the patient's own BOOKED appointment, end recomputed; a refusal writes nothing."""
         ...
 
 
@@ -100,6 +128,12 @@ class ExpireHolds(Protocol):
         ...
 
 
+class SendReminders(Protocol):
+    def execute(self) -> int:
+        """Remind each BOOKED appointment of the next 24 hours once, auditing the count if any."""
+        ...
+
+
 @dataclass(frozen=True, slots=True)
 class HeldPeriod:
     hold_id: Id
@@ -118,6 +152,7 @@ class OpenHolds(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class BookedPeriod:
+    id: Id
     start: datetime
     end: datetime
     status: AppointmentStatus
@@ -176,4 +211,18 @@ class ViewHold(Protocol):
 class ViewAppointment(Protocol):
     def execute(self, *, appointment_id: Id, patient_id: Id) -> Appointment:
         """The patient's own appointment; not_found when absent, forbidden for another patient."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class PatientAppointments:
+    """Upcoming soonest first, past latest first."""
+
+    upcoming: tuple[AgendaEntry, ...]
+    past: tuple[AgendaEntry, ...]
+
+
+class ListPatientAppointments(Protocol):
+    def execute(self, *, patient_id: Id, agenda_filter: AgendaFilter) -> PatientAppointments:
+        """The patient's own appointments with their allowed actions; forbidden for staff."""
         ...

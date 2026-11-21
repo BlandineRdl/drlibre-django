@@ -59,6 +59,7 @@ class FormView:
     message: str
     errors: tuple[ErrorView, ...]
     cancel_url: str
+    cancel_label: str = "Annuler"
 
     @property
     def has_errors(self) -> bool:
@@ -81,6 +82,7 @@ def build_form(
     error: DomainError | None = None,
     choices: Mapping[str, tuple[Choice, ...]] | None = None,
     cancel_url: str = "",
+    cancel_label: str = "Annuler",
 ) -> FormView:
     """Map raw values and a refusal to the fields the dumb form template renders."""
     messages = field_messages(error)
@@ -105,6 +107,7 @@ def build_form(
         message=error.message if error else "",
         errors=errors,
         cancel_url=cancel_url,
+        cancel_label=cancel_label,
     )
 
 

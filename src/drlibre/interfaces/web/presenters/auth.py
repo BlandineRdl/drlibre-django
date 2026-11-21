@@ -59,13 +59,13 @@ class LinkSentView:
     message: str
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LinkContinueView:
     """The page a link opens: one button holding the token, or a refusal with a new request."""
 
     title: str
     action: str
-    token: str
+    token: str = ""
     submit_label: str
     message: str
     request_form: FormView | None
@@ -101,7 +101,6 @@ def link_refused(error: DomainError) -> LinkContinueView:
     return LinkContinueView(
         title="Votre lien de connexion",
         action="/sign-in/link",
-        token="",
         submit_label="Continuer",
         message=error.message,
         request_form=link_request_form({}),

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Mes notifications{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+<h1>Mes notifications</h1>
+{% for item in view.items %}
+<article class="notification{% if item.unread %} unread{% endif %}">
+  <header>
+    <h2 class="card-when">{% if item.unread %}<span aria-hidden="true">● </span>{% endif %}{{ item.title }}</h2>
+    <p class="result-line"><strong>{{ item.state }}</strong> · {{ item.kind }} · {{ item.received }}</p>
+  </header>
+  <p>{{ item.body }}</p>
+  {% if item.mark_url %}
+  <form method="post" action="{{ item.mark_url }}" class="inline-form">
+    {% csrf_token %}
+    <button type="submit" class="outline">Marquer comme lu</button>
+  </form>
+  {% endif %}
+</article>
+{% empty %}
+<p>{{ view.empty_text }}</p>
+{% endfor %}
+{% if view.previous_url or view.next_url %}
+<nav aria-label="Pagination" class="pagination">
+  <p>{{ view.summary }}</p>
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Page précédente</a>{% endif %}
+  {% if view.next_url %}<a href="{{ view.next_url }}">Page suivante ›</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

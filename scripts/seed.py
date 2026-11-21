@@ -121,9 +121,11 @@ TYPES = (
 )
 ADMIN_EMAIL = "admin@drlibre.localhost"
 VISITOR_EMAIL = "visiteur@drlibre.localhost"
+# The honorific is the profile's title (spec §3.1); seeds before it put it in the name too.
+LEGACY_CLINICIAN_NAME = "Dr Claire Martin"
 USERS = (
     ("ADMIN", "Alice Admin", ADMIN_EMAIL),
-    ("CLINICIAN", "Dr Claire Martin", "clinicien@drlibre.localhost"),
+    ("CLINICIAN", "Claire Martin", "clinicien@drlibre.localhost"),
     ("PATIENT", "Paul Patient", "patient@drlibre.localhost"),
 )
 
@@ -187,7 +189,9 @@ def _user_id(app: Container, email: str) -> Id | None:
 
 def seed_users(app: Container) -> None:
     for role, name, email in USERS:
-        if _user_id(app, email) is not None:
+        existing = _user_id(app, email)
+        if existing is not None:
+            _rename_legacy(app, existing, name)
             continue
         # The first account, the demo admin, has no one before it to act.
         user_id = app.save_user.execute(
@@ -204,18 +208,40 @@ def seed_users(app: Container) -> None:
         )
 
 
+def _rename_legacy(app: Container, user_id: Id, name: str) -> None:
+    user = app.user_queries.user(user_id)
+    if user is None or user.full_name != LEGACY_CLINICIAN_NAME:
+        return
+    app.save_user.execute(
+        actor=_demo_admin(app),
+        user_id=user_id,
+        full_name=name,
+        email=user.email.value,
+        role=user.role.value,
+        active=user.active,
+        temporary_password="",
+    )
+
+
 def seed_clinician_profile(app: Container) -> None:
     clinician = _user_id(app, "clinicien@drlibre.localhost")
     q = app.reference_queries
-    if clinician is None or clinician in q.profiled_user_ids():
+    if clinician is None:
         return
     fields = {
         "department_id": str(_by_code(q.departments, "HNORD-CARD")),
         "specialty_id": str(_by_code(q.specialties, "CARDIO")),
         "default_room_id": str(_by_code(q.rooms, "HNORD-C101")),
-        "title": "Dr Claire Martin",
+        "title": "Dr",
         "bio": "Cardiologue, consultations adultes.",
     }
+    profile = q.clinician_profile_of(clinician)
+    if profile is not None:
+        if profile.title == LEGACY_CLINICIAN_NAME:
+            app.edit_clinician_profile.execute(
+                actor=_demo_admin(app), profile_id=profile.id, fields=fields
+            )
+        return
     app.attach_clinician_profile.execute(
         actor=_demo_admin(app), user_id=str(clinician), fields=fields
     )
@@ -289,9 +315,8 @@ def _load_appointments(
     rows = []
     for start in sorted(rng.sample(starts, LOAD_APPOINTMENTS_PER_CLINICIAN)):
         past = start < now
-        status = rng.choice(
-            ("COMPLETED",) * 8 + ("CANCELLED", "NO_SHOW") if past else ("BOOKED", "CONFIRMED")
-        )
+        status = rng.choice(("COMPLETED",) * 8 + ("CANCELLED", "NO_SHOW")) if past else "BOOKED"
+        cancelled = status == "CANCELLED"
         patient = rng.choice(patients)
         while (patient, start) in taken:
             patient = rng.choice(patients)
@@ -306,6 +331,8 @@ def _load_appointments(
                 end=start + timedelta(minutes=kind.duration_minutes),
                 status=status,
                 source=rng.choice(("ONLINE", "ONLINE", "STAFF")),
+                cancelled_at=start if cancelled else None,
+                cancellation_reason="Empêchement" if cancelled else None,
             )
         )
     return rows
@@ -390,7 +417,7 @@ def seed_load(app: Container) -> None:
         department = departments[n % len(departments)]
         user = UserRecord.objects.create(
             email=f"load-clinician-{n:03}@drlibre.localhost",
-            full_name=f"Dr Charge {n:03}",
+            full_name=f"Charge {n:03}",
             role="CLINICIAN",
             active=True,
             email_verified_at=now,
@@ -413,7 +440,7 @@ def seed_load(app: Container) -> None:
             user_id=user.id,
             department=department,
             specialty=specialties[department.name],
-            title=f"Dr Charge {n:03}",
+            title="Dr",
             bio="Praticien du jeu de charge.",
             default_room=room,
             weight=1 + n % 3,

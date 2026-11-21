@@ -1,18 +1,33 @@
 """Behaviour properties of the spec 5.1 free-slot engine."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from hypothesis import given
 from hypothesis import strategies as st
 
+from drlibre.scheduling.application.ports.outbound import AppointmentType, Clinician
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
+from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
+from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
+from drlibre.scheduling.domain.appointment import Appointment
 from drlibre.scheduling.domain.availability_rule import AvailabilityRule, weekday_of
-from drlibre.scheduling.domain.slot import Period
+from drlibre.scheduling.domain.slot import Period, Slot
 from drlibre.scheduling.domain.slot_engine import SlotEngine
 from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.ids import Id
-from tests.builders_scheduling import rule, time_off
+from tests.builders_scheduling import appointment, rule, time_off
+from tests.fakes.clock import FixedClock
+from tests.fakes.scheduling import (
+    FixedSchedulingDirectory,
+    InMemoryAvailabilityRules,
+    InMemoryClinicianAppointments,
+    InMemorySlotHolds,
+    InMemorySlotStore,
+    InMemoryTimeOffs,
+)
 
 PARIS = ZoneInfo("Europe/Paris")
 CLINICIAN = Id()
@@ -129,3 +144,94 @@ def test_no_slot_overlaps_time_off_or_a_buffered_appointment(
         and free_after.minute % 5 == 0
     ):
         assert blocked.end in {s.start for s in slots}
+
+
+@dataclass(frozen=True)
+class Setting:
+    now: datetime
+    day: date
+    department: Id
+    kind: AppointmentType
+    rule: AvailabilityRule
+
+
+def _free_slots(
+    appointments: Sequence[tuple[Id, Appointment]], *, ignoring: Id | None, setting: Setting
+) -> tuple[Slot, ...]:
+    directory = FixedSchedulingDirectory()
+    clinician = Clinician(CLINICIAN, setting.department, "Europe/Paris", active=True)
+    directory.clinicians[CLINICIAN] = clinician
+    directory.types[setting.kind.id] = setting.kind
+    rules, offs = InMemoryAvailabilityRules(), InMemoryTimeOffs()
+    rules.rows[setting.rule.id] = setting.rule
+    booked = InMemoryClinicianAppointments()
+    booked.rows.extend(appointments)
+    store, holds, clock = InMemorySlotStore(), InMemorySlotHolds(), FixedClock(setting.now)
+    RefreshSlotsUseCase(
+        clock=clock,
+        directory=directory,
+        rules=rules,
+        time_offs=offs,
+        appointments=booked,
+        store=store,
+    ).execute(clinician_id=CLINICIAN)
+    computation = SlotComputation(
+        directory=directory, rules=rules, time_offs=offs, appointments=booked
+    )
+    window = day_window(setting.day)
+    return FindFreeSlotsUseCase(
+        clock=clock, directory=directory, queries=store, holds=holds, computation=computation
+    ).execute(
+        appointment_type_id=setting.kind.id,
+        clinician_id=CLINICIAN,
+        start=window.start,
+        end=window.end,
+        ignoring_appointment=ignoring,
+    )
+
+
+@given(
+    offset=st.integers(0, 10),
+    hour=st.integers(0, 23),
+    step=st.sampled_from([10, 15, 30]),
+    duration=st.integers(10, 60),
+    buffer=st.integers(0, 30),
+    booked=st.lists(
+        st.tuples(st.integers(0, 60), st.integers(1, 12), st.booleans()), min_size=1, max_size=4
+    ),
+)
+def test_ignoring_an_appointment_frees_what_a_refresh_without_it_would_store(
+    offset: int,
+    hour: int,
+    step: int,
+    duration: int,
+    buffer: int,
+    booked: list[tuple[int, int, bool]],
+) -> None:
+    """Story déplacement : le RDV déplacé est ignoré, son heure redevient un créneau libre."""
+    now = datetime(2026, 11, 20, hour, tzinfo=UTC)
+    day = now.astimezone(PARIS).date() + timedelta(days=offset)
+    department = Id()
+    kind = AppointmentType(
+        Id(), department, duration, buffer, active=True, time_zone="Europe/Paris"
+    )
+    morning = rule(
+        CLINICIAN, weekday=weekday_of(day), start=time(8), end=time(18), step_minutes=step
+    )
+    origin = datetime.combine(day, time(7, 30), tzinfo=PARIS)
+    appointments = [
+        appointment(
+            CLINICIAN,
+            origin + timedelta(minutes=10 * at),
+            origin + timedelta(minutes=10 * (at + length)),
+            status="BOOKED" if active else "CANCELLED",
+        )
+        for at, length, active in booked
+    ]
+    setting = Setting(now, day, department, kind, morning)
+    ignored = appointments[0][1].id
+
+    ignoring = _free_slots(appointments, ignoring=ignored, setting=setting)
+    without = _free_slots(appointments[1:], ignoring=None, setting=setting)
+
+    assert ignoring == without

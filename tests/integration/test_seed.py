@@ -7,7 +7,10 @@ from drlibre.audit.infrastructure.django.models import AuditEntryRecord
 from drlibre.booking.infrastructure.django.models import AppointmentRecord
 from drlibre.bootstrap.container import container
 from drlibre.identity.infrastructure.django.models import UserRecord
-from drlibre.organisation.infrastructure.django.models import AppointmentTypeRecord
+from drlibre.organisation.infrastructure.django.models import (
+    AppointmentTypeRecord,
+    ClinicianProfileRecord,
+)
 from drlibre.shared_kernel.ids import Id
 from scripts import seed
 
@@ -82,3 +85,20 @@ def test_the_load_seed_never_double_books_a_room_a_clinician_or_a_patient(
     for key in ("patient_id", "clinician_id", "room_id"):
         slots = [(row[key], row["start"]) for row in rows]
         assert len(set(slots)) == len(slots), key
+
+
+def test_the_demo_clinician_is_named_once_with_an_honorific_title_even_after_a_reseed() -> None:
+    """Spec §3.1: the profile title is the honorific; the name stays in the user record."""
+    seed.main()
+    user = UserRecord.objects.get(email="clinicien@drlibre.localhost")
+    profile = ClinicianProfileRecord.objects.get(user_id=user.id)
+    assert (user.full_name, profile.title) == ("Claire Martin", "Dr")
+    # A database seeded before the fix held the name in both places.
+    UserRecord.objects.filter(id=user.id).update(full_name="Dr Claire Martin")
+    ClinicianProfileRecord.objects.filter(id=profile.id).update(title="Dr Claire Martin")
+
+    seed.main()
+
+    user.refresh_from_db()
+    profile.refresh_from_db()
+    assert (user.full_name, profile.title) == ("Claire Martin", "Dr")

@@ -52,9 +52,10 @@ def reset_rate_limits() -> None:
         client.delete(key)
 
 
-def _mail_text(to: str, wait: float = 15) -> str:
+def _mail_text(to: str, subject: str = "", wait: float = 15) -> str:
     """The body of the newest email sent to this address, waiting for the worker to send it."""
-    query = urllib.parse.urlencode({"query": f"to:{to}"})
+    search = f"to:{to}" + (f' subject:"{subject}"' if subject else "")
+    query = urllib.parse.urlencode({"query": search})
     deadline = time.monotonic() + wait
     while time.monotonic() < deadline:
         with urllib.request.urlopen(f"{MAILPIT}/api/v1/search?{query}", timeout=5) as found:  # noqa: S310  # nosec B310
@@ -65,7 +66,19 @@ def _mail_text(to: str, wait: float = 15) -> str:
             ) as message:
                 return json.load(message)["Text"]
         time.sleep(0.3)
-    raise AssertionError(f"no email for {to} in Mailpit")
+    raise AssertionError(f"no email for {to} {subject!r} in Mailpit")
+
+
+def clear_mail(to: str) -> None:
+    """Deletes every email sent to this address, so each subject read next is this run's."""
+    query = urllib.parse.urlencode({"query": f"to:{to}"})
+    url = f"{MAILPIT}/api/v1/search?{query}"
+    request = urllib.request.Request(url, method="DELETE")  # noqa: S310  # nosec B310
+    urllib.request.urlopen(request, timeout=5).close()  # noqa: S310  # nosec B310
+
+
+def read_mail(to: str, subject: str) -> str:
+    return _mail_text(to, subject)
 
 
 def read_code(to: str) -> str:
@@ -75,6 +88,7 @@ def read_code(to: str) -> str:
 
 
 def read_link(to: str) -> str:
-    match = re.search(r"https?://\S+/sign-in/link\?token=\S+", _mail_text(to))
+    body = read_mail(to, "Votre lien de connexion")
+    match = re.search(r"https?://\S+/sign-in/link\?token=\S+", body)
     assert match, "no sign-in link in the email"
     return match.group(0)

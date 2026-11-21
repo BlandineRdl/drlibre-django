@@ -8,11 +8,15 @@ from drlibre.audit.infrastructure.queries import DjangoAuditQueries
 from drlibre.audit.infrastructure.unit_of_work import DjangoUnitOfWork
 from drlibre.booking.application.ports.inbound import (
     BookAppointment,
+    CancelAppointment,
     CreateHold,
     ExpireHolds,
+    ListPatientAppointments,
     OpenHolds,
     RequirePatient,
+    RescheduleAppointment,
     ResendCode,
+    SendReminders,
     VerifyHold,
     ViewAppointment,
     ViewHold,
@@ -26,6 +30,7 @@ from drlibre.booking.application.ports.outbound import (
     CodeIssuer,
     FreeSlots,
     Holds,
+    PatientAgenda,
     Patients,
     RoundRobinLedger,
     ScheduleLocks,
@@ -33,12 +38,20 @@ from drlibre.booking.application.ports.outbound import (
 )
 from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
+from drlibre.booking.application.use_cases.cancel_appointment import CancelAppointmentUseCase
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
+from drlibre.booking.application.use_cases.list_patient_appointments import (
+    ListPatientAppointmentsUseCase,
+)
 from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.application.use_cases.placement import Placement
 from drlibre.booking.application.use_cases.require_patient import RequirePatientUseCase
+from drlibre.booking.application.use_cases.reschedule_appointment import (
+    RescheduleAppointmentUseCase,
+)
 from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
+from drlibre.booking.application.use_cases.send_reminders import SendRemindersUseCase
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
@@ -51,6 +64,7 @@ from drlibre.booking.infrastructure.identity_patients import (
     IdentityPatientSessions,
 )
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
+from drlibre.booking.infrastructure.patient_agenda import SqlPatientAgenda
 from drlibre.booking.infrastructure.patients import IdentityPatients
 from drlibre.booking.infrastructure.queries import DjangoBookingQueries
 from drlibre.booking.infrastructure.repositories import (
@@ -75,6 +89,7 @@ from drlibre.identity.application.ports.inbound import (
     SignIn,
     SignOut,
     StaffLookup,
+    UpdateProfile,
     UserQueries,
     UseSignInLink,
 )
@@ -103,6 +118,7 @@ from drlibre.identity.application.use_cases.request_sign_in_link import RequestS
 from drlibre.identity.application.use_cases.save_user import SaveUserUseCase
 from drlibre.identity.application.use_cases.sign_in import SignInUseCase
 from drlibre.identity.application.use_cases.sign_out import SignOutUseCase
+from drlibre.identity.application.use_cases.update_profile import UpdateProfileUseCase
 from drlibre.identity.application.use_cases.use_sign_in_link import UseSignInLinkUseCase
 from drlibre.identity.infrastructure.audit_actors import AuditLogActors
 from drlibre.identity.infrastructure.failed_sign_ins import RedisFailedSignIns
@@ -118,8 +134,26 @@ from drlibre.identity.infrastructure.repositories import (
 from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
-from drlibre.notifications.application.ports.outbound import Mailer
+from drlibre.notifications.application.ports.inbound import (
+    CountUnread,
+    ListNotifications,
+    MarkNotificationRead,
+    Notify,
+)
+from drlibre.notifications.application.ports.outbound import Mailer, Notifications
+from drlibre.notifications.application.use_cases.count_unread import CountUnreadUseCase
+from drlibre.notifications.application.use_cases.list_notifications import (
+    ListNotificationsUseCase,
+)
+from drlibre.notifications.application.use_cases.mark_notification_read import (
+    MarkNotificationReadUseCase,
+)
+from drlibre.notifications.application.use_cases.notify import NotifyUseCase
+from drlibre.notifications.application.use_cases.reminded_appointments import (
+    RemindedAppointmentsUseCase,
+)
 from drlibre.notifications.infrastructure.celery_outbox import CeleryEmailOutbox
+from drlibre.notifications.infrastructure.repositories import DjangoNotifications
 from drlibre.notifications.infrastructure.smtp_mailer import SmtpMailer
 from drlibre.organisation.application.ports.inbound import (
     AttachClinicianProfile,
@@ -194,6 +228,7 @@ from drlibre.scheduling.application.ports.inbound import (
     DeleteTimeOff,
     ExtendSlotHorizon,
     FindFreeSlots,
+    FindFreeWeek,
     NextBookableSlots,
     RecordTimeOff,
     SaveAvailabilityRule,
@@ -207,12 +242,14 @@ from drlibre.scheduling.application.ports.outbound import (
     SlotStore,
     TimeOffs,
 )
+from drlibre.scheduling.application.use_cases.computed_slots import SlotComputation
 from drlibre.scheduling.application.use_cases.delete_availability_rule import (
     DeleteAvailabilityRuleUseCase,
 )
 from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
 from drlibre.scheduling.application.use_cases.extend_slot_horizon import ExtendSlotHorizonUseCase
 from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
+from drlibre.scheduling.application.use_cases.find_free_week import FindFreeWeekUseCase
 from drlibre.scheduling.application.use_cases.free_clinicians_at import FreeCliniciansAtUseCase
 from drlibre.scheduling.application.use_cases.is_slot_free import IsSlotFreeUseCase
 from drlibre.scheduling.application.use_cases.next_bookable_slots import NextBookableSlotsUseCase
@@ -274,6 +311,7 @@ class BookingAdapters:
     codes: VerificationCodes
     issuer: CodeIssuer
     limiter: RateLimiter
+    agenda: PatientAgenda
     network_hourly_limit: int = 20
 
 
@@ -317,6 +355,11 @@ class Adapters:
     links: SignInLinks
     link_notices: LinkNotices
     search_queries: SearchQueries
+    notifications: Notifications
+    # Booking's notices write through it, so it is built with them.
+    notify: Notify
+    # The application's zone, whose date is "today" for a patient's profile.
+    time_zone: str
     # None wires organisation to scheduling's own RefreshSlots.
     slot_refresh: SlotRefresh | None = None
 
@@ -330,6 +373,7 @@ class Container:
     sign_out: SignOut
     authenticate_session: AuthenticateSession
     change_password: ChangePassword
+    update_profile: UpdateProfile
     save_hospital: SaveHospital
     delete_hospital: DeleteHospital
     save_specialty: SaveSpecialty
@@ -355,6 +399,7 @@ class Container:
     availability_queries: AvailabilityQueries
     extend_slot_horizon: ExtendSlotHorizon
     find_free_slots: FindFreeSlots
+    find_free_week: FindFreeWeek
     next_bookable_slots: NextBookableSlots
     book_appointment: BookAppointment
     require_patient: RequirePatient
@@ -365,6 +410,10 @@ class Container:
     open_holds: OpenHolds
     view_hold: ViewHold
     view_appointment: ViewAppointment
+    list_patient_appointments: ListPatientAppointments
+    cancel_appointment: CancelAppointment
+    reschedule_appointment: RescheduleAppointment
+    send_reminders: SendReminders
     provide_patient_account: ProvidePatientAccount
     open_patient_session: OpenPatientSession
     request_sign_in_link: RequestSignInLink
@@ -377,13 +426,25 @@ class Container:
     view_provider_page: ViewProviderPage
     view_hospital_page: ViewHospitalPage
     view_specialty_page: ViewSpecialtyPage
+    list_notifications: ListNotifications
+    mark_notification_read: MarkNotificationRead
+    count_unread: CountUnread
 
 
 def wire(a: Adapters) -> Container:
     clock, uow, audit = a.clock, a.uow, a.audit
     directory = a.scheduling_directory
     find_free_slots = FindFreeSlotsUseCase(
-        clock=clock, directory=directory, queries=a.slot_queries, holds=a.slot_holds
+        clock=clock,
+        directory=directory,
+        queries=a.slot_queries,
+        holds=a.slot_holds,
+        computation=SlotComputation(
+            directory=directory,
+            rules=a.availability_rules,
+            time_offs=a.time_offs,
+            appointments=a.clinician_appointments,
+        ),
     )
     refresh = RefreshSlotsUseCase(
         clock=clock,
@@ -421,6 +482,9 @@ def wire(a: Adapters) -> Container:
         ),
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
+        ),
+        update_profile=UpdateProfileUseCase(
+            clock=clock, uow=uow, audit=audit, users=a.users, time_zone=a.time_zone
         ),
         save_hospital=SaveHospitalUseCase(
             clock=clock,
@@ -579,6 +643,9 @@ def wire(a: Adapters) -> Container:
             uow=uow, rules=a.availability_rules, refresh=refresh
         ),
         find_free_slots=find_free_slots,
+        find_free_week=FindFreeWeekUseCase(
+            clock=clock, directory=directory, find_free_slots=find_free_slots
+        ),
         next_bookable_slots=NextBookableSlotsUseCase(clock=clock, find_free_slots=find_free_slots),
         book_appointment=booking.book_appointment,
         require_patient=booking.require_patient,
@@ -589,6 +656,10 @@ def wire(a: Adapters) -> Container:
         open_holds=booking.open_holds,
         view_hold=booking.view_hold,
         view_appointment=booking.view_appointment,
+        list_patient_appointments=booking.list_patient_appointments,
+        cancel_appointment=booking.cancel_appointment,
+        reschedule_appointment=booking.reschedule_appointment,
+        send_reminders=booking.send_reminders,
         provide_patient_account=provide_patient_account,
         open_patient_session=open_patient_session,
         request_sign_in_link=RequestSignInLinkUseCase(
@@ -619,6 +690,11 @@ def wire(a: Adapters) -> Container:
         view_provider_page=ViewProviderPageUseCase(clock=clock, queries=a.search_queries),
         view_hospital_page=ViewHospitalPageUseCase(clock=clock, queries=a.search_queries),
         view_specialty_page=ViewSpecialtyPageUseCase(clock=clock, queries=a.search_queries),
+        list_notifications=ListNotificationsUseCase(notifications=a.notifications),
+        mark_notification_read=MarkNotificationReadUseCase(
+            clock=clock, uow=uow, audit=audit, notifications=a.notifications
+        ),
+        count_unread=CountUnreadUseCase(notifications=a.notifications),
     )
 
 
@@ -633,6 +709,10 @@ class _BookingUseCases:
     open_holds: OpenHolds
     view_hold: ViewHold
     view_appointment: ViewAppointment
+    list_patient_appointments: ListPatientAppointments
+    cancel_appointment: CancelAppointment
+    reschedule_appointment: RescheduleAppointment
+    send_reminders: SendReminders
 
 
 def _wire_booking(
@@ -672,6 +752,7 @@ def _wire_booking(
             limiter=booking.limiter,
             notices=booking.notices,
             network_hourly_limit=booking.network_hourly_limit,
+            time_zone=a.time_zone,
         ),
         verify_hold=VerifyHoldUseCase(
             clock=a.clock,
@@ -701,6 +782,37 @@ def _wire_booking(
         open_holds=booking.open_holds,
         view_hold=ViewHoldUseCase(clock=a.clock, holds=booking.holds),
         view_appointment=ViewAppointmentUseCase(appointments=booking.appointments),
+        list_patient_appointments=ListPatientAppointmentsUseCase(
+            clock=a.clock, patients=booking.patients, agenda=booking.agenda
+        ),
+        cancel_appointment=CancelAppointmentUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            appointments=booking.appointments,
+            locks=booking.locks,
+            slot_refresh=booking.slot_refresh,
+            notices=booking.notices,
+        ),
+        reschedule_appointment=RescheduleAppointmentUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            appointments=booking.appointments,
+            directory=booking.directory,
+            free_slots=booking.free_slots,
+            placement=placement,
+            locks=booking.locks,
+            slot_refresh=booking.slot_refresh,
+            notices=booking.notices,
+        ),
+        send_reminders=SendRemindersUseCase(
+            clock=a.clock,
+            uow=a.uow,
+            audit=a.audit,
+            appointments=booking.appointments,
+            notices=booking.notices,
+        ),
     )
 
 
@@ -731,12 +843,24 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         store=slot_store,
     )
     is_slot_free = IsSlotFreeUseCase(
-        clock=clock, directory=scheduling_directory, queries=slot_queries, holds=slot_holds
+        clock=clock,
+        directory=scheduling_directory,
+        queries=slot_queries,
+        holds=slot_holds,
+        computation=SlotComputation(
+            directory=scheduling_directory,
+            rules=rules,
+            time_offs=time_offs,
+            appointments=clinician_appointments,
+        ),
     )
     free_clinicians_at = FreeCliniciansAtUseCase(
         clock=clock, directory=scheduling_directory, queries=slot_queries, holds=slot_holds
     )
     patients = IdentityPatients(user_queries)
+    # Notifications depend on nothing; booking's notices write through them.
+    notifications = DjangoNotifications()
+    notify = NotifyUseCase(clock=clock, notifications=notifications)
     booking_directory = OrganisationBookingDirectory(queries=reference_queries, staff=user_queries)
     return Adapters(
         clock=clock,
@@ -783,6 +907,8 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             patients=patients,
             notices=OutboxBookingNotices(
                 outbox=CeleryEmailOutbox(),
+                notify=notify,
+                reminded=RemindedAppointmentsUseCase(notifications=notifications),
                 directory=booking_directory,
                 patients=patients,
                 public_base_url=settings.PUBLIC_BASE_URL,
@@ -795,6 +921,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             codes=DjangoVerificationCodes(),
             issuer=HmacCodeIssuer(key=settings.SECRET_KEY),
             limiter=RedisRateLimiter(prefix=settings.RATE_LIMIT_PREFIX),
+            agenda=SqlPatientAgenda(),
             network_hourly_limit=settings.NETWORK_HOURLY_LIMIT,
         ),
         links=DjangoSignInLinks(),
@@ -802,6 +929,9 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             outbox=CeleryEmailOutbox(), public_base_url=settings.PUBLIC_BASE_URL
         ),
         search_queries=SqlSearchQueries(),
+        notifications=notifications,
+        notify=notify,
+        time_zone=settings.TIME_ZONE,
     )
 
 
