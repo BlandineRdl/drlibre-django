@@ -7,7 +7,6 @@ from drlibre.shared_kernel.ids import Id
 
 class AppointmentStatus(StrEnum):
     BOOKED = "BOOKED"
-    CONFIRMED = "CONFIRMED"
     CHECKED_IN = "CHECKED_IN"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
@@ -32,6 +31,8 @@ class Appointment:
     status: AppointmentStatus
     source: Source
     reason: str | None = None
+    cancelled_at: datetime | None = None
+    cancellation_reason: str | None = None
 
     @classmethod
     def book(

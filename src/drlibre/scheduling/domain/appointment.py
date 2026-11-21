@@ -6,7 +6,6 @@ from drlibre.scheduling.domain.slot import Period
 
 class AppointmentStatus(StrEnum):
     BOOKED = "BOOKED"
-    CONFIRMED = "CONFIRMED"
     CHECKED_IN = "CHECKED_IN"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"

@@ -4,14 +4,14 @@ from datetime import UTC, datetime
 
 import pytest
 
-from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
+from drlibre.booking.domain.appointment import AppointmentStatus
 from drlibre.booking.infrastructure.queries import DjangoBookingQueries
 from drlibre.booking.infrastructure.repositories import DjangoAppointments
 from drlibre.identity.application.ports.outbound import UpcomingAppointments
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
-from tests.builders_booking import stored_scene
+from tests.builders_booking import existing_appointment, stored_scene
 from tests.fakes.upcoming_appointments import InMemoryUpcomingAppointments
 
 REAL = [pytest.mark.integration, pytest.mark.django_db]
@@ -46,16 +46,13 @@ def setup(request: pytest.FixtureRequest) -> Setup:
 
     def store(start: datetime, status: str) -> None:
         DjangoAppointments().add(
-            Appointment(
-                id=Id(),
+            existing_appointment(
                 patient_id=patient,
                 clinician_id=profile.id,
                 appointment_type_id=scene.kind,
-                room_id=None,
                 start=start,
                 end=start.replace(minute=30),
                 status=AppointmentStatus(status),
-                source=Source.ONLINE,
             )
         )
 

@@ -1,10 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
 
-from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME
-
-CANCELLATION_WINDOW = timedelta(hours=24)
-MAX_OPEN_ONLINE = 3
+from drlibre.shared_kernel.booking_policy import BOOKING_LEAD_TIME, MAX_OPEN_ONLINE
 
 
 class BookingRule(StrEnum):
@@ -12,6 +9,7 @@ class BookingRule(StrEnum):
     TOO_MANY_OPEN_BOOKINGS = "too_many_open_bookings"
     TYPE_NOT_BOOKABLE_ONLINE = "type_not_bookable_online"
     OUTSIDE_AVAILABILITY = "outside_availability"
+    CANCELLATION_WINDOW_CLOSED = "cancellation_window_closed"
 
 
 def violations(

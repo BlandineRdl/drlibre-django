@@ -19,9 +19,15 @@ class RacingAppointments(DjangoAppointments):
     def __init__(self, race: Race) -> None:
         self._race = race
 
-    def busy_rooms(self, room_ids: tuple[Id, ...], start: datetime, end: datetime) -> frozenset[Id]:
+    def busy_rooms(
+        self,
+        room_ids: tuple[Id, ...],
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
+    ) -> frozenset[Id]:
         # Read before booking, so without the room lock both clinicians see the room free.
-        found = super().busy_rooms(room_ids, start, end)
+        found = super().busy_rooms(room_ids, start, end, excluding)
         self._race.hold_first()
         return found
 

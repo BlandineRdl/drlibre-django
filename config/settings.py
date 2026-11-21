@@ -38,6 +38,7 @@ ALLOWED_HOSTS = env.allowed_hosts
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
+    "django.contrib.postgres",
     "django.contrib.staticfiles",
     "drlibre.audit.infrastructure.django",
     "drlibre.booking.infrastructure.django",

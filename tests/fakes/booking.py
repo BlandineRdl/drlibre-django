@@ -24,6 +24,7 @@ from drlibre.booking.domain.verification_code import VerificationCode
 from drlibre.identity.domain.user import Role
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.dependents import Dependent
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from tests.fakes.users import InMemoryUsers
 
@@ -35,13 +36,29 @@ class InMemoryAppointments(Appointments):
     def add(self, appointment: Appointment) -> None:
         self.rows.append(appointment)
 
+    def save(self, appointment: Appointment) -> None:
+        index = next((i for i, a in enumerate(self.rows) if a.id == appointment.id), None)
+        if index is None:
+            raise DomainError(ErrorCode.NOT_FOUND, "Rendez-vous introuvable.")
+        self.rows[index] = appointment
+
     def get(self, appointment_id: Id) -> Appointment | None:
         return next((a for a in self.rows if a.id == appointment_id), None)
 
     def conflicting_resources(
-        self, *, clinician_id: Id, patient_id: Id, start: datetime, end: datetime
+        self,
+        *,
+        clinician_id: Id,
+        patient_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
     ) -> tuple[str, ...]:
-        overlapping = [a for a in self.rows if a.active and a.start < end and start < a.end]
+        overlapping = [
+            a
+            for a in self.rows
+            if a.active and a.id != excluding and a.start < end and start < a.end
+        ]
         resources = (
             ("clinician", any(a.clinician_id == clinician_id for a in overlapping)),
             ("patient", any(a.patient_id == patient_id for a in overlapping)),
@@ -62,11 +79,18 @@ class InMemoryAppointments(Appointments):
             if a.patient_id == patient_id and a.active and a.source in online and a.start > now
         )
 
-    def busy_rooms(self, room_ids: tuple[Id, ...], start: datetime, end: datetime) -> frozenset[Id]:
+    def busy_rooms(
+        self,
+        room_ids: tuple[Id, ...],
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
+    ) -> frozenset[Id]:
         return frozenset(
             a.room_id
             for a in self.rows
             if a.active
+            and a.id != excluding
             and a.room_id in room_ids
             and a.room_id is not None
             and a.start < end

@@ -1,6 +1,28 @@
 import uuid
 
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateTimeRangeField, RangeBoundary, RangeOperators
 from django.db import models
+from django.db.models import F, Func, Q
+
+INACTIVE_STATUSES = ("CANCELLED", "NO_SHOW")
+STATUSES = ("BOOKED", "CHECKED_IN", "COMPLETED", *INACTIVE_STATUSES)
+
+
+class TsTzRange(Func):
+    function = "TSTZRANGE"
+    output_field = DateTimeRangeField()
+
+
+def _no_overlap(name: str, column: str) -> ExclusionConstraint:
+    return ExclusionConstraint(
+        name=name,
+        expressions=(
+            (TsTzRange("start", "end", RangeBoundary()), RangeOperators.OVERLAPS),
+            (column, RangeOperators.EQUAL),
+        ),
+        condition=~Q(status__in=INACTIVE_STATUSES),
+    )
 
 
 class AppointmentRecord(models.Model):
@@ -24,6 +46,8 @@ class AppointmentRecord(models.Model):
     status = models.CharField(max_length=20)
     source = models.CharField(max_length=20)
     reason = models.CharField(max_length=500, null=True)  # noqa: DJ001
+    cancelled_at = models.DateTimeField(null=True)
+    cancellation_reason = models.CharField(max_length=500, null=True)  # noqa: DJ001
     clinician_id: uuid.UUID
     appointment_type_id: uuid.UUID
     room_id: uuid.UUID | None
@@ -33,6 +57,31 @@ class AppointmentRecord(models.Model):
             models.Index(fields=("clinician", "start"), name="appointment_clinician_start"),
             models.Index(fields=("patient_id", "start"), name="appointment_patient_start"),
             models.Index(fields=("room", "start"), name="appointment_room_start"),
+        )
+        constraints = (
+            _no_overlap("appointment_clinician_no_overlap", "clinician"),
+            _no_overlap("appointment_patient_no_overlap", "patient_id"),
+            models.CheckConstraint(
+                condition=Q(end__gt=F("start")), name="appointment_end_after_start"
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=STATUSES), name="appointment_status_known"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        status="CANCELLED",
+                        cancelled_at__isnull=False,
+                        cancellation_reason__isnull=False,
+                    )
+                    | Q(
+                        ~Q(status="CANCELLED"),
+                        cancelled_at__isnull=True,
+                        cancellation_reason__isnull=True,
+                    )
+                ),
+                name="appointment_cancellation_consistent",
+            ),
         )
 
     def __str__(self) -> str:
@@ -70,6 +119,11 @@ class BookingHoldRecord(models.Model):
             models.Index(fields=("clinician", "start"), name="hold_clinician_start"),
             models.Index(fields=("email", "expires_at"), name="hold_email_expires"),
             models.Index(fields=("expires_at",), name="hold_expires"),
+        )
+        constraints = (
+            models.CheckConstraint(
+                condition=Q(end__gt=F("start")), name="booking_hold_end_after_start"
+            ),
         )
 
     def __str__(self) -> str:

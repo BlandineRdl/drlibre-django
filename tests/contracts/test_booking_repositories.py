@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -13,6 +13,7 @@ from drlibre.booking.infrastructure.repositories import (
     DjangoHolds,
     DjangoVerificationCodes,
 )
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import stored_scene
 from tests.fakes.booking import InMemoryAppointments, InMemoryHolds, InMemoryVerificationCodes
@@ -73,6 +74,7 @@ def appointment(
     source: Source = Source.ONLINE,
     status: AppointmentStatus = AppointmentStatus.BOOKED,
 ) -> Appointment:
+    cancelled = status is AppointmentStatus.CANCELLED
     return Appointment(
         id=Id(),
         patient_id=patient,
@@ -84,6 +86,8 @@ def appointment(
         status=status,
         source=source,
         reason="Douleur",
+        cancelled_at=NOW if cancelled else None,
+        cancellation_reason="Empêchement" if cancelled else None,
     )
 
 
@@ -141,13 +145,59 @@ def test_a_stored_appointment_is_read_back_whatever_its_status(scene: Scene) -> 
     assert scene.appointments.get(Id()) is None
 
 
+def test_a_saved_appointment_replaces_the_stored_one(scene: Scene) -> None:
+    """Story annulation : le rendez-vous annulé garde l'heure et le motif de l'annulation."""
+    booked = appointment(scene, patient=Id(), start=at(30), room=scene.room)
+    scene.appointments.add(booked)
+    cancelled = replace(
+        booked,
+        status=AppointmentStatus.CANCELLED,
+        cancelled_at=NOW,
+        cancellation_reason="Empêchement",
+    )
+
+    scene.appointments.save(cancelled)
+
+    assert scene.appointments.get(booked.id) == cancelled
+
+
+def test_saving_an_unknown_appointment_is_refused_as_not_found(scene: Scene) -> None:
+    """Spec §12.3 : un rendez-vous inconnu est introuvable."""
+    with pytest.raises(DomainError) as refused:
+        scene.appointments.save(appointment(scene, patient=Id(), start=at(30)))
+
+    assert refused.value.code is ErrorCode.NOT_FOUND
+
+
+def test_a_moved_appointment_conflicts_neither_with_itself_nor_with_its_room(scene: Scene) -> None:
+    """Story déplacement : le rendez-vous déplacé ne se gêne pas lui-même."""
+    patient = Id()
+    moved = appointment(scene, patient=patient, start=at(5), room=scene.room)
+    scene.appointments.add(moved)
+    later = (at(5) + timedelta(minutes=30), at(6) + timedelta(minutes=30))
+
+    def conflicts(excluding: Id | None) -> tuple[str, ...]:
+        return scene.appointments.conflicting_resources(
+            clinician_id=scene.clinician,
+            patient_id=patient,
+            start=later[0],
+            end=later[1],
+            excluding=excluding,
+        )
+
+    assert conflicts(None) == ("clinician", "patient")
+    assert conflicts(moved.id) == ()
+    assert scene.appointments.busy_rooms((scene.room,), *later) == {scene.room}
+    assert scene.appointments.busy_rooms((scene.room,), *later, excluding=moved.id) == frozenset()
+
+
 def test_only_future_active_online_appointments_count_as_open_bookings(scene: Scene) -> None:
     """Story réservation : trois réservations en ligne ouvertes au plus par patient."""
     patient = Id()
     make = appointment
     for start, source, status in (
         (at(3), Source.ONLINE, AppointmentStatus.BOOKED),
-        (at(4), Source.ROUND_ROBIN, AppointmentStatus.CONFIRMED),
+        (at(4), Source.ROUND_ROBIN, AppointmentStatus.CHECKED_IN),
         (at(5), Source.STAFF, AppointmentStatus.BOOKED),
         (at(6), Source.ONLINE, AppointmentStatus.CANCELLED),
         (at(7), Source.ONLINE, AppointmentStatus.NO_SHOW),

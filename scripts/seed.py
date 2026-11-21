@@ -289,9 +289,8 @@ def _load_appointments(
     rows = []
     for start in sorted(rng.sample(starts, LOAD_APPOINTMENTS_PER_CLINICIAN)):
         past = start < now
-        status = rng.choice(
-            ("COMPLETED",) * 8 + ("CANCELLED", "NO_SHOW") if past else ("BOOKED", "CONFIRMED")
-        )
+        status = rng.choice(("COMPLETED",) * 8 + ("CANCELLED", "NO_SHOW")) if past else "BOOKED"
+        cancelled = status == "CANCELLED"
         patient = rng.choice(patients)
         while (patient, start) in taken:
             patient = rng.choice(patients)
@@ -306,6 +305,8 @@ def _load_appointments(
                 end=start + timedelta(minutes=kind.duration_minutes),
                 status=status,
                 source=rng.choice(("ONLINE", "ONLINE", "STAFF")),
+                cancelled_at=start if cancelled else None,
+                cancellation_reason="Empêchement" if cancelled else None,
             )
         )
     return rows

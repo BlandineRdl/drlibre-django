@@ -51,7 +51,11 @@ class OpenedSession:
 
 class Appointments(Protocol):
     def add(self, appointment: Appointment) -> None:
-        """Store the appointment."""
+        """Store the appointment; an active overlap of its clinician or patient is a conflict."""
+        ...
+
+    def save(self, appointment: Appointment) -> None:
+        """Replace the stored appointment; an absent id is refused as not found."""
         ...
 
     def get(self, appointment_id: Id) -> Appointment | None:
@@ -59,9 +63,15 @@ class Appointments(Protocol):
         ...
 
     def conflicting_resources(
-        self, *, clinician_id: Id, patient_id: Id, start: datetime, end: datetime
+        self,
+        *,
+        clinician_id: Id,
+        patient_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
     ) -> tuple[str, ...]:
-        """Names ("clinician", "patient") having an active appointment overlapping the range."""
+        """Names ("clinician", "patient") with another active appointment overlapping the range."""
         ...
 
     def clinician_busy(self, clinician_id: Id, start: datetime, end: datetime) -> bool:
@@ -72,8 +82,14 @@ class Appointments(Protocol):
         """Future active ONLINE or ROUND_ROBIN appointments of the patient."""
         ...
 
-    def busy_rooms(self, room_ids: tuple[Id, ...], start: datetime, end: datetime) -> frozenset[Id]:
-        """The given rooms used by an active appointment overlapping the range."""
+    def busy_rooms(
+        self,
+        room_ids: tuple[Id, ...],
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
+    ) -> frozenset[Id]:
+        """The given rooms used by an active appointment, other than the excluded one, in range."""
         ...
 
 

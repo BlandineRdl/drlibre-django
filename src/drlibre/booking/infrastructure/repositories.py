@@ -1,5 +1,9 @@
+from collections.abc import Generator
+from contextlib import contextmanager
 from datetime import datetime
+from typing import Any
 
+from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
 
 from drlibre.booking.application.ports.outbound import Appointments, Holds, VerificationCodes
@@ -12,6 +16,7 @@ from drlibre.booking.infrastructure.django.models import (
     BookingHoldRecord,
     VerificationCodeRecord,
 )
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 
 _INACTIVE = (AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW)
@@ -26,20 +31,63 @@ def overlapping(start: datetime, end: datetime) -> Q:
     return Q(start__lt=end, end__gt=start)
 
 
+_OVERLAP_RESOURCES = {
+    "appointment_clinician_no_overlap": "clinician",
+    "appointment_patient_no_overlap": "patient",
+}
+
+
+@contextmanager
+def _overlap_is_conflict() -> Generator[None]:
+    """Turn an exclusion constraint hit, slipped past the locks, into a booking conflict."""
+    try:
+        with transaction.atomic():
+            yield
+    except IntegrityError as error:
+        name = getattr(getattr(error.__cause__, "diag", None), "constraint_name", None)
+        if name not in _OVERLAP_RESOURCES:
+            raise
+        raise DomainError(
+            ErrorCode.CONFLICT,
+            "Un rendez-vous actif occupe déjà ce créneau.",
+            {"resources": [_OVERLAP_RESOURCES[name]]},
+        ) from error
+
+
+def _fields(appointment: Appointment) -> dict[str, Any]:
+    return {
+        "patient_id": appointment.patient_id.value,
+        "clinician_id": appointment.clinician_id.value,
+        "appointment_type_id": appointment.appointment_type_id.value,
+        "room_id": appointment.room_id.value if appointment.room_id else None,
+        "start": appointment.start,
+        "end": appointment.end,
+        "status": appointment.status.value,
+        "source": appointment.source.value,
+        "reason": appointment.reason,
+        "cancelled_at": appointment.cancelled_at,
+        "cancellation_reason": appointment.cancellation_reason,
+    }
+
+
+def _excluding(
+    rows: QuerySet[AppointmentRecord], excluding: Id | None
+) -> QuerySet[AppointmentRecord]:
+    return rows if excluding is None else rows.exclude(id=excluding.value)
+
+
 class DjangoAppointments(Appointments):
     def add(self, appointment: Appointment) -> None:
-        AppointmentRecord.objects.create(
-            id=appointment.id.value,
-            patient_id=appointment.patient_id.value,
-            clinician_id=appointment.clinician_id.value,
-            appointment_type_id=appointment.appointment_type_id.value,
-            room_id=appointment.room_id.value if appointment.room_id else None,
-            start=appointment.start,
-            end=appointment.end,
-            status=appointment.status.value,
-            source=appointment.source.value,
-            reason=appointment.reason,
-        )
+        with _overlap_is_conflict():
+            AppointmentRecord.objects.create(id=appointment.id.value, **_fields(appointment))
+
+    def save(self, appointment: Appointment) -> None:
+        with _overlap_is_conflict():
+            updated = AppointmentRecord.objects.filter(id=appointment.id.value).update(
+                **_fields(appointment)
+            )
+        if not updated:
+            raise DomainError(ErrorCode.NOT_FOUND, "Rendez-vous introuvable.")
 
     def get(self, appointment_id: Id) -> Appointment | None:
         row = AppointmentRecord.objects.filter(id=appointment_id.value).first()
@@ -56,12 +104,20 @@ class DjangoAppointments(Appointments):
             status=AppointmentStatus(row.status),
             source=Source(row.source),
             reason=row.reason,
+            cancelled_at=row.cancelled_at,
+            cancellation_reason=row.cancellation_reason,
         )
 
     def conflicting_resources(
-        self, *, clinician_id: Id, patient_id: Id, start: datetime, end: datetime
+        self,
+        *,
+        clinician_id: Id,
+        patient_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
     ) -> tuple[str, ...]:
-        rows = active_appointments().filter(overlapping(start, end))
+        rows = _excluding(active_appointments().filter(overlapping(start, end)), excluding)
         resources = (
             ("clinician", rows.filter(clinician_id=clinician_id.value).exists()),
             ("patient", rows.filter(patient_id=patient_id.value).exists()),
@@ -79,10 +135,17 @@ class DjangoAppointments(Appointments):
             .count()
         )
 
-    def busy_rooms(self, room_ids: tuple[Id, ...], start: datetime, end: datetime) -> frozenset[Id]:
+    def busy_rooms(
+        self,
+        room_ids: tuple[Id, ...],
+        start: datetime,
+        end: datetime,
+        excluding: Id | None = None,
+    ) -> frozenset[Id]:
         rows = active_appointments().filter(
             overlapping(start, end), room_id__in=[r.value for r in room_ids]
         )
+        rows = _excluding(rows, excluding)
         return frozenset(Id(room) for room in rows.values_list("room_id", flat=True) if room)
 
 

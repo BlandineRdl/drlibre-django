@@ -4,11 +4,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from drlibre.booking.application.ports.inbound import AppointmentQueries
-from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
+from drlibre.booking.domain.appointment import AppointmentStatus
 from drlibre.booking.infrastructure.queries import DjangoBookingQueries
 from drlibre.booking.infrastructure.repositories import DjangoAppointments
 from drlibre.shared_kernel.ids import Id
-from tests.builders_booking import stored_scene
+from tests.builders_booking import existing_appointment, stored_scene
 from tests.fakes.booking import InMemoryAppointmentQueries, InMemoryAppointments
 
 REAL = [pytest.mark.integration, pytest.mark.django_db]
@@ -54,8 +54,7 @@ def book(
     patient: Id | None = None,
     status: AppointmentStatus = AppointmentStatus.BOOKED,
 ) -> Id:
-    appointment = Appointment(
-        id=Id(),
+    appointment = existing_appointment(
         patient_id=patient or Id(),
         clinician_id=scene.clinician,
         appointment_type_id=scene.kind,
@@ -63,7 +62,6 @@ def book(
         start=start,
         end=start + timedelta(minutes=30),
         status=status,
-        source=Source.ONLINE,
     )
     scene.store.add(appointment)
     return appointment.id

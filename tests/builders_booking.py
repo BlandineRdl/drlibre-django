@@ -58,17 +58,21 @@ def existing_appointment(
     room_id: Id | None = None,
     source: Source = Source.ONLINE,
     status: AppointmentStatus = AppointmentStatus.BOOKED,
+    appointment_type_id: Id | None = None,
 ) -> Appointment:
+    cancelled = status is AppointmentStatus.CANCELLED
     return Appointment(
         id=Id(),
         patient_id=patient_id,
         clinician_id=clinician_id,
-        appointment_type_id=Id(),
+        appointment_type_id=appointment_type_id or Id(),
         room_id=room_id,
         start=start,
         end=end,
         status=status,
         source=source,
+        cancelled_at=start if cancelled else None,
+        cancellation_reason="Empêchement" if cancelled else None,
     )
 
 

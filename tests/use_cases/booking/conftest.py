@@ -219,7 +219,7 @@ def room_busy(world: FakeWorld, scene: Scene, room: str, start: str, end: str) -
             start=at(start),
             end=at(end),
             room_id=scene.rooms[room],
-            status=AppointmentStatus.CONFIRMED,
+            status=AppointmentStatus.CHECKED_IN,
         )
     )
 
