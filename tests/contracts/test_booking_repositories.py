@@ -161,6 +161,20 @@ def test_a_saved_appointment_replaces_the_stored_one(scene: Scene) -> None:
     assert scene.appointments.get(booked.id) == cancelled
 
 
+def test_clinical_notes_are_kept_with_the_appointment_and_cleared(scene: Scene) -> None:
+    """Story notes cliniques : les notes s'enregistrent à part, et se vident."""
+    completed = appointment(
+        scene, patient=Id(), start=at(-3), status=AppointmentStatus.COMPLETED, room=scene.room
+    )
+    scene.appointments.add(completed)
+    noted = replace(completed, clinical_notes="Tension 12/8")
+
+    scene.appointments.save(noted)
+    assert scene.appointments.get(completed.id) == noted
+    scene.appointments.save(completed)
+    assert scene.appointments.get(completed.id) == completed
+
+
 def test_saving_an_unknown_appointment_is_refused_as_not_found(scene: Scene) -> None:
     """Spec §12.3 : un rendez-vous inconnu est introuvable."""
     with pytest.raises(DomainError) as refused:

@@ -1,14 +1,24 @@
 from dataclasses import dataclass
 from datetime import date, datetime
+from enum import StrEnum
 from typing import Protocol
 
-from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
+from drlibre.booking.application.ports.outbound import (
+    AgendaEntry,
+    AgendaFilter,
+    ClinicianEntry,
+    ClinicianFilter,
+    ClinicianPatient,
+    RoomBooking,
+    RoomLabel,
+)
 from drlibre.booking.domain.appointment import (
     MAX_CANCELLATION_REASON,
+    MAX_CLINICAL_NOTES,
     Appointment,
     AppointmentStatus,
 )
-from drlibre.booking.domain.booking_rules import BookingRule, PatientAction
+from drlibre.booking.domain.booking_rules import BookingRule, ClinicianAction, PatientAction
 from drlibre.booking.domain.waitlist import WaitlistEntry, WaitlistStatus
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
@@ -17,24 +27,50 @@ from drlibre.shared_kernel.pagination import Page, PageRequest
 
 __all__ = [
     "MAX_CANCELLATION_REASON",
+    "MAX_CLINICAL_NOTES",
     "AcceptWaitlistOffer",
     "AgendaEntry",
     "AgendaFilter",
+    "AgendaHour",
     "Appointment",
+    "AppointmentFile",
     "AppointmentQueries",
     "AppointmentStatus",
+    "AppointmentsQuery",
     "BookAppointment",
+    "BookAppointmentAsCaller",
+    "BookForPatient",
     "BookedPeriod",
     "BookingRule",
     "CancelAppointment",
+    "CheckInAppointment",
+    "ClinicianAction",
+    "ClinicianAppointment",
+    "ClinicianAppointments",
+    "ClinicianDay",
+    "ClinicianDayView",
+    "ClinicianEntry",
+    "ClinicianFilter",
+    "ClinicianPatient",
+    "ClinicianPatients",
+    "ClinicianWeek",
+    "ClinicianWeekView",
+    "CompleteAppointment",
     "CreateHold",
+    "DayCounts",
+    "DepartmentRoomsDay",
     "ExpireHolds",
     "ExpireWaitlist",
     "HeldPeriod",
+    "HistoryActor",
+    "HistoryLine",
     "HoldCreated",
     "HoldSummary",
     "JoinWaitlist",
+    "ListAppointmentsAsCaller",
+    "ListClinicianAppointments",
     "ListPatientAppointments",
+    "MarkNoShow",
     "OfferCancelledSlot",
     "OpenHolds",
     "PatientAction",
@@ -42,6 +78,9 @@ __all__ = [
     "RequirePatient",
     "RescheduleAppointment",
     "ResendCode",
+    "RoomBooking",
+    "RoomLabel",
+    "RoomsDayView",
     "SendReminders",
     "VerifiedBooking",
     "VerifyHold",
@@ -52,6 +91,7 @@ __all__ = [
     "WaitlistQueries",
     "WaitlistRow",
     "WaitlistStatus",
+    "WriteClinicalNotes",
 ]
 
 
@@ -75,14 +115,68 @@ class BookAppointment(Protocol):
 
 
 class CancelAppointment(Protocol):
-    def execute(self, *, appointment_id: Id, patient_id: Id, reason: str) -> Appointment:
-        """Cancel the patient's own appointment for a reason; a refusal writes or sends nothing."""
+    def execute(self, *, appointment_id: Id, actor_id: Id, reason: str) -> Appointment:
+        """Cancel the actor's own appointment, patient or clinician; a refusal writes nothing."""
         ...
 
 
 class RescheduleAppointment(Protocol):
-    def execute(self, *, appointment_id: Id, patient_id: Id, start: datetime) -> Appointment:
-        """Move the patient's own BOOKED appointment, end recomputed; a refusal writes nothing."""
+    def execute(self, *, appointment_id: Id, actor_id: Id, start: datetime) -> Appointment:
+        """Move the actor's own BOOKED appointment, patient or clinician; refusals write nothing."""
+        ...
+
+
+class BookForPatient(Protocol):
+    def execute(
+        self,
+        *,
+        actor_id: Id,
+        patient_id: Id,
+        appointment_type_id: Id,
+        start: datetime,
+        room_id: Id | None = None,
+        clinician_id: Id | None = None,
+    ) -> Appointment:
+        """Book an active patient in the caller's own calendar as STAFF; refusals write nothing."""
+        ...
+
+
+class BookAppointmentAsCaller(Protocol):
+    def execute(
+        self,
+        *,
+        actor_id: Id,
+        appointment_type_id: Id,
+        start: datetime,
+        clinician_id: Id | None = None,
+        patient_id: Id | None = None,
+        room_id: Id | None = None,
+    ) -> Appointment:
+        """Clinicians book a named patient, others themself and no room; refusals write nothing."""
+        ...
+
+
+class CheckInAppointment(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> Appointment:
+        """Mark the clinician's own BOOKED appointment arrived; notifies no one."""
+        ...
+
+
+class CompleteAppointment(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> Appointment:
+        """Mark the clinician's own CHECKED_IN appointment completed; notifies no one."""
+        ...
+
+
+class MarkNoShow(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> Appointment:
+        """Mark the clinician's own BOOKED appointment absent, freeing its slot; notifies no one."""
+        ...
+
+
+class WriteClinicalNotes(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id, text: str) -> Appointment:
+        """Store the clinician's notes on their own appointment; empty clears, too long refused."""
         ...
 
 
@@ -239,6 +333,109 @@ class ListPatientAppointments(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class DayCounts:
+    """Cancelled appointments are counted apart, never among the appointments."""
+
+    appointments: int
+    cancelled: int
+    completed: int
+    no_show: int
+
+
+@dataclass(frozen=True, slots=True)
+class AgendaHour:
+    """The appointments starting within one hour of the hospital's day."""
+
+    hour: int
+    entries: tuple[ClinicianEntry, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianDayView:
+    day: date
+    time_zone: str
+    hours: tuple[AgendaHour, ...]
+    counts: DayCounts
+    next_free_slot: datetime | None
+
+
+class ClinicianDay(Protocol):
+    def execute(self, *, actor_id: Id, day: date | None) -> ClinicianDayView:
+        """The clinician's own day in the hospital zone, today when none; forbidden without one."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianWeekView:
+    monday: date
+    time_zone: str
+    entries: tuple[ClinicianEntry, ...]
+
+
+class ClinicianWeek(Protocol):
+    def execute(self, *, actor_id: Id, week: date | None) -> ClinicianWeekView:
+        """The clinician's active appointments of the week holding the date, this week if none."""
+        ...
+
+
+class HistoryActor(StrEnum):
+    PATIENT = "PATIENT"
+    CLINICIAN = "CLINICIAN"
+    STAFF = "STAFF"
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryLine:
+    action: str
+    actor: HistoryActor
+    at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentFile:
+    """One appointment as its clinician sees it, notes, allowed actions and history included."""
+
+    entry: ClinicianEntry
+    time_zone: str
+    patient_age: int | None
+    history: tuple[HistoryLine, ...]
+
+
+class ClinicianAppointment(Protocol):
+    def execute(self, *, actor_id: Id, appointment_id: Id) -> AppointmentFile:
+        """The clinician's own appointment; not_found when absent, forbidden for another's."""
+        ...
+
+
+class ClinicianPatients(Protocol):
+    def execute(self, *, actor_id: Id, request: PageRequest) -> Page[ClinicianPatient]:
+        """The clinician's own patients, searched by name, 20 per page."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class RoomsDayView:
+    day: date
+    time_zone: str
+    rooms: tuple[RoomLabel, ...]
+    bookings: tuple[RoomBooking, ...]
+
+
+class DepartmentRoomsDay(Protocol):
+    def execute(self, *, actor_id: Id, day: date | None) -> RoomsDayView:
+        """The day's occupancy of the clinician's department rooms, today when none."""
+        ...
+
+
+class ListClinicianAppointments(Protocol):
+    def execute(
+        self, *, actor_id: Id, agenda_filter: ClinicianFilter
+    ) -> tuple[ClinicianEntry, ...]:
+        """The clinician's own appointments with their actions, by start, never their notes."""
+        ...
+
+
 class JoinWaitlist(Protocol):
     def execute(
         self,
@@ -269,6 +466,30 @@ class AcceptWaitlistOffer(Protocol):
 class ExpireWaitlist(Protocol):
     def execute(self) -> int:
         """Expire entries past their window, free offers whose slot started; returns how many."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentsQuery:
+    """Optional narrowing of the caller's appointments; the range bounds the start, end excluded."""
+
+    clinician_id: Id | None = None
+    patient_id: Id | None = None
+    status: AppointmentStatus | None = None
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianAppointments:
+    entries: tuple[ClinicianEntry, ...]
+
+
+class ListAppointmentsAsCaller(Protocol):
+    def execute(
+        self, *, actor_id: Id, query: AppointmentsQuery
+    ) -> PatientAppointments | ClinicianAppointments:
+        """Clinicians get their own calendar, patients their own list; forbidden for other staff."""
         ...
 
 

@@ -168,6 +168,19 @@ class DayView:
 class CellView:
     text: str
     kind: str
+    colour: str = ""
+    url: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class GridAppointment:
+    """An appointment placed on the week grid, named by its type."""
+
+    start: datetime
+    end: datetime
+    label: str
+    colour: str
+    url: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +224,8 @@ def week_view(
     rules: tuple[AvailabilityRule, ...],
     time_offs: tuple[TimeOff, ...],
     base_url: str,
+    appointments: tuple[GridAppointment, ...] = (),
+    title: str = "",
 ) -> WeekView:
     """Read-only 07:00-19:00 grid in 30-minute rows, each cell labelled in text."""
     tz = ZoneInfo(time_zone)
@@ -219,12 +234,12 @@ def week_view(
     for n in range(GRID_ROWS):
         start = datetime.combine(monday, GRID_START) + n * GRID_STEP
         cells = tuple(
-            _cell(day, start.time(), (start + GRID_STEP).time(), tz, rules, time_offs)
+            _cell(day, start.time(), (start + GRID_STEP).time(), tz, rules, time_offs, appointments)
             for day in days
         )
         rows.append(GridRowView(f"{start:%H:%M}", cells))
     return WeekView(
-        title=f"Calendrier de {clinician}",
+        title=title or f"Calendrier de {clinician}",
         time_zone=time_zone,
         week_label=f"Semaine du {monday:%d/%m/%Y}",
         days=tuple(_day(d) for d in days),
@@ -247,9 +262,13 @@ def _cell(
     tz: ZoneInfo,
     rules: tuple[AvailabilityRule, ...],
     time_offs: tuple[TimeOff, ...],
+    appointments: tuple[GridAppointment, ...],
 ) -> CellView:
     since = datetime.combine(day, start, tzinfo=tz)
     until = datetime.combine(day, end, tzinfo=tz)
+    booked = next((a for a in appointments if a.start < until and since < a.end), None)
+    if booked is not None:
+        return CellView(booked.label, "appointment", booked.colour, booked.url)
     if any(t.start < until and since < t.end for t in time_offs):
         return CellView(TIME_OFF, "time-off")
     if any(r.applies_on(day) and r.start < end and start < r.end for r in rules):

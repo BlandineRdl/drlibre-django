@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ view.heading }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+<h1>{{ view.heading }}</h1>
+{% if view.notice %}<p role="status" class="notice">{{ view.notice }}</p>{% endif %}
+{% if view.refusal %}
+<div role="alert" class="error-summary" tabindex="-1" id="refusal" autofocus>
+  <p><strong>{{ view.refusal }}</strong></p>
+  {% if view.reasons %}<ul>{% for reason in view.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+<dl class="facts">
+  {% for fact in view.facts %}<dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd>{% endfor %}
+</dl>
+{% if view.buttons or view.cancel_url %}
+<section aria-labelledby="actions-heading">
+  <h2 id="actions-heading">Actions</h2>
+  <div class="actions">
+    {% include "workspace/_status_buttons.html" with buttons=view.buttons origin="file" %}
+    {% if view.cancel_url %}<a href="{{ view.cancel_url }}" role="button" class="secondary outline">Annuler le rendez-vous</a>{% endif %}
+  </div>
+</section>
+{% endif %}
+<section aria-labelledby="notes-heading">
+  <h2 id="notes-heading">{{ view.notes.title }}</h2>
+  {% include "_form.html" with form=view.notes %}
+</section>
+{% if view.strip %}
+<section aria-labelledby="move-heading" id="reschedule">
+  <h2 id="move-heading">Déplacer</h2>
+  {% include "_week_strip.html" with strip=view.strip week_level="h3" day_level="h4" %}
+</section>
+{% endif %}
+<section aria-labelledby="history-heading">
+  <h2 id="history-heading">Historique</h2>
+  {% if view.history %}
+  <div class="overflow-auto" role="region" aria-labelledby="history-caption" tabindex="0">
+    <table>
+      <caption id="history-caption">Historique du rendez-vous, heure locale ({{ view.time_zone }})</caption>
+      <thead><tr><th scope="col">Heure</th><th scope="col">Action</th><th scope="col">Par</th></tr></thead>
+      <tbody>{% for line in view.history %}<tr><td>{{ line.at }}</td><td>{{ line.action }}</td><td>{{ line.actor }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}<p>Aucune entrée.</p>{% endif %}
+</section>
+<p><a href="{{ view.back_url }}">Retour à l'agenda du jour</a></p>
+{% endblock %}

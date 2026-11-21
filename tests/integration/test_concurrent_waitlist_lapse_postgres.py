@@ -50,7 +50,7 @@ def test_an_offer_accepted_as_its_slot_starts_is_booked_and_never_also_lapsed() 
         )
         DjangoWaitlist().add(entry)
         app.cancel_appointment.execute(
-            appointment_id=freed.id, patient_id=leaving.id, reason="Empêchement"
+            appointment_id=freed.id, actor_id=leaving.id, reason="Empêchement"
         )
         admin = stored_user(Role.ADMIN)
         # The offered slot starts now: the job lapses it, an admin may still book it.

@@ -46,6 +46,23 @@ def test_the_demo_seed_can_run_again_without_duplicating_rows() -> None:
     assert set(seeded.values_list("actor_id", flat=True)) == {admin.id}
 
 
+def test_the_second_demo_clinician_shares_the_demo_department_once_even_after_a_reseed() -> None:
+    """Epic E6: a second clinician of HNORD-CARD with its own room and rules, seeded once."""
+    seed.main()
+    seed.main()
+
+    users = UserRecord.objects.filter(email=seed.SECOND_CLINICIAN_EMAIL)
+    (user,) = users
+    profiles = ClinicianProfileRecord.objects.filter(user_id=user.id)
+    (profile,) = profiles
+    demo = UserRecord.objects.get(email=seed.CLINICIAN_EMAIL)
+    first = ClinicianProfileRecord.objects.get(user_id=demo.id)
+    assert (user.role, profile.department_id) == ("CLINICIAN", first.department_id)
+    assert profile.default_room_id != first.default_room_id
+    rules = container().availability_queries.rules_of(Id(profile.id))
+    assert len(rules) == len(seed.DEMO_RULES)
+
+
 def test_the_demo_clinician_has_free_slots_after_the_seed() -> None:
     """Epic E2: the seeded weekly rules give the demo clinician bookable slots."""
     seed.main()
@@ -63,6 +80,21 @@ def test_the_demo_clinician_has_free_slots_after_the_seed() -> None:
     )
 
     assert slots
+
+
+def test_the_demo_clinician_sees_the_seeded_appointments_on_the_next_working_day() -> None:
+    """Epic E6: the seed books the passwordless patient on the demo clinician's next day, once."""
+    seed.main()
+    seed.main()
+    user = UserRecord.objects.get(email="clinicien@drlibre.localhost")
+    day = seed._next_working_day(datetime.now(UTC)).date()
+
+    view = container().clinician_day.execute(actor_id=Id(user.id), day=day)
+
+    entries = [e for hour in view.hours for e in hour.entries]
+    assert len(entries) == seed.DEMO_APPOINTMENTS
+    assert {e.patient_name for e in entries} == {"Victor Visiteur"}
+    assert {e.appointment.status.value for e in entries} == {"BOOKED"}
 
 
 def test_the_load_seed_never_double_books_a_room_a_clinician_or_a_patient(

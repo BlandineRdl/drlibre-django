@@ -15,10 +15,19 @@ Feature: Un patient connecté réserve sans ressaisir ses informations
     When the patient books "A" at "2026-11-23 09:00"
     Then the appointment is "BOOKED" for "ONLINE"
 
-  Scenario: Il réserve pour lui-même seulement : son identité vient de la session, et il ne peut nommer ni un autre patient ni une salle
-    When the patient books "A" at "2026-11-23 09:00"
+  Scenario: Il réserve pour lui-même seulement : son identité vient de la session, et il ne peut nommer ni un autre patient ni une salle (lui-même)
+    When the patient books "A" at "2026-11-23 09:00" naming themself
     Then the appointment belongs to the signed-in patient
-    And the booking offers no way to name a patient or a room
+
+  Scenario: Il réserve pour lui-même seulement : son identité vient de la session, et il ne peut nommer ni un autre patient ni une salle (autre patient)
+    When the patient books "A" at "2026-11-23 09:00" naming another patient
+    Then the booking is refused as "forbidden"
+    And nothing was written
+
+  Scenario: Il réserve pour lui-même seulement : son identité vient de la session, et il ne peut nommer ni un autre patient ni une salle (salle)
+    When the patient books "A" at "2026-11-23 09:00" in room "R2"
+    Then the booking is refused as "forbidden"
+    And nothing was written
 
   Scenario: Sans praticien nommé, il réserve le premier disponible
     Given "A" was assigned at "2026-11-19 10:00"

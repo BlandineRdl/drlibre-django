@@ -6,13 +6,14 @@ from pydantic import AwareDatetime, ConfigDict, Field
 
 from drlibre.booking.application.ports.inbound import (
     AgendaEntry,
-    AgendaFilter,
+    AppointmentsQuery,
     AppointmentStatus,
+    ClinicianAppointments,
+    ClinicianEntry,
 )
 from drlibre.bootstrap.container import container
 from drlibre.interfaces.api.booking import AppointmentOut
-from drlibre.interfaces.web.auth import current_identity, identity_of
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
+from drlibre.interfaces.web.auth import current_identity
 from drlibre.shared_kernel.ids import Id
 
 router = Router(tags=["appointments"])
@@ -24,24 +25,31 @@ class BookingIn(Schema):
     type: UUID
     clinician: UUID | None = None
     start: AwareDatetime
+    patient: UUID | None = None
+    room: UUID | None = None
+
+
+def _optional_id(raw: UUID | None) -> Id | None:
+    return Id(raw) if raw else None
 
 
 @router.post("/appointments", response={201: AppointmentOut}, auth=None)
 def book(request: HttpRequest, payload: BookingIn) -> Status[AppointmentOut]:
-    identity = identity_of(request)
-    if identity is None:
-        raise DomainError(ErrorCode.UNAUTHENTICATED, "Connectez-vous pour continuer.")
-    appointment = container().book_appointment.execute(
-        patient_id=identity.user_id,
+    identity = current_identity(request)
+    appointment = container().book_appointment_as_caller.execute(
+        actor_id=identity.user_id,
         appointment_type_id=Id(payload.type),
-        clinician_id=Id(payload.clinician) if payload.clinician else None,
         start=payload.start,
+        clinician_id=_optional_id(payload.clinician),
+        patient_id=_optional_id(payload.patient),
+        room_id=_optional_id(payload.room),
     )
     return Status(201, AppointmentOut.of(appointment))
 
 
 class AgendaQuery(Schema):
     clinician: UUID | None = None
+    patient: UUID | None = None
     status: AppointmentStatus | None = None
     start: AwareDatetime | None = Field(None, alias="from")
     end: AwareDatetime | None = Field(None, alias="to")
@@ -93,22 +101,57 @@ class AgendaOut(Schema):
     past: list[AgendaEntryOut]
 
 
-@router.get("/appointments", response=AgendaOut, auth=None)
-def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> AgendaOut:
+class ClinicianEntryOut(Schema):
+    id: UUID
+    status: str
+    start: str
+    end: str
+    reason: str | None
+    patient: UUID
+    patient_name: str
+    type: str
+    room: str | None
+    allowed_actions: list[str]
+
+    @staticmethod
+    def of(entry: ClinicianEntry) -> "ClinicianEntryOut":
+        appointment = entry.appointment
+        return ClinicianEntryOut(
+            id=appointment.id.value,
+            status=appointment.status.value,
+            start=appointment.start.isoformat(),
+            end=appointment.end.isoformat(),
+            reason=appointment.reason,
+            patient=appointment.patient_id.value,
+            patient_name=entry.patient_name,
+            type=entry.appointment_type,
+            room=entry.room,
+            allowed_actions=sorted(action.value for action in entry.actions),
+        )
+
+
+class ClinicianAgendaOut(Schema):
+    appointments: list[ClinicianEntryOut]
+
+
+@router.get("/appointments", response=AgendaOut | ClinicianAgendaOut, auth=None)
+def list_own(request: HttpRequest, query: Query[AgendaQuery]) -> AgendaOut | ClinicianAgendaOut:
     identity = current_identity(request)
-    # A patient sees only their own appointments, so a `patient` parameter changes nothing.
-    agenda = container().list_patient_appointments.execute(
-        patient_id=identity.user_id,
-        agenda_filter=AgendaFilter(
-            clinician_id=Id(query.clinician) if query.clinician else None,
+    listed = container().list_appointments_as_caller.execute(
+        actor_id=identity.user_id,
+        query=AppointmentsQuery(
+            clinician_id=_optional_id(query.clinician),
+            patient_id=_optional_id(query.patient),
             status=query.status,
             start=query.start,
             end=query.end,
         ),
     )
+    if isinstance(listed, ClinicianAppointments):
+        return ClinicianAgendaOut(appointments=[ClinicianEntryOut.of(e) for e in listed.entries])
     return AgendaOut(
-        upcoming=[AgendaEntryOut.of(e) for e in agenda.upcoming],
-        past=[AgendaEntryOut.of(e) for e in agenda.past],
+        upcoming=[AgendaEntryOut.of(e) for e in listed.upcoming],
+        past=[AgendaEntryOut.of(e) for e in listed.past],
     )
 
 
@@ -127,10 +170,8 @@ class RescheduleIn(Schema):
 @router.post("/appointments/{appointment_id}/cancel", response=AppointmentOut, auth=None)
 def cancel(request: HttpRequest, appointment_id: UUID, payload: CancelIn) -> AppointmentOut:
     identity = current_identity(request)
-    c = container()
-    c.require_patient.execute(user_id=identity.user_id)
-    cancelled = c.cancel_appointment.execute(
-        appointment_id=Id(appointment_id), patient_id=identity.user_id, reason=payload.reason
+    cancelled = container().cancel_appointment.execute(
+        appointment_id=Id(appointment_id), actor_id=identity.user_id, reason=payload.reason
     )
     return AppointmentOut.of(cancelled)
 
@@ -138,9 +179,34 @@ def cancel(request: HttpRequest, appointment_id: UUID, payload: CancelIn) -> App
 @router.post("/appointments/{appointment_id}/reschedule", response=AppointmentOut, auth=None)
 def reschedule(request: HttpRequest, appointment_id: UUID, payload: RescheduleIn) -> AppointmentOut:
     identity = current_identity(request)
-    c = container()
-    c.require_patient.execute(user_id=identity.user_id)
-    moved = c.reschedule_appointment.execute(
-        appointment_id=Id(appointment_id), patient_id=identity.user_id, start=payload.start
+    moved = container().reschedule_appointment.execute(
+        appointment_id=Id(appointment_id), actor_id=identity.user_id, start=payload.start
     )
     return AppointmentOut.of(moved)
+
+
+@router.post("/appointments/{appointment_id}/check-in", response=AppointmentOut, auth=None)
+def check_in(request: HttpRequest, appointment_id: UUID) -> AppointmentOut:
+    identity = current_identity(request)
+    changed = container().check_in_appointment.execute(
+        actor_id=identity.user_id, appointment_id=Id(appointment_id)
+    )
+    return AppointmentOut.of(changed)
+
+
+@router.post("/appointments/{appointment_id}/complete", response=AppointmentOut, auth=None)
+def complete(request: HttpRequest, appointment_id: UUID) -> AppointmentOut:
+    identity = current_identity(request)
+    changed = container().complete_appointment.execute(
+        actor_id=identity.user_id, appointment_id=Id(appointment_id)
+    )
+    return AppointmentOut.of(changed)
+
+
+@router.post("/appointments/{appointment_id}/no-show", response=AppointmentOut, auth=None)
+def no_show(request: HttpRequest, appointment_id: UUID) -> AppointmentOut:
+    identity = current_identity(request)
+    changed = container().mark_no_show.execute(
+        actor_id=identity.user_id, appointment_id=Id(appointment_id)
+    )
+    return AppointmentOut.of(changed)

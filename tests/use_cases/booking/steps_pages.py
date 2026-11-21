@@ -75,7 +75,9 @@ def page_offers(scene: Scene, actions: str) -> None:
 def posts_to_api(
     world: FakeWorld, scene: Scene, web: Client, who: str, body: str, action: str
 ) -> None:
-    caller = scene.caller if who == "caller" else None
+    caller = scene.caller if who in ("caller", "clinician") else None
+    if who == "clinician" and caller is not None and caller not in world.users.rows:
+        world.users.save(patient_user(caller, email="dr@example.org", role=Role.CLINICIAN))
     open_session(world, web, caller or scene.patient)
     url = f"/api/v1/appointments/{mine(scene).id}/{action}"
     scene.page = web.post(url, body, content_type="application/json")

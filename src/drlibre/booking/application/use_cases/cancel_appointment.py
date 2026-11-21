@@ -2,11 +2,12 @@ from drlibre.audit.application.ports.outbound import AuditEntry, AuditLog
 from drlibre.booking.application.ports.inbound import Appointment, CancelAppointment
 from drlibre.booking.application.ports.outbound import (
     Appointments,
+    BookingDirectory,
     BookingNotices,
     ScheduleLocks,
     SlotRefresh,
 )
-from drlibre.booking.application.use_cases.view_appointment import own_appointment
+from drlibre.booking.application.use_cases.own_clinician_appointment import own_appointment_of
 from drlibre.booking.application.use_cases.waitlist_offers import WaitlistOffers
 from drlibre.booking.domain import booking_rules
 from drlibre.shared_kernel.clock import Clock
@@ -23,6 +24,7 @@ class CancelAppointmentUseCase(CancelAppointment):
         uow: UnitOfWork,
         audit: AuditLog,
         appointments: Appointments,
+        directory: BookingDirectory,
         locks: ScheduleLocks,
         slot_refresh: SlotRefresh,
         notices: BookingNotices,
@@ -32,21 +34,28 @@ class CancelAppointmentUseCase(CancelAppointment):
         self._uow = uow
         self._audit = audit
         self._appointments = appointments
+        self._directory = directory
         self._locks = locks
         self._slot_refresh = slot_refresh
         self._notices = notices
         self._offers = offers
 
-    def execute(self, *, appointment_id: Id, patient_id: Id, reason: str) -> Appointment:
+    def execute(self, *, appointment_id: Id, actor_id: Id, reason: str) -> Appointment:
         with self._uow:
-            found = own_appointment(self._appointments, appointment_id, patient_id)
+            profile_id = self._directory.clinician_of_user(actor_id)
+            found = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
             self._locks.lock_clinician(found.clinician_id)
             self._locks.lock_patient(found.patient_id)
             # Read again under the locks, so a change committed meanwhile is seen.
-            current = own_appointment(self._appointments, appointment_id, patient_id)
+            current = own_appointment_of(self._appointments, appointment_id, actor_id, profile_id)
             now = self._clock.now()
             cancelled = current.cancelled(at=now, reason=reason)
-            broken = booking_rules.cancel_violations(start=current.start, now=now)
+            # The 24 hour window binds patients only.
+            broken = (
+                booking_rules.cancel_violations(start=current.start, now=now)
+                if profile_id is None
+                else ()
+            )
             if broken:
                 raise DomainError(
                     ErrorCode.RULE_VIOLATION,
@@ -57,7 +66,7 @@ class CancelAppointmentUseCase(CancelAppointment):
             self._slot_refresh.refresh(cancelled.clinician_id)
             self._audit.record(
                 AuditEntry.from_event(
-                    actor=patient_id,
+                    actor=actor_id,
                     action="booking.appointment_cancelled",
                     entity_type="appointment",
                     entity_id=cancelled.id,

@@ -6,7 +6,7 @@ import pytest
 from django.test import Client
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from drlibre.booking.application.ports.inbound import AgendaFilter, PatientAppointments
+from drlibre.booking.application.ports.inbound import AppointmentsQuery, PatientAppointments
 from drlibre.booking.domain.appointment import AppointmentStatus
 from drlibre.shared_kernel.ids import Id
 from tests.builders_booking import existing_appointment, patient_user
@@ -84,9 +84,11 @@ def someone_elses_appointment(
 
 @when("the patient lists their appointments")
 def lists(world: FakeWorld, scene: Scene, listing: Listing) -> None:
-    listing.found = world.app.list_patient_appointments.execute(
-        patient_id=scene.patient, agenda_filter=AgendaFilter()
+    found = world.app.list_appointments_as_caller.execute(
+        actor_id=scene.patient, query=AppointmentsQuery()
     )
+    assert isinstance(found, PatientAppointments)
+    listing.found = found
 
 
 @when(parsers.parse('the patient asks the API for "{query}"'))

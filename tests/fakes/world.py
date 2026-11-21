@@ -9,6 +9,7 @@ from drlibre.notifications.application.use_cases.reminded_appointments import (
     RemindedAppointmentsUseCase,
 )
 from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
+from tests.fakes.appointment_history import InMemoryAppointmentHistory
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
 from tests.fakes.booking import (
@@ -28,6 +29,7 @@ from tests.fakes.booking import (
     RecordingScheduleLocks,
     RecordingSlotRefresh,
 )
+from tests.fakes.clinician_agenda import InMemoryClinicianAgenda
 from tests.fakes.clock import FixedClock
 from tests.fakes.database_probe import InMemoryDatabaseProbe
 from tests.fakes.email_outbox import RecordingEmailOutbox
@@ -118,6 +120,13 @@ class FakeWorld:
         self.booking_slot_refresh = RecordingSlotRefresh()
         self.schedule_locks = RecordingScheduleLocks()
         self.patients = InMemoryPatients(self.users)
+        self.clinician_agenda = InMemoryClinicianAgenda(
+            appointments=self.booking_appointments,
+            users=self.users,
+            directory=self.booking_directory,
+            slots=self.slots,
+            holds=self.holds,
+        )
         self.notifications = InMemoryNotifications()
         self.notify = NotifyUseCase(clock=self.clock, notifications=self.notifications)
         self.notices = OutboxBookingNotices(
@@ -212,6 +221,8 @@ class FakeWorld:
                 issuer=self.issuer,
                 limiter=self.limiter,
                 agenda=self.agenda,
+                clinician_agenda=self.clinician_agenda,
+                history=InMemoryAppointmentHistory(self.audit),
                 waitlist=self.waitlist,
                 waitlist_queries=self.waitlist_queries,
                 staff=InMemoryStaff(self.users),

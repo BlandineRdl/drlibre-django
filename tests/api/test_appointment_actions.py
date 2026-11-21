@@ -9,6 +9,7 @@ from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
 from drlibre.booking.infrastructure.repositories import DjangoAppointments
 from drlibre.bootstrap.container import use_container
 from drlibre.identity.domain.user import Role
+from drlibre.shared_kernel.ids import Id
 from tests.builders import stored_session, stored_user
 from tests.integration.bookable import SLOT_START, Bookable, bookable
 
@@ -83,17 +84,41 @@ def test_a_patient_moves_through_the_api_to_a_free_slot_with_the_end_recomputed(
     assert taken.json()["details"]["rules"] == ["outside_availability"]
 
 
-def test_staff_and_anonymous_callers_cannot_change_a_patients_appointment(
-    client: Client, world: Bookable
+@pytest.mark.parametrize("role", [Role.CLINICIAN, Role.ADMIN], ids=["no-profile", "admin"])
+def test_an_admin_or_a_stranger_cannot_change_a_patients_appointment(
+    client: Client, world: Bookable, role: Role
 ) -> None:
-    """§14 : réservé aux patients en E4 ; un praticien reçoit forbidden."""
+    """§14 : seuls le patient et son praticien agissent ; l'admin attend E7."""
     appointment = booked(world, client)
-    clinician = Client()
-    clinician.cookies[COOKIE] = stored_session(stored_user(Role.CLINICIAN))
+    staff = Client()
+    staff.cookies[COOKIE] = stored_session(stored_user(role))
 
-    staff = post(clinician, appointment, "cancel", {"reason": "x"})
+    refused = [
+        post(staff, appointment, "cancel", {"reason": "x"}),
+        post(staff, appointment, "reschedule", {"start": "2026-11-23T09:00:00Z"}),
+        post(staff, appointment, "check-in", {}),
+    ]
     anonymous = post(Client(), appointment, "cancel", {"reason": "x"})
 
-    assert staff.status_code == 403
-    assert staff.json()["code"] == "forbidden"
+    assert [(r.status_code, r.json()["code"]) for r in refused] == [(403, "forbidden")] * 3
     assert anonymous.status_code == 401
+
+
+def test_a_patient_cannot_name_another_patient_or_a_room_when_booking(
+    client: Client, world: Bookable
+) -> None:
+    """Règle §5.4 : un patient ne choisit ni le patient ni la salle (forbidden)."""
+    patient = stored_user(Role.PATIENT, password=None)
+    client.cookies[COOKIE] = stored_session(patient)
+    body = {"type": str(world.scene.kind), "start": SLOT_START.isoformat()}
+
+    other = client.post(
+        "/api/v1/appointments", {**body, "patient": str(Id())}, content_type="application/json"
+    )
+    room = client.post(
+        "/api/v1/appointments",
+        {**body, "room": str(world.scene.room)},
+        content_type="application/json",
+    )
+
+    assert [(r.status_code, r.json()["code"]) for r in (other, room)] == [(403, "forbidden")] * 2

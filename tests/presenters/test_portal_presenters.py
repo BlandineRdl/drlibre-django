@@ -176,21 +176,21 @@ def test_the_week_strip_groups_free_slots_by_local_day_and_posts_their_start() -
 
     view = reschedule_page(entry(), week, error)
 
-    monday, tuesday = view.days[0], view.days[1]
+    monday, tuesday = view.strip.days[0], view.strip.days[1]
     assert (monday.label, monday.slots[0].label, monday.slots[0].value) == (
         "lun. 23/11",
         "09:00",
         "2026-11-23T08:00:00Z",
     )
     assert (tuesday.slots, tuesday.empty_text) == ((), "Aucun créneau")
-    assert view.week_label == "Semaine du lun. 23/11 au dim. 29/11"
-    assert view.previous_url == ""
-    assert view.next_url.endswith("/reschedule?week=2026-11-30")
+    assert view.strip.week_label == "Semaine du lun. 23/11 au dim. 29/11"
+    assert view.strip.previous_url == ""
+    assert view.strip.next_url.endswith("/reschedule?week=2026-11-30")
     assert view.reasons == (
         "le nouveau créneau commence dans moins de 120 min",
         "ce créneau n'est pas libre",
     )
-    assert view.empty_week_text == ""
+    assert view.strip.empty_week_text == ""
 
 
 def test_unread_notifications_are_marked_by_text_not_colour_alone() -> None:

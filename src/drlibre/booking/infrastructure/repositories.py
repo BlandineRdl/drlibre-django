@@ -75,6 +75,7 @@ def _fields(appointment: Appointment) -> dict[str, Any]:
         "reason": appointment.reason,
         "cancelled_at": appointment.cancelled_at,
         "cancellation_reason": appointment.cancellation_reason,
+        "clinical_notes": appointment.clinical_notes,
     }
 
 
@@ -98,6 +99,7 @@ def _appointment(row: AppointmentRecord) -> Appointment:
         reason=row.reason,
         cancelled_at=row.cancelled_at,
         cancellation_reason=row.cancellation_reason,
+        clinical_notes=row.clinical_notes,
     )
 
 

@@ -70,7 +70,7 @@ def _entry(identity: Identity, appointment_id: UUID) -> AgendaEntry:
     return listed
 
 
-def _private(response: HttpResponse) -> HttpResponse:
+def private(response: HttpResponse) -> HttpResponse:
     response["Cache-Control"] = "no-store"
     return response
 
@@ -81,14 +81,14 @@ def home(request: HttpRequest) -> HttpResponse:
     identity = current_identity(request)
     unread = container().count_unread.execute(recipient_id=identity.user_id)
     view = home_page(identity.full_name, _agenda(identity), unread)
-    return _private(render(request, "portal/home.html", {"view": view}))
+    return private(render(request, "portal/home.html", {"view": view}))
 
 
 @require_GET
 @require_role(Role.PATIENT)
 def appointments(request: HttpRequest) -> HttpResponse:
     view = appointments_page(_agenda(current_identity(request)), request.GET.get("done", ""))
-    return _private(render(request, "portal/appointments.html", {"view": view}))
+    return private(render(request, "portal/appointments.html", {"view": view}))
 
 
 @require_http_methods(["GET", "POST"])
@@ -102,7 +102,7 @@ def cancel(request: HttpRequest, appointment_id: UUID) -> HttpResponse:
     try:
         container().cancel_appointment.execute(
             appointment_id=entry.appointment.id,
-            patient_id=identity.user_id,
+            actor_id=identity.user_id,
             reason=values["reason"],
         )
     except DomainError as error:
@@ -148,7 +148,7 @@ def reschedule(request: HttpRequest, appointment_id: UUID) -> HttpResponse:
     try:
         container().reschedule_appointment.execute(
             appointment_id=entry.appointment.id,
-            patient_id=identity.user_id,
+            actor_id=identity.user_id,
             start=_start(request.POST.get("start", "")),
         )
     except DomainError as error:
@@ -173,7 +173,7 @@ def appointment_calendar(request: HttpRequest, appointment_id: UUID) -> HttpResp
     )
     response = HttpResponse(text, content_type="text/calendar; charset=utf-8")
     response["Content-Disposition"] = 'attachment; filename="rendez-vous.ics"'
-    return _private(response)
+    return private(response)
 
 
 @require_GET
@@ -184,7 +184,7 @@ def notifications(request: HttpRequest) -> HttpResponse:
         request=PageRequest.from_query(page=request.GET.get("page"), search=None),
     )
     view = notifications_page(page, settings.TIME_ZONE)
-    return _private(render(request, "portal/notifications.html", {"view": view}))
+    return private(render(request, "portal/notifications.html", {"view": view}))
 
 
 @require_POST
@@ -211,7 +211,7 @@ def profile(request: HttpRequest) -> HttpResponse:
             has_password=identity.has_password,
             notice=request.GET.get("done", ""),
         )
-        return _private(render(request, "portal/profile.html", {"view": view}))
+        return private(render(request, "portal/profile.html", {"view": view}))
     values = {key: request.POST.get(key, "") for key in ("phone", "birth_date")}
     try:
         c.update_profile.execute(user_id=identity.user_id, **values)
@@ -250,7 +250,7 @@ def _waitlist_page(
     )
     refused = form_error or error
     status = refused.code.http_status if refused else 200
-    return _private(render(request, "portal/waitlist.html", {"view": view}, status=status))
+    return private(render(request, "portal/waitlist.html", {"view": view}, status=status))
 
 
 @require_http_methods(["GET", "POST"])

@@ -3,11 +3,12 @@ from datetime import date, datetime
 from typing import Protocol
 
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus
-from drlibre.booking.domain.booking_rules import PatientAction
+from drlibre.booking.domain.booking_rules import ClinicianAction, PatientAction
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
 from drlibre.booking.domain.waitlist import WaitlistEntry
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import Page, PageRequest
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +122,10 @@ class BookingDirectory(Protocol):
 
     def venue(self, clinician_id: Id) -> Venue | None:
         """The clinician's hospital and name, or None when unknown."""
+        ...
+
+    def clinician_of_user(self, user_id: Id) -> Id | None:
+        """The clinician profile id of the user, or None when the user holds none."""
         ...
 
 
@@ -349,6 +354,102 @@ class AgendaEntry:
 class PatientAgenda(Protocol):
     def entries(self, patient_id: Id, agenda_filter: AgendaFilter) -> tuple[AgendaEntry, ...]:
         """The patient's appointments matching the filter, by start, actions left empty."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianFilter:
+    """Optional narrowing of a clinician's agenda; the range bounds the start, end excluded."""
+
+    patient_id: Id | None = None
+    status: AppointmentStatus | None = None
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianEntry:
+    """An appointment with the patient, type and room, as the clinician's agenda shows it."""
+
+    appointment: Appointment
+    patient_name: str
+    patient_phone: str | None
+    patient_birth_date: date | None
+    appointment_type: str
+    type_colour: str
+    room: str | None
+    actions: frozenset[ClinicianAction] = frozenset()
+
+
+@dataclass(frozen=True, slots=True)
+class ClinicianPatient:
+    """A patient seen by the clinician, with their last and next visit."""
+
+    patient_id: Id
+    full_name: str
+    phone: str | None
+    last_visit: datetime | None
+    next_visit: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class RoomLabel:
+    id: Id
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class RoomBooking:
+    """A room in use; the patient is named only on the clinician's own appointments."""
+
+    room_id: Id
+    start: datetime
+    end: datetime
+    patient_name: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RoomsDay:
+    rooms: tuple[RoomLabel, ...]
+    bookings: tuple[RoomBooking, ...]
+
+
+class ClinicianAgenda(Protocol):
+    def entries(
+        self, clinician_id: Id, agenda_filter: ClinicianFilter
+    ) -> tuple[ClinicianEntry, ...]:
+        """The clinician's appointments matching the filter, by start, notes and actions empty."""
+        ...
+
+    def detail(self, appointment_id: Id) -> ClinicianEntry | None:
+        """One appointment with its clinical notes, or None when unknown."""
+        ...
+
+    def patients(
+        self, clinician_id: Id, request: PageRequest, now: datetime
+    ) -> Page[ClinicianPatient]:
+        """Patients with an appointment of the clinician, by name, searched on the name."""
+        ...
+
+    def room_day(self, clinician_id: Id, start: datetime, end: datetime) -> RoomsDay:
+        """Active rooms of the clinician's department and their active appointments in range."""
+        ...
+
+    def next_free_slot(self, clinician_id: Id, after: datetime, now: datetime) -> datetime | None:
+        """The clinician's earliest stored free slot from the instant on, any type, not held."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryEntry:
+    actor_id: Id | None
+    action: str
+    at: datetime
+
+
+class AppointmentHistory(Protocol):
+    def entries_of(self, appointment_id: Id) -> tuple[HistoryEntry, ...]:
+        """The appointment's audit entries, oldest first; empty when there is none."""
         ...
 
 

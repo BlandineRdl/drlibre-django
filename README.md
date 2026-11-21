@@ -8,9 +8,10 @@ Hospital appointment scheduling, a hexagonal Django back end. Portfolio sandbox,
 4. Sign in at `localhost:8000/sign-in` with a demo account (fictitious, localhost only), password `drlibre-demo-2026`:
    - admin: `admin@drlibre.localhost`
    - clinician: `clinicien@drlibre.localhost`
+   - second clinician, same department: `clinicien2@drlibre.localhost`
    - patient: `patient@drlibre.localhost`
    - passwordless patient, signs in by email link only: `visiteur@drlibre.localhost`
-5. The demo clinician works Monday to Friday, 09:00–12:00 and 14:00–17:00 (Paris): edit at `/workspace/availability/` and `/workspace/time-off/`; signed in, `GET /api/v1/slots?type=…&clinician=…&start=…&end=…` lists free slots.
+5. Both demo clinicians work Monday to Friday, 09:00–12:00 and 14:00–17:00 (Paris): edit at `/workspace/availability/` and `/workspace/time-off/`; signed in, `GET /api/v1/slots?type=…&clinician=…&start=…&end=…` lists free slots.
 
 ## Develop
 1. `uv sync` and `uv run pre-commit install`.

@@ -22,6 +22,7 @@ from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.unit_of_work import UnitOfWork
+from drlibre.shared_kernel.validation import invalid_field
 
 
 class Placement:
@@ -116,9 +117,10 @@ class Placement:
         for_patient: bool,
         ignoring_hold: Id | None = None,
         reason: str | None = None,
+        room_id: Id | None = None,
         announce: bool = True,
     ) -> Appointment:
-        """Book for the patient on the actor's behalf; staff skip the patient-only rules."""
+        """Book for the patient on the actor's behalf; staff skip patient rules, may name a room."""
         with self._uow:
             self._locks.lock_clinician(clinician_id)
             self._locks.lock_patient(patient_id)
@@ -137,11 +139,16 @@ class Placement:
                 ignoring_hold=ignoring_hold,
                 for_patient=for_patient,
             )
+            end = start + duration
             appointment = Appointment.book(
                 patient_id=patient_id,
                 clinician_id=clinician_id,
                 appointment_type_id=kind.id,
-                room_id=self.room(kind, clinician, start, start + duration),
+                room_id=(
+                    self.room(kind, clinician, start, end)
+                    if room_id is None
+                    else self.named_room(kind, room_id, start, end)
+                ),
                 start=start,
                 duration=duration,
                 source=source,
@@ -210,7 +217,9 @@ class Placement:
             now=now,
             type_online=kind.bookable_online,
             open_online_count=(
-                0 if patient_id is None else self._appointments.open_online_count(patient_id, now)
+                self._appointments.open_online_count(patient_id, now)
+                if for_patient and patient_id is not None
+                else 0
             ),
             is_free_slot=self._free_slots.is_free(
                 clinician_id, kind.id, start, ignoring_hold=ignoring_hold
@@ -245,6 +254,21 @@ class Placement:
             if room_id not in busy:
                 return room_id
         raise DomainError(ErrorCode.NO_ROOM_AVAILABLE, "Aucune salle libre à cette heure.")
+
+    def named_room(self, kind: BookableType, room_id: Id, start: datetime, end: datetime) -> Id:
+        """The named active room of the type's department; not_found, else conflict when taken."""
+        if not kind.needs_room:
+            raise invalid_field("room", "Ce type de rendez-vous ne prend pas de salle.")
+        self._locks.lock_rooms(kind.department_id)
+        if room_id not in self._directory.rooms(kind.department_id):
+            raise DomainError(ErrorCode.NOT_FOUND, "Salle introuvable.")
+        if self._appointments.busy_rooms((room_id,), start, end):
+            raise DomainError(
+                ErrorCode.CONFLICT,
+                "Un rendez-vous actif occupe déjà cette salle.",
+                {"resources": ["room"]},
+            )
+        return room_id
 
     def _booked_entry(self, appointment: Appointment, actor_id: Id) -> AuditEntry:
         metadata: dict[str, object] = {

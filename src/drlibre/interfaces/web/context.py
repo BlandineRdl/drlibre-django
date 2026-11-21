@@ -5,11 +5,13 @@ from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import HOMES, identity_of
 from drlibre.interfaces.web.presenters.portal import notifications_label
+from drlibre.interfaces.web.presenters.workspace import workspace_nav
 
 
 def shell(request: HttpRequest) -> dict[str, object]:
     identity = identity_of(request)
     is_patient = identity is not None and identity.role is Role.PATIENT
+    is_clinician = identity is not None and identity.role is Role.CLINICIAN
     unread = (
         container().count_unread.execute(recipient_id=identity.user_id)
         if identity is not None and is_patient
@@ -21,7 +23,8 @@ def shell(request: HttpRequest) -> dict[str, object]:
             "signed_in": identity is not None,
             "home_url": HOMES[identity.role] if identity else "",
             "can_change_password": identity is not None and identity.has_password,
-            "is_clinician": identity is not None and identity.role is Role.CLINICIAN,
+            "is_clinician": is_clinician,
+            "workspace_nav": workspace_nav(request.path) if is_clinician else (),
             "is_patient": is_patient,
             "notifications_label": notifications_label(unread),
         },

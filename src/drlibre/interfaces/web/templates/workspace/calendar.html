@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ view.title }}{% endblock %}
+{% block timezone %}Heures affichées dans le fuseau {{ view.time_zone }}.{% endblock %}
+{% block content %}
+<h1>{{ view.title }}</h1>
+<p>{{ view.week_label }} · Fuseau : {{ view.time_zone }}</p>
+<nav aria-label="Semaines" class="pagination">
+  <a href="{{ view.previous_url }}">‹ Semaine précédente</a>
+  <a href="{{ view.this_url }}">Cette semaine</a>
+  <a href="{{ view.next_url }}">Semaine suivante ›</a>
+</nav>
+<div class="overflow-auto week-grid" role="region" aria-labelledby="week-caption" tabindex="0">
+  <table>
+    <caption id="week-caption">{{ view.week_label }}, heure locale ({{ view.time_zone }}) : chaque rendez-vous nommé par son type, « Absence » pour une absence, « Disponible » pour une plage libre</caption>
+    <thead><tr><th scope="col">Heure</th>{% for day in view.days %}<th scope="col"><abbr title="{{ day.long }}">{{ day.short }}</abbr></th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in view.rows %}
+      <tr><th scope="row">{{ row.time }}</th>{% for cell in row.cells %}<td{% if cell.kind %} class="{{ cell.kind }}"{% endif %}{% if cell.colour %} style="--type-colour:{{ cell.colour }}"{% endif %}>{% if cell.url %}<a href="{{ cell.url }}">{{ cell.text }}</a>{% else %}{{ cell.text }}{% endif %}</td>{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

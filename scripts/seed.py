@@ -77,6 +77,14 @@ ROOMS = (
         "equipment": "ECG, Tensiomètre",
     },
     {
+        "code": "HNORD-C102",
+        "name": "Consultation 102",
+        "department": "HNORD-CARD",
+        "floor": "1",
+        "capacity": "1",
+        "equipment": "Tensiomètre",
+    },
+    {
         "code": "HNORD-P201",
         "name": "Consultation 201",
         "department": "HNORD-PEDIA",
@@ -120,12 +128,16 @@ TYPES = (
     },
 )
 ADMIN_EMAIL = "admin@drlibre.localhost"
+CLINICIAN_EMAIL = "clinicien@drlibre.localhost"
+# A second clinician of the same department, so journeys see another clinician's rows.
+SECOND_CLINICIAN_EMAIL = "clinicien2@drlibre.localhost"
 VISITOR_EMAIL = "visiteur@drlibre.localhost"
 # The honorific is the profile's title (spec §3.1); seeds before it put it in the name too.
 LEGACY_CLINICIAN_NAME = "Dr Claire Martin"
 USERS = (
     ("ADMIN", "Alice Admin", ADMIN_EMAIL),
-    ("CLINICIAN", "Claire Martin", "clinicien@drlibre.localhost"),
+    ("CLINICIAN", "Claire Martin", CLINICIAN_EMAIL),
+    ("CLINICIAN", "Hugo Bernard", SECOND_CLINICIAN_EMAIL),
     ("PATIENT", "Paul Patient", "patient@drlibre.localhost"),
 )
 
@@ -223,17 +235,29 @@ def _rename_legacy(app: Container, user_id: Id, name: str) -> None:
     )
 
 
+# Email, default room and bio of each demo clinician of HNORD-CARD.
+CLINICIANS = (
+    (CLINICIAN_EMAIL, "HNORD-C101", "Cardiologue, consultations adultes."),
+    (SECOND_CLINICIAN_EMAIL, "HNORD-C102", "Cardiologue, suivi des insuffisants cardiaques."),
+)
+
+
 def seed_clinician_profile(app: Container) -> None:
-    clinician = _user_id(app, "clinicien@drlibre.localhost")
+    for email, room, bio in CLINICIANS:
+        _seed_clinician_profile(app, email, room, bio)
+
+
+def _seed_clinician_profile(app: Container, email: str, room: str, bio: str) -> None:
+    clinician = _user_id(app, email)
     q = app.reference_queries
     if clinician is None:
         return
     fields = {
         "department_id": str(_by_code(q.departments, "HNORD-CARD")),
         "specialty_id": str(_by_code(q.specialties, "CARDIO")),
-        "default_room_id": str(_by_code(q.rooms, "HNORD-C101")),
+        "default_room_id": str(_by_code(q.rooms, room)),
         "title": "Dr",
-        "bio": "Cardiologue, consultations adultes.",
+        "bio": bio,
     }
     profile = q.clinician_profile_of(clinician)
     if profile is not None:
@@ -256,7 +280,12 @@ DEMO_RULES = tuple(
 
 
 def seed_availability(app: Container) -> None:
-    clinician = _user_id(app, "clinicien@drlibre.localhost")
+    for email, _, _ in CLINICIANS:
+        _seed_availability(app, email)
+
+
+def _seed_availability(app: Container, email: str) -> None:
+    clinician = _user_id(app, email)
     profile = app.reference_queries.clinician_profile_of(clinician) if clinician else None
     if clinician is None or profile is None:
         return
@@ -282,6 +311,45 @@ def seed_passwordless_patient(app: Container) -> None:
             "updated_at": now,
         },
     )
+
+
+DEMO_APPOINTMENTS = 3
+DEMO_ZONE = ZoneInfo("Europe/Paris")
+
+
+def _next_working_day(now: datetime) -> datetime:
+    """Local midnight of the next Monday to Friday after today, in the demo hospital zone."""
+    day = now.astimezone(DEMO_ZONE).date() + timedelta(days=1)
+    while day.weekday() >= 5:
+        day += timedelta(days=1)
+    return datetime.combine(day, time(), tzinfo=DEMO_ZONE)
+
+
+def seed_demo_appointments(app: Container) -> None:
+    """A few BOOKED appointments of the passwordless patient on the demo clinician's next day."""
+    clinician = _user_id(app, CLINICIAN_EMAIL)
+    patient = _user_id(app, VISITOR_EMAIL)
+    q = app.reference_queries
+    profile = q.clinician_profile_of(clinician) if clinician else None
+    kind = _by_code(q.appointment_types, "HNORD-CONSULT")
+    if clinician is None or patient is None or profile is None or kind is None:
+        return
+    start = _next_working_day(datetime.now(UTC))
+    end = start + timedelta(days=1)
+    seeded = AppointmentRecord.objects.filter(
+        patient_id=patient.value, clinician_id=profile.id.value, start__gte=start, start__lt=end
+    )
+    if seeded.exists():
+        return
+    for _ in range(DEMO_APPOINTMENTS):
+        slots = app.find_free_slots.execute(
+            appointment_type_id=kind, clinician_id=profile.id, start=start, end=end
+        )
+        if not slots:
+            return
+        app.book_appointment_as_caller.execute(
+            actor_id=clinician, patient_id=patient, appointment_type_id=kind, start=slots[0].start
+        )
 
 
 # Load size, bulk inserts through the ORM: 50k rows through the use cases would take hours.
@@ -472,6 +540,7 @@ SEEDERS: list[Callable[[Container], None]] = [
     seed_clinician_profile,
     seed_availability,
     seed_passwordless_patient,
+    seed_demo_appointments,
 ]
 
 

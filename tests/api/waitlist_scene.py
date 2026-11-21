@@ -60,7 +60,7 @@ def waitlist_scene(*, offered: bool = True) -> Generator[Waiting]:
 
         def cancel() -> None:
             app.cancel_appointment.execute(
-                appointment_id=freed.id, patient_id=leaving.id, reason="Empêchement"
+                appointment_id=freed.id, actor_id=leaving.id, reason="Empêchement"
             )
 
         if offered:

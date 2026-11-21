@@ -62,7 +62,7 @@ def test_two_cancellations_at_once_offer_the_oldest_entry_only_once() -> None:
             def run() -> object:
                 return app.cancel_appointment.execute(
                     appointment_id=appointment.id,
-                    patient_id=appointment.patient_id,
+                    actor_id=appointment.patient_id,
                     reason="Empêchement",
                 )
 

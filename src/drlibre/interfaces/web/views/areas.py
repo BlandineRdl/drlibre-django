@@ -16,10 +16,3 @@ def console_home(request: HttpRequest) -> HttpResponse:
         "section_nav": console_nav(request.path),
     }
     return render(request, "areas/home.html", context)
-
-
-@require_GET
-@require_role(Role.CLINICIAN)
-def workspace_home(request: HttpRequest) -> HttpResponse:
-    context = {"title": "Mon espace praticien", "intro": "Votre agenda apparaîtra ici."}
-    return render(request, "areas/home.html", context)

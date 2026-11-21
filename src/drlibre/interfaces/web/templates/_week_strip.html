@@ -1,0 +1,22 @@
+<nav aria-label="Semaines" class="pagination">
+  {% if strip.previous_url %}<a href="{{ strip.previous_url }}">‹ Semaine précédente</a>{% endif %}
+  <{{ week_level|default:"h2" }}>{{ strip.week_label }}</{{ week_level|default:"h2" }}>
+  {% if strip.next_url %}<a href="{{ strip.next_url }}">Semaine suivante ›</a>{% endif %}
+</nav>
+{% if strip.empty_week_text %}<p>{{ strip.empty_week_text }}</p>{% endif %}
+<form method="post" action="{{ strip.action }}">
+  {% csrf_token %}
+  <input type="hidden" name="week" value="{{ strip.week_value }}">
+  <div class="week-strip">
+    {% for day in strip.days %}
+    <section aria-labelledby="day-{{ forloop.counter }}">
+      <{{ day_level|default:"h3" }} id="day-{{ forloop.counter }}">{{ day.label }}</{{ day_level|default:"h3" }}>
+      {% if day.slots %}
+      <ul class="slot-list">
+        {% for slot in day.slots %}<li><button type="submit" name="start" value="{{ slot.value }}" class="outline secondary" aria-describedby="day-{{ forloop.parentloop.counter }}">{{ slot.label }}</button></li>{% endfor %}
+      </ul>
+      {% else %}<p>{{ day.empty_text }}</p>{% endif %}
+    </section>
+    {% endfor %}
+  </div>
+</form>

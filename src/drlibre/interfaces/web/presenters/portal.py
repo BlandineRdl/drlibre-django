@@ -140,10 +140,7 @@ class DayView:
 
 
 @dataclass(frozen=True, slots=True)
-class ReschedulePageView:
-    appointment: AppointmentCardView
-    refusal: str
-    reasons: tuple[str, ...]
+class WeekStripView:
     action: str
     week_label: str
     week_value: str
@@ -151,6 +148,14 @@ class ReschedulePageView:
     next_url: str
     days: tuple[DayView, ...]
     empty_week_text: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReschedulePageView:
+    appointment: AppointmentCardView
+    refusal: str
+    reasons: tuple[str, ...]
+    strip: WeekStripView
     back_url: str
     time_zone: str
 
@@ -296,14 +301,8 @@ def cancel_page(
     return CancelPageView(appointment_card(entry), form, entry.time_zone)
 
 
-def _week_url(entry: AgendaEntry, monday: date | None) -> str:
-    return f"{appointment_url(entry, 'reschedule')}?week={monday.isoformat()}" if monday else ""
-
-
-def reschedule_page(
-    entry: AgendaEntry, week: FreeWeek, error: DomainError | None = None
-) -> ReschedulePageView:
-    """The week strip of the clinician's free slots, each posting its start; refusals inline."""
+def week_strip(week: FreeWeek, action: str) -> WeekStripView:
+    """The week's free slots by local day, each posting its start, with week links."""
     zone = week.time_zone
     by_day: dict[date, list[SlotButtonView]] = {
         week.monday + timedelta(days=n): [] for n in range(7)
@@ -313,22 +312,35 @@ def reschedule_page(
         if at.date() in by_day:
             by_day[at.date()].append(SlotButtonView(f"{at:%H:%M}", slot_instant(slot.start)))
     sunday = week.monday + timedelta(days=6)
-    return ReschedulePageView(
-        appointment=appointment_card(entry),
-        refusal=refusal_text(error) if error else "",
-        reasons=rule_reasons(error),
-        action=appointment_url(entry, "reschedule"),
+
+    def week_url(monday: date | None) -> str:
+        return f"{action}?week={monday.isoformat()}" if monday else ""
+
+    return WeekStripView(
+        action=action,
         week_label=f"Semaine du {day_label(week.monday)} au {day_label(sunday)}",
         week_value=week.monday.isoformat(),
-        previous_url=_week_url(entry, week.previous_monday),
-        next_url=_week_url(entry, week.next_monday),
+        previous_url=week_url(week.previous_monday),
+        next_url=week_url(week.next_monday),
         days=tuple(
             DayView(day_label(day), tuple(slots), "" if slots else "Aucun créneau")
             for day, slots in by_day.items()
         ),
         empty_week_text="" if week.slots else "Aucun créneau libre cette semaine.",
+    )
+
+
+def reschedule_page(
+    entry: AgendaEntry, week: FreeWeek, error: DomainError | None = None
+) -> ReschedulePageView:
+    """The week strip of the clinician's free slots, each posting its start; refusals inline."""
+    return ReschedulePageView(
+        appointment=appointment_card(entry),
+        refusal=refusal_text(error) if error else "",
+        reasons=rule_reasons(error),
+        strip=week_strip(week, appointment_url(entry, "reschedule")),
         back_url=APPOINTMENTS_URL,
-        time_zone=zone,
+        time_zone=week.time_zone,
     )
 
 

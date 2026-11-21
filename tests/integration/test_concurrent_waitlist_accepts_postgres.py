@@ -66,7 +66,7 @@ def test_an_accept_racing_a_booking_of_its_slot_fails_and_puts_the_entry_back() 
         )
         DjangoWaitlist().add(entry)
         app.cancel_appointment.execute(
-            appointment_id=freed.id, patient_id=leaving.id, reason="Empêchement"
+            appointment_id=freed.id, actor_id=leaving.id, reason="Empêchement"
         )
         other = stored_user(Role.PATIENT, password=None)
         adapters = world.at(NOW)
