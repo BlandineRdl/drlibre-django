@@ -86,7 +86,7 @@ Feature: Chaque résultat montre ses prochaines disponibilités
     When the visitor opens "/api/v1/slots?type=[type:Consultation cardio]&clinician=[id:Dr Alice Martin]&start=2026-11-23T00:00:00Z&end=2026-11-24T00:00:00Z"
     Then the free slots start at "08:20" UTC
 
-  Scenario: Règle §6.2 : un créneau dont toutes les salles du département sont prises n'est pas proposé (une salle libre suffit)
+  Scenario: Règle §6.2 : un créneau reste proposé tant qu'une salle active du département est libre
     Given the type "Consultation cardio" needs a room
     And the room "Box 1" of "Cardiologie"
     And the room "Box 2" of "Cardiologie"

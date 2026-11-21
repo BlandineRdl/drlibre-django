@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from django.contrib.postgres.fields import RangeBoundary
+from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
 from django.db.models import Q, QuerySet
 
 from drlibre.booking.application.ports.inbound import (
@@ -8,7 +10,11 @@ from drlibre.booking.application.ports.inbound import (
     BookedPeriod,
     RoomPeriod,
 )
-from drlibre.booking.infrastructure.django.models import AppointmentRecord, WaitlistEntryRecord
+from drlibre.booking.infrastructure.django.models import (
+    AppointmentRecord,
+    TsTzRange,
+    WaitlistEntryRecord,
+)
 from drlibre.booking.infrastructure.repositories import active_appointments
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
@@ -47,8 +53,14 @@ class DjangoBookingQueries(AppointmentQueries):
     def room_periods(
         self, room_ids: tuple[Id, ...], *, start: datetime, end: datetime
     ) -> tuple[RoomPeriod, ...]:
-        rows = active_appointments().filter(
-            room_id__in=[r.value for r in room_ids], start__lt=end, end__gt=start
+        # Same range expression and predicate as the GiST `appointment_room_period` index.
+        rows = (
+            active_appointments()
+            .annotate(period=TsTzRange("start", "end", RangeBoundary()))
+            .filter(
+                room_id__in=[r.value for r in room_ids],
+                period__overlap=DateTimeTZRange(start, end),
+            )
         )
         fields = rows.values_list("id", "room_id", "start", "end")
         return tuple(RoomPeriod(Id(pk), Id(room), a, b) for pk, room, a, b in fields)

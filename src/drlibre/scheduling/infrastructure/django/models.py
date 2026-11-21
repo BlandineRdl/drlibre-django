@@ -46,7 +46,8 @@ class TimeOffModel(TrackedRecord):
         return f"{self.start}-{self.end}"
 
 
-class SlotModel(TrackedRecord):
+class SlotModel(models.Model):
+    # Derived cache, not a §3 record: no provenance columns.
     # Rebuilt per clinician by RefreshSlots; indexed for the department and clinician reads.
     clinician = models.ForeignKey(
         "organisation.ClinicianProfileRecord",

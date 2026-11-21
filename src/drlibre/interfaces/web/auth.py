@@ -7,9 +7,9 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
 
+from drlibre.bootstrap import act_as, stop_acting
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
-from drlibre.persistence.provenance import act_as, stop_acting
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 type View = Callable[..., HttpResponseBase]

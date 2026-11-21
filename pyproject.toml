@@ -73,6 +73,7 @@ forbidden_modules = [
     "drlibre.*.infrastructure",
     "drlibre.interfaces",
     "drlibre.bootstrap",
+    "drlibre.persistence",
 ]
 
 [[tool.importlinter.contracts]]
@@ -86,6 +87,7 @@ forbidden_modules = [
     "drlibre.*.infrastructure",
     "drlibre.interfaces",
     "drlibre.bootstrap",
+    "drlibre.persistence",
 ]
 
 [[tool.importlinter.contracts]]
@@ -96,8 +98,27 @@ forbidden_modules = [
     "drlibre.*.infrastructure",
     "drlibre.*.domain",
     "drlibre.*.application.use_cases",
+    "drlibre.persistence",
 ]
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Persistence imports no context"
+type = "forbidden"
+source_modules = ["drlibre.persistence"]
+forbidden_modules = [
+    "drlibre.audit",
+    "drlibre.booking",
+    "drlibre.health",
+    "drlibre.identity",
+    "drlibre.notifications",
+    "drlibre.organisation",
+    "drlibre.reporting",
+    "drlibre.scheduling",
+    "drlibre.search",
+    "drlibre.interfaces",
+    "drlibre.bootstrap",
+]
 
 [[tool.importlinter.contracts]]
 name = "Each context layers infrastructure over application over domain"
