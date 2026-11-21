@@ -5,7 +5,7 @@
 - `src/drlibre/shared_kernel/`: `Id`, `Clock` port, `Result`, `ErrorCode` (spec 4), `DomainError`, `UnitOfWork` port, `Page`/`PageRequest` (20 rows), `FieldErrors` and `Dependents` (`has_dependents` lists).
 - `src/drlibre/audit/`: write side of the audit log; `AuditEntry` refuses personal metadata, `DjangoAuditLog` (append-only), `DjangoUnitOfWork` (`transaction.atomic`); `AuditQueries` inbound port tells identity who acted.
 - `src/drlibre/identity/`: users, password sign-in, sessions (token hash), lockout (Redis), password change, user management, `authorize_owned` guard; `StaffLookup` inbound port for other contexts.
-- `src/drlibre/organisation/`: hospitals, specialties, departments, rooms, appointment types, clinician profiles; `DjangoReferenceQueries` reads; `SchedulingSlotRefresh` and `SchedulingScheduleDependents` reach scheduling through its ports.
+- `src/drlibre/organisation/`: hospitals, specialties, departments, rooms, appointment types, clinician profiles; `DjangoReferenceQueries` reads; `SchedulingSlotRefresh` and `ScheduleAndBookingDependents` reach scheduling through its ports.
 - `src/drlibre/health/`: health check context; `DatabaseProbe` port, PostgreSQL adapter, `SystemClock`.
 - `src/drlibre/scheduling/`: availability rules, time off, pure `SlotEngine`; `scheduling_slot` table rebuilt by `RefreshSlots`, read by `FindFreeSlots`; `ExtendSlotHorizon` daily job; `NoAppointmentsYet` null adapter until E3.
 - `src/drlibre/booking/`: appointments, booking holds, verification codes, booking rules, round robin and placement.

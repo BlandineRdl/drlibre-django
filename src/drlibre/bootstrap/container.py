@@ -31,7 +31,7 @@ from drlibre.booking.application.ports.outbound import (
     ScheduleLocks,
     VerificationCodes,
 )
-from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefresh
+from drlibre.booking.application.ports.outbound import SlotRefresh as BookingSlotRefreshPort
 from drlibre.booking.application.use_cases.book_appointment import BookAppointmentUseCase
 from drlibre.booking.application.use_cases.create_hold import CreateHoldUseCase
 from drlibre.booking.application.use_cases.expire_holds import ExpireHoldsUseCase
@@ -42,6 +42,7 @@ from drlibre.booking.application.use_cases.resend_code import ResendCodeUseCase
 from drlibre.booking.application.use_cases.verify_hold import VerifyHoldUseCase
 from drlibre.booking.application.use_cases.view_appointment import ViewAppointmentUseCase
 from drlibre.booking.application.use_cases.view_hold import ViewHoldUseCase
+from drlibre.booking.infrastructure.booking_slot_refresh import BookingSlotRefresh
 from drlibre.booking.infrastructure.code_issuer import HmacCodeIssuer
 from drlibre.booking.infrastructure.directory import OrganisationBookingDirectory
 from drlibre.booking.infrastructure.free_slots import SchedulingFreeSlots
@@ -59,9 +60,6 @@ from drlibre.booking.infrastructure.repositories import (
 )
 from drlibre.booking.infrastructure.round_robin_ledger import OrganisationRoundRobinLedger
 from drlibre.booking.infrastructure.schedule_locks import DjangoScheduleLocks
-from drlibre.booking.infrastructure.slot_refresh import (
-    SchedulingSlotRefresh as BookingSchedulingSlotRefresh,
-)
 from drlibre.health.application.ports.inbound import CheckHealth
 from drlibre.health.application.ports.outbound import DatabaseProbe
 from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
@@ -185,7 +183,9 @@ from drlibre.organisation.infrastructure.repositories import (
     DjangoRooms,
     DjangoSpecialties,
 )
-from drlibre.organisation.infrastructure.schedule_dependents import SchedulingScheduleDependents
+from drlibre.organisation.infrastructure.schedule_and_booking_dependents import (
+    ScheduleAndBookingDependents,
+)
 from drlibre.organisation.infrastructure.slot_refresh import SchedulingSlotRefresh
 from drlibre.organisation.infrastructure.staff_directory import IdentityStaffDirectory
 from drlibre.scheduling.application.ports.inbound import (
@@ -264,12 +264,13 @@ class BookingAdapters:
     appointments: BookingAppointments
     directory: BookingDirectory
     free_slots: FreeSlots
-    slot_refresh: BookingSlotRefresh
+    slot_refresh: BookingSlotRefreshPort
     locks: ScheduleLocks
     patients: Patients
     notices: BookingNotices
     ledger: RoundRobinLedger
     holds: Holds
+    open_holds: OpenHolds
     codes: VerificationCodes
     issuer: CodeIssuer
     limiter: RateLimiter
@@ -697,7 +698,7 @@ def _wire_booking(
         expire_holds=ExpireHoldsUseCase(
             clock=a.clock, uow=a.uow, audit=a.audit, holds=booking.holds, codes=booking.codes
         ),
-        open_holds=OpenHoldsUseCase(holds=booking.holds),
+        open_holds=booking.open_holds,
         view_hold=ViewHoldUseCase(clock=a.clock, holds=booking.holds),
         view_appointment=ViewAppointmentUseCase(appointments=booking.appointments),
     )
@@ -715,7 +716,8 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
     # Booking's queries and holds depend on nothing, so scheduling can read them first.
     booking_queries = DjangoBookingQueries()
     booking_holds = DjangoHolds()
-    slot_holds = BookingSlotHolds(OpenHoldsUseCase(holds=booking_holds))
+    open_holds = OpenHoldsUseCase(holds=booking_holds)
+    slot_holds = BookingSlotHolds(open_holds)
     clinician_appointments = BookingClinicianAppointments(booking_queries)
     rules, time_offs = DjangoAvailabilityRules(), DjangoTimeOffs()
     slot_store, slot_queries = DjangoSlotStore(), DjangoSlotQueries()
@@ -752,7 +754,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         departments=DjangoDepartments(),
         rooms=DjangoRooms(),
         appointment_types=DjangoAppointmentTypes(),
-        schedule=SchedulingScheduleDependents(
+        schedule=ScheduleAndBookingDependents(
             usage=availability_queries, appointments=booking_queries
         ),
         reference_queries=reference_queries,
@@ -776,7 +778,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
             appointments=DjangoAppointments(),
             directory=booking_directory,
             free_slots=SchedulingFreeSlots(is_slot_free, free_clinicians_at),
-            slot_refresh=BookingSchedulingSlotRefresh(refresh),
+            slot_refresh=BookingSlotRefresh(refresh),
             locks=DjangoScheduleLocks(),
             patients=patients,
             notices=OutboxBookingNotices(
@@ -789,6 +791,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
                 RecordRoundRobinAssignmentUseCase(profiles=profiles)
             ),
             holds=booking_holds,
+            open_holds=open_holds,
             codes=DjangoVerificationCodes(),
             issuer=HmacCodeIssuer(key=settings.SECRET_KEY),
             limiter=RedisRateLimiter(prefix=settings.RATE_LIMIT_PREFIX),

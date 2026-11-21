@@ -19,7 +19,9 @@ from drlibre.organisation.infrastructure.repositories import (
     DjangoRooms,
     DjangoSpecialties,
 )
-from drlibre.organisation.infrastructure.schedule_dependents import SchedulingScheduleDependents
+from drlibre.organisation.infrastructure.schedule_and_booking_dependents import (
+    ScheduleAndBookingDependents,
+)
 from drlibre.scheduling.infrastructure.queries import DjangoAvailabilityQueries
 from drlibre.shared_kernel.ids import Id
 from tests import builders_organisation as build
@@ -64,7 +66,7 @@ def stores(request: pytest.FixtureRequest) -> Stores:
         DjangoDepartments(),
         DjangoRooms(),
         DjangoAppointmentTypes(),
-        SchedulingScheduleDependents(
+        ScheduleAndBookingDependents(
             usage=DjangoAvailabilityQueries(), appointments=DjangoBookingQueries()
         ),
     )

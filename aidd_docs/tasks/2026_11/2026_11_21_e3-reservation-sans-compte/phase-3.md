@@ -22,7 +22,7 @@ status: done
 │   ├── directory.py                                       ✅  OrganisationBookingDirectory over organisation ReferenceQueries and identity StaffLookup
 │   ├── round_robin_ledger.py                              ✅  over organisation RecordRoundRobinAssignment
 │   ├── free_slots.py                                      ✅  SchedulingFreeSlots over scheduling FindFreeSlots
-│   ├── slot_refresh.py                                    ✅  SchedulingSlotRefresh over scheduling RefreshSlots
+│   ├── booking_slot_refresh.py                            ✅  BookingSlotRefresh over scheduling RefreshSlots
 │   ├── schedule_locks.py                                  ✅  clinician profile and patient row `select_for_update`
 │   └── patients.py                                        ✅  IdentityPatients over identity inbound ports
 ├── src/drlibre/identity/

@@ -5,7 +5,7 @@ from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
 
 
-class SchedulingScheduleDependents(ScheduleDependents):
+class ScheduleAndBookingDependents(ScheduleDependents):
     """Asks scheduling which rules use a room and booking which appointments use a record."""
 
     def __init__(self, *, usage: RoomUsage, appointments: AppointmentQueries) -> None:

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+from drlibre.booking.application.use_cases.open_holds import OpenHoldsUseCase
 from drlibre.booking.infrastructure.outbox_notices import OutboxBookingNotices
 from drlibre.bootstrap.container import Adapters, BookingAdapters, Container, wire
 from drlibre.identity.infrastructure.outbox_link_notices import OutboxLinkNotices
@@ -188,6 +189,7 @@ class FakeWorld:
                 notices=self.notices,
                 ledger=self.ledger,
                 holds=self.holds,
+                open_holds=OpenHoldsUseCase(holds=self.holds),
                 codes=self.codes,
                 issuer=self.issuer,
                 limiter=self.limiter,
