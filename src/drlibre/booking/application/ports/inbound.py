@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from drlibre.booking.application.ports.outbound import AgendaEntry, AgendaFilter
@@ -9,12 +9,15 @@ from drlibre.booking.domain.appointment import (
     AppointmentStatus,
 )
 from drlibre.booking.domain.booking_rules import BookingRule, PatientAction
+from drlibre.booking.domain.waitlist import WaitlistEntry, WaitlistStatus
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import Page, PageRequest
 
 __all__ = [
     "MAX_CANCELLATION_REASON",
+    "AcceptWaitlistOffer",
     "AgendaEntry",
     "AgendaFilter",
     "Appointment",
@@ -26,10 +29,13 @@ __all__ = [
     "CancelAppointment",
     "CreateHold",
     "ExpireHolds",
+    "ExpireWaitlist",
     "HeldPeriod",
     "HoldCreated",
     "HoldSummary",
+    "JoinWaitlist",
     "ListPatientAppointments",
+    "OfferCancelledSlot",
     "OpenHolds",
     "PatientAction",
     "PatientAppointments",
@@ -41,6 +47,11 @@ __all__ = [
     "VerifyHold",
     "ViewAppointment",
     "ViewHold",
+    "WaitlistEntry",
+    "WaitlistOption",
+    "WaitlistQueries",
+    "WaitlistRow",
+    "WaitlistStatus",
 ]
 
 
@@ -225,4 +236,74 @@ class PatientAppointments:
 class ListPatientAppointments(Protocol):
     def execute(self, *, patient_id: Id, agenda_filter: AgendaFilter) -> PatientAppointments:
         """The patient's own appointments with their allowed actions; forbidden for staff."""
+        ...
+
+
+class JoinWaitlist(Protocol):
+    def execute(
+        self,
+        *,
+        actor_id: Id,
+        appointment_type_id: Id,
+        clinician_id: Id | None,
+        from_date: date,
+        to_date: date,
+        patient_email: str | None,
+    ) -> WaitlistEntry:
+        """A WAITING entry for the actor, or for the emailed patient when an admin names one."""
+        ...
+
+
+class OfferCancelledSlot(Protocol):
+    def execute(self, *, actor_id: Id, entry_id: Id) -> WaitlistEntry:
+        """Admin only: offer a WAITING entry the first fitting cancelled slot; not_found if none."""
+        ...
+
+
+class AcceptWaitlistOffer(Protocol):
+    def execute(self, *, actor_id: Id, entry_id: Id) -> Appointment:
+        """Book an OFFERED entry for its patient or an admin; a taken slot puts it back WAITING."""
+        ...
+
+
+class ExpireWaitlist(Protocol):
+    def execute(self) -> int:
+        """Expire entries past their window, free offers whose slot started; returns how many."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistRow:
+    """An entry with who waits, for what, with whom, and the offered start if any."""
+
+    entry: WaitlistEntry
+    patient_name: str
+    appointment_type: str
+    hospital_name: str
+    time_zone: str
+    clinician_name: str | None
+    offered_start: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistOption:
+    id: Id
+    label: str
+
+
+class WaitlistQueries(Protocol):
+    def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
+        """The patient's entries, newest first."""
+        ...
+
+    def page(self, status: str, request: PageRequest) -> Page[WaitlistRow]:
+        """Entries of every hospital, oldest first, 20 a page; an unknown status lists all."""
+        ...
+
+    def type_options(self, *, online_only: bool) -> tuple[WaitlistOption, ...]:
+        """Active types of active hospitals, labelled with their hospital, by label."""
+        ...
+
+    def clinician_options(self) -> tuple[WaitlistOption, ...]:
+        """Active clinicians labelled with their department, by label."""
         ...

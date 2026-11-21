@@ -2,7 +2,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from drlibre.booking.application.ports.inbound import AppointmentQueries, BookedPeriod
+from drlibre.booking.application.ports.inbound import (
+    AppointmentQueries,
+    BookedPeriod,
+    WaitlistOption,
+    WaitlistQueries,
+    WaitlistRow,
+)
 from drlibre.booking.application.ports.outbound import (
     AgendaEntry,
     AgendaFilter,
@@ -11,6 +17,7 @@ from drlibre.booking.application.ports.outbound import (
     BookableType,
     BookingDirectory,
     CodeIssuer,
+    ExpiringEntry,
     FreeSlots,
     Holds,
     IssuedCode,
@@ -19,17 +26,21 @@ from drlibre.booking.application.ports.outbound import (
     RoundRobinLedger,
     ScheduleLocks,
     SlotRefresh,
+    Staff,
     Venue,
     VerificationCodes,
+    Waitlist,
 )
 from drlibre.booking.domain.appointment import Appointment, AppointmentStatus, Source
 from drlibre.booking.domain.hold import BookingHold
 from drlibre.booking.domain.verification_code import VerificationCode
+from drlibre.booking.domain.waitlist import WaitlistEntry, WaitlistStatus
 from drlibre.identity.domain.user import Role
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.pagination import PAGE_SIZE, Page, PageRequest
 from tests.fakes.users import InMemoryUsers
 
 
@@ -54,6 +65,20 @@ class InMemoryAppointments(Appointments):
             a
             for a in self.rows
             if a.status is AppointmentStatus.BOOKED and after < a.start <= until
+        )
+        return tuple(sorted(found, key=lambda a: (a.start, str(a.id))))
+
+    def cancelled_of_type(
+        self, appointment_type_id: Id, *, after: datetime, earliest: datetime, latest: datetime
+    ) -> tuple[Appointment, ...]:
+        found = (
+            a
+            for a in self.rows
+            if a.status is AppointmentStatus.CANCELLED
+            and a.appointment_type_id == appointment_type_id
+            and a.start > after
+            and earliest <= a.start
+            and a.end <= latest
         )
         return tuple(sorted(found, key=lambda a: (a.start, str(a.id))))
 
@@ -231,6 +256,22 @@ class InMemoryPatients(Patients):
         user = self.users.rows.get(patient_id)
         return user.email.value if user is not None and user.role is Role.PATIENT else None
 
+    def active_patient_by_email(self, email: str) -> Id | None:
+        wanted = email.strip().lower()
+        found = (u for u in self.users.rows.values() if u.email.value == wanted)
+        return next((u.id for u in found if u.active and u.role is Role.PATIENT), None)
+
+
+class InMemoryStaff(Staff):
+    """Admins are the active ADMIN users of the in-memory users."""
+
+    def __init__(self, users: InMemoryUsers) -> None:
+        self.users = users
+
+    def is_admin(self, user_id: Id) -> bool:
+        user = self.users.rows.get(user_id)
+        return user is not None and user.active and user.role is Role.ADMIN
+
 
 class InMemoryRoundRobinLedger(RoundRobinLedger):
     def __init__(self) -> None:
@@ -316,11 +357,90 @@ class FixedCodeIssuer(CodeIssuer):
         return code == code_hash
 
 
-class InMemoryAppointmentQueries(AppointmentQueries):
-    """Reads the in-memory appointments; `clinician_users` maps a profile to its user."""
+class InMemoryWaitlist(Waitlist):
+    """Entries by id; offered starts read from the in-memory appointments."""
 
     def __init__(self, appointments: InMemoryAppointments) -> None:
+        self.rows: dict[Id, WaitlistEntry] = {}
         self.appointments = appointments
+
+    def add(self, entry: WaitlistEntry) -> None:
+        self._refuse_taken_offer(entry)
+        self.rows[entry.id] = entry
+
+    def save(self, entry: WaitlistEntry) -> None:
+        if entry.id not in self.rows:
+            raise DomainError(ErrorCode.NOT_FOUND, "Entrée d'attente introuvable.")
+        self._refuse_taken_offer(entry)
+        self.rows[entry.id] = entry
+
+    def get(self, entry_id: Id) -> WaitlistEntry | None:
+        return self.rows.get(entry_id)
+
+    def get_locked(self, entry_id: Id) -> WaitlistEntry | None:
+        return self.rows.get(entry_id)
+
+    def candidates_locked(
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id,
+        start: datetime,
+        end: datetime,
+        excluding_patient: Id,
+    ) -> tuple[WaitlistEntry, ...]:
+        found = (
+            e
+            for e in self.rows.values()
+            if e.status is WaitlistStatus.WAITING
+            and e.patient_id != excluding_patient
+            and e.matches(appointment_type_id, clinician_id, start, end)
+        )
+        return tuple(sorted(found, key=lambda e: e.id.value))
+
+    def holds_offer(self, appointment_id: Id) -> bool:
+        return any(self._offers(e, appointment_id) for e in self.rows.values())
+
+    def expiring_locked(self, now: datetime) -> tuple[ExpiringEntry, ...]:
+        due: list[ExpiringEntry] = []
+        for entry in sorted(self.rows.values(), key=lambda e: e.id.value):
+            offered = entry.offered_appointment_id
+            appointment = self.appointments.get(offered) if offered else None
+            start = appointment.start if appointment else None
+            waiting_past = entry.status is WaitlistStatus.WAITING and entry.latest <= now
+            offer_started = (
+                entry.status is WaitlistStatus.OFFERED and start is not None and start <= now
+            )
+            if waiting_past or offer_started:
+                due.append(ExpiringEntry(entry, start))
+        return tuple(due)
+
+    @staticmethod
+    def _offers(entry: WaitlistEntry, appointment_id: Id) -> bool:
+        return entry.status is WaitlistStatus.OFFERED and entry.offered_appointment_id == (
+            appointment_id
+        )
+
+    def _refuse_taken_offer(self, entry: WaitlistEntry) -> None:
+        offered = entry.offered_appointment_id
+        if offered is None or entry.status is not WaitlistStatus.OFFERED:
+            return
+        if any(e.id != entry.id and self._offers(e, offered) for e in self.rows.values()):
+            raise DomainError(
+                ErrorCode.CONFLICT,
+                "Ce créneau est déjà proposé à une autre entrée.",
+                {"resources": ["waitlist_entry"]},
+            )
+
+
+class InMemoryAppointmentQueries(AppointmentQueries):
+    """Reads in-memory appointments and waitlist; `clinician_users` maps a profile to its user."""
+
+    def __init__(
+        self, appointments: InMemoryAppointments, waitlist: InMemoryWaitlist | None = None
+    ) -> None:
+        self.appointments = appointments
+        self.waitlist = waitlist or InMemoryWaitlist(appointments)
         self.clinician_users: dict[Id, Id] = {}
 
     def periods_of(
@@ -333,13 +453,17 @@ class InMemoryAppointmentQueries(AppointmentQueries):
         )
 
     def dependents_of_type(self, appointment_type_id: Id) -> tuple[Dependent, ...]:
-        return self._of(lambda a: a.appointment_type_id == appointment_type_id)
+        return self._of(lambda a: a.appointment_type_id == appointment_type_id) + self._waiting(
+            lambda e: e.appointment_type_id == appointment_type_id
+        )
 
     def dependents_of_room(self, room_id: Id) -> tuple[Dependent, ...]:
         return self._of(lambda a: a.room_id == room_id)
 
     def dependents_of_clinician(self, clinician_id: Id) -> tuple[Dependent, ...]:
-        return self._of(lambda a: a.clinician_id == clinician_id)
+        return self._of(lambda a: a.clinician_id == clinician_id) + self._waiting(
+            lambda e: e.clinician_id == clinician_id
+        )
 
     def active_upcoming_for_clinician_user(
         self, user_id: Id, *, after: datetime
@@ -353,11 +477,20 @@ class InMemoryAppointmentQueries(AppointmentQueries):
     def any_for_user(self, user_id: Id) -> tuple[Dependent, ...]:
         return self._of(
             lambda a: a.patient_id == user_id or self.clinician_users.get(a.clinician_id) == user_id
-        )
+        ) + self._waiting(lambda e: e.patient_id == user_id)
 
     def _of(self, keep: Callable[[Appointment], bool]) -> tuple[Dependent, ...]:
         found = sorted((a for a in self.appointments.rows if keep(a)), key=lambda a: a.start)
         return tuple(Dependent("appointment", a.id, "Rendez-vous") for a in found)
+
+    def _waiting(self, keep: Callable[[WaitlistEntry], bool]) -> tuple[Dependent, ...]:
+        found = sorted(
+            (e for e in self.waitlist.rows.values() if keep(e)),
+            key=lambda e: (e.created_at, e.id.value),
+        )
+        return tuple(
+            Dependent("waitlist_entry", e.id, f"Attente du {e.created_at:%d/%m/%Y}") for e in found
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -412,4 +545,76 @@ class InMemoryPatientAgenda(PatientAgenda):
             room=self.labels.get(appointment.room_id) if appointment.room_id else None,
             appointment_type=self.labels.get(appointment.appointment_type_id, ""),
             bookable_online=appointment.appointment_type_id not in self.offline_types,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistType:
+    """What the waitlist names about a type; `active` covers its hospital too."""
+
+    name: str = "Consultation"
+    hospital_name: str = "Hôpital Nord"
+    time_zone: str = "Europe/Paris"
+    bookable_online: bool = True
+    active: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistClinician:
+    name: str = "Dr Martin"
+    department: str = "Cardiologie"
+    active: bool = True
+
+
+class InMemoryWaitlistQueries(WaitlistQueries):
+    """Joins in-memory entries to users, `types` and `clinicians`."""
+
+    def __init__(self, waitlist: InMemoryWaitlist, users: InMemoryUsers) -> None:
+        self.waitlist = waitlist
+        self.users = users
+        self.types: dict[Id, WaitlistType] = {}
+        self.clinicians: dict[Id, WaitlistClinician] = {}
+
+    def own_entries(self, patient_id: Id) -> tuple[WaitlistRow, ...]:
+        mine = (e for e in self.waitlist.rows.values() if e.patient_id == patient_id)
+        newest = sorted(mine, key=lambda e: (e.created_at, e.id.value), reverse=True)
+        return tuple(self._row(e) for e in newest)
+
+    def page(self, status: str, request: PageRequest) -> Page[WaitlistRow]:
+        rows = sorted(self.waitlist.rows.values(), key=lambda e: (e.created_at, e.id.value))
+        if status in set(WaitlistStatus):
+            rows = [e for e in rows if e.status.value == status]
+        window = rows[request.offset : request.offset + PAGE_SIZE]
+        return Page(tuple(self._row(e) for e in window), len(rows), request.number)
+
+    def type_options(self, *, online_only: bool) -> tuple[WaitlistOption, ...]:
+        found = (
+            WaitlistOption(i, f"{t.name} · {t.hospital_name}")
+            for i, t in self.types.items()
+            if t.active and (t.bookable_online or not online_only)
+        )
+        return tuple(sorted(found, key=lambda o: (o.label, o.id.value)))
+
+    def clinician_options(self) -> tuple[WaitlistOption, ...]:
+        found = (
+            WaitlistOption(i, f"{c.name} · {c.department}")
+            for i, c in self.clinicians.items()
+            if c.active
+        )
+        return tuple(sorted(found, key=lambda o: (o.label, o.id.value)))
+
+    def _row(self, entry: WaitlistEntry) -> WaitlistRow:
+        kind = self.types.get(entry.appointment_type_id, WaitlistType())
+        patient = self.users.rows.get(entry.patient_id)
+        clinician = self.clinicians.get(entry.clinician_id) if entry.clinician_id else None
+        offered = entry.offered_appointment_id
+        appointment = self.waitlist.appointments.get(offered) if offered else None
+        return WaitlistRow(
+            entry=entry,
+            patient_name=patient.full_name if patient else "",
+            appointment_type=kind.name,
+            hospital_name=kind.hospital_name,
+            time_zone=kind.time_zone,
+            clinician_name=clinician.name if clinician else None,
+            offered_start=appointment.start if appointment else None,
         )

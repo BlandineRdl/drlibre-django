@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Liste d'attente{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+<h1>Liste d'attente</h1>
+{% if view.notice %}<p role="status" class="notice">{{ view.notice }}</p>{% endif %}
+{% if view.refusal %}<div role="alert" class="error-summary"><p><strong>{{ view.refusal }}</strong></p></div>{% endif %}
+<section aria-labelledby="entries-heading">
+  <h2 id="entries-heading">Mes inscriptions</h2>
+  {% for card in view.entries %}
+  <article class="appointment-card">
+    <header><h3 class="card-when">{{ card.title }}</h3></header>
+    <p><strong>{{ card.status }}</strong></p>
+    {% for line in card.lines %}<p class="result-line">{{ line }}</p>{% endfor %}
+    {% if card.offered %}<p>{{ card.offered }}</p>{% endif %}
+    {% if card.accept_url %}
+    <footer class="actions">
+      <form method="post" action="{{ card.accept_url }}" class="inline-form">
+        {% csrf_token %}
+        <button type="submit" aria-label="Accepter le créneau proposé pour {{ card.title }}">Accepter</button>
+      </form>
+    </footer>
+    {% endif %}
+  </article>
+  {% empty %}
+  <p>{{ view.empty_text }}</p>
+  {% endfor %}
+</section>
+<section aria-labelledby="join-heading">
+  <h2 id="join-heading">{{ view.form.title }}</h2>
+  {% include "_form.html" with form=view.form %}
+</section>
+{% endblock %}

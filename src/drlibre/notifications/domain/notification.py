@@ -11,6 +11,8 @@ class NotificationKind(StrEnum):
     SCHEDULE_CHANGED = "SCHEDULE_CHANGED"
     APPOINTMENT_CANCELLED = "APPOINTMENT_CANCELLED"
     APPOINTMENT_REMINDER = "APPOINTMENT_REMINDER"
+    WAITLIST_OFFERED = "WAITLIST_OFFERED"
+    WAITLIST_BOOKED = "WAITLIST_BOOKED"
 
 
 class AppointmentEvent(StrEnum):
@@ -18,6 +20,8 @@ class AppointmentEvent(StrEnum):
     RESCHEDULED = "RESCHEDULED"
     CANCELLED = "CANCELLED"
     REMINDED = "REMINDED"
+    WAITLIST_OFFERED = "WAITLIST_OFFERED"
+    WAITLIST_BOOKED = "WAITLIST_BOOKED"
 
 
 # Kind, title and body template of each event's notification.
@@ -42,6 +46,16 @@ _WORDING = {
         "Rappel de RDV",
         "Rappel : votre RDV a lieu le {when}.",
     ),
+    AppointmentEvent.WAITLIST_OFFERED: (
+        NotificationKind.WAITLIST_OFFERED,
+        "Créneau proposé",
+        "Un créneau vous est proposé le {when}.",
+    ),
+    AppointmentEvent.WAITLIST_BOOKED: (
+        NotificationKind.WAITLIST_BOOKED,
+        "Créneau réservé",
+        "Votre créneau du {when} est réservé.",
+    ),
 }
 
 
@@ -64,7 +78,7 @@ class Notification:
         *,
         event: AppointmentEvent,
         recipient_id: Id,
-        appointment_id: Id,
+        appointment_id: Id | None,
         start: datetime,
         zone_name: str,
         at: datetime,

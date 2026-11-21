@@ -38,18 +38,19 @@ Tranchées au plan E4 (`aidd_docs/tasks/2026_11/2026_11_21_e4-portail-patient-no
 - À quelle fréquence tourne le job de rappel ? → Toutes les 15 minutes : le rappel part entre 24 h et 23 h 45 avant le RDV, une seule fois par RDV.
 
 ## E5 Liste d'attente
-- Un patient peut-il s'inscrire pour un type non réservable en ligne ?
-- Quelles règles pour la fenêtre (début avant fin, pas dans le passé, fin incluse) ?
-- Le praticien préféré doit-il être du département du type ?
-- Après un échec d'acceptation en `rule_violation`, l'entrée reste-t-elle `OFFERED` ou repasse-t-elle `WAITING` ?
-- L'acceptation envoie-t-elle aussi la notification « RDV réservé », en plus de « Créneau réservé » ?
-- Quel code pour accepter une entrée qui n'est pas `OFFERED` ?
-- L'offre manuelle tient-elle compte du praticien préféré, et quel code sans créneau convenable ?
-- Où l'admin accepte-t-il une offre dans la console ?
-- Le patient est-il prévenu quand son offre repasse en `WAITING` ou que son entrée expire ?
-- Le job d'expiration audite-t-il chaque entrée ou une seule fois avec le nombre ?
-- L'offre automatique est-elle dans la transaction de l'annulation, et celui qui annule peut-il recevoir son propre créneau ?
-- Quelles colonnes affiche la liste d'attente admin ?
+Tranchées au plan E5 (`aidd_docs/tasks/2026_11/2026_11_21_e5-liste-d-attente/plan.md`, Decisions).
+- Un patient peut-il s'inscrire pour un type non réservable en ligne ? → Non, `rule_violation` `type_not_bookable_online` ; l'admin inscrit pour tout type actif.
+- Quelles règles pour la fenêtre (début avant fin, pas dans le passé, fin incluse) ? → Deux dates, fin incluse, dans le fuseau de l'hôpital du type ; fin avant début ou avant aujourd'hui donne `invalid_input` sur `to_date`.
+- Le praticien préféré doit-il être du département du type ? → Oui, actif et du département du type, sinon `not_found`.
+- Après un échec d'acceptation en `rule_violation`, l'entrée reste-t-elle `OFFERED` ou repasse-t-elle `WAITING` ? → Elle reste `OFFERED`, rien n'est écrit ; seul un `conflict` la repasse en `WAITING`.
+- L'acceptation envoie-t-elle aussi la notification « RDV réservé », en plus de « Créneau réservé » ? → Non, « Créneau réservé » seule, ni « RDV réservé » ni email de confirmation.
+- Quel code pour accepter une entrée qui n'est pas `OFFERED` ? → `invalid_transition` avec le statut actuel.
+- L'offre manuelle tient-elle compte du praticien préféré, et quel code sans créneau convenable ? → Oui, même filtre que l'offre automatique ; sans RDV annulé à venir, libre et non offert, `not_found`.
+- Où l'admin accepte-t-il une offre dans la console ? → Sur la ligne de la liste d'attente, « Accepter pour le patient » ; « Proposer un créneau » sur les lignes `WAITING`, inscription par `/console/waitlist/new`.
+- Le patient est-il prévenu quand son offre repasse en `WAITING` ou que son entrée expire ? → Non, le statut se lit dans sa liste.
+- Le job d'expiration audite-t-il chaque entrée ou une seule fois avec le nombre ? → Chaque entrée, acteur vide.
+- L'offre automatique est-elle dans la transaction de l'annulation, et celui qui annule peut-il recevoir son propre créneau ? → Oui, dans la même transaction, après la mise à jour des créneaux ; les entrées de celui qui annule sont exclues.
+- Quelles colonnes affiche la liste d'attente admin ? → Inscription, patient, type, praticien préféré, fenêtre, statut, heure proposée avec fuseau ; filtre `status`, plus anciennes d'abord, 20 par page avec le total.
 
 ## E6 Espace praticien
 - « Prochain créneau libre » : pour quel type et à partir de quand ?

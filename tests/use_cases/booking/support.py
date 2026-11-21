@@ -9,6 +9,7 @@ from django.test import Client
 
 from drlibre.booking.application.ports.inbound import HoldCreated, VerifiedBooking
 from drlibre.booking.domain.appointment import Appointment
+from drlibre.booking.domain.waitlist import WaitlistEntry
 from drlibre.identity.domain.session import Session
 from drlibre.identity.domain.user import User
 from drlibre.shared_kernel.errors import DomainError
@@ -50,6 +51,11 @@ class Scene:
         self.mine: Appointment | None = None
         self.caller: Id | None = None
         self.page: Any = None
+        self.actor: Id | None = None
+        self.people: dict[str, Id] = {}
+        self.freed: dict[str, Appointment] = {}
+        self.waitlist_before: dict[Id, WaitlistEntry] = {}
+        self.expiry_runs: list[int] = []
 
 
 def at(raw: str) -> datetime:

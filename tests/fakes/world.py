@@ -21,7 +21,10 @@ from tests.fakes.booking import (
     InMemoryPatientAgenda,
     InMemoryPatients,
     InMemoryRoundRobinLedger,
+    InMemoryStaff,
     InMemoryVerificationCodes,
+    InMemoryWaitlist,
+    InMemoryWaitlistQueries,
     RecordingScheduleLocks,
     RecordingSlotRefresh,
 )
@@ -101,7 +104,9 @@ class FakeWorld:
             rules=self.availability_rules, time_offs=self.time_offs
         )
         self.booking_appointments = InMemoryAppointments()
-        self.booking_queries = InMemoryAppointmentQueries(self.booking_appointments)
+        self.waitlist = InMemoryWaitlist(self.booking_appointments)
+        self.waitlist_queries = InMemoryWaitlistQueries(self.waitlist, self.users)
+        self.booking_queries = InMemoryAppointmentQueries(self.booking_appointments, self.waitlist)
         self.agenda = InMemoryPatientAgenda(self.booking_appointments)
         self.booking_directory = FixedBookingDirectory()
         self.holds = InMemoryHolds()
@@ -146,6 +151,7 @@ class FakeWorld:
             self.outbox,
             self.ledger,
             self.notifications,
+            self.waitlist,
         )
         self.app: Container = wire(self.adapters())
 
@@ -206,6 +212,9 @@ class FakeWorld:
                 issuer=self.issuer,
                 limiter=self.limiter,
                 agenda=self.agenda,
+                waitlist=self.waitlist,
+                waitlist_queries=self.waitlist_queries,
+                staff=InMemoryStaff(self.users),
             ),
             links=self.links,
             link_notices=OutboxLinkNotices(

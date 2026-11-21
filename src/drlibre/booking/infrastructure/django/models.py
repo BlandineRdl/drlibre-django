@@ -143,3 +143,69 @@ class VerificationCodeRecord(models.Model):
 
     def __str__(self) -> str:
         return str(self.hold_id)
+
+
+WAITLIST_STATUSES = ("WAITING", "OFFERED", "BOOKED", "EXPIRED")
+
+
+class WaitlistEntryRecord(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Identity owns users; contexts share no foreign key, only the id.
+    patient_id = models.UUIDField(db_index=True)
+    appointment_type = models.ForeignKey(
+        "organisation.AppointmentTypeRecord",
+        on_delete=models.PROTECT,
+        db_index=False,
+        related_name="waitlist_entries",
+    )
+    clinician = models.ForeignKey(
+        "organisation.ClinicianProfileRecord",
+        on_delete=models.PROTECT,
+        null=True,
+        related_name="waitlist_entries",
+    )
+    earliest = models.DateTimeField()
+    latest = models.DateTimeField()
+    status = models.CharField(max_length=20)
+    created_at = models.DateTimeField()
+    offered_appointment = models.ForeignKey(
+        AppointmentRecord,
+        on_delete=models.PROTECT,
+        null=True,
+        db_index=False,
+        related_name="waitlist_offers",
+    )
+    appointment_type_id: uuid.UUID
+    clinician_id: uuid.UUID | None
+    offered_appointment_id: uuid.UUID | None
+
+    class Meta:
+        indexes = (
+            models.Index(
+                fields=("status", "appointment_type", "created_at"),
+                name="waitlist_status_type_created",
+            ),
+        )
+        constraints = (
+            models.CheckConstraint(
+                condition=Q(latest__gt=F("earliest")), name="waitlist_latest_after_earliest"
+            ),
+            models.CheckConstraint(
+                condition=Q(status__in=WAITLIST_STATUSES), name="waitlist_status_known"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(status="OFFERED", offered_appointment__isnull=False)
+                    | Q(~Q(status="OFFERED"), offered_appointment__isnull=True)
+                ),
+                name="waitlist_offer_iff_offered",
+            ),
+            models.UniqueConstraint(
+                fields=("offered_appointment",),
+                condition=Q(status="OFFERED"),
+                name="waitlist_one_offer_per_appointment",
+            ),
+        )
+
+    def __str__(self) -> str:
+        return str(self.id)

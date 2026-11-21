@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Liste d'attente{% endblock %}
+{% block timezone %}{{ view.zone_note }}{% endblock %}
+{% block content %}
+{% include "_section_nav.html" %}
+<div class="actions">
+  <h1>Liste d'attente</h1>
+  <a href="{{ view.add_url }}" role="button">Inscrire un patient</a>
+</div>
+{% if view.notice %}<p role="status">{{ view.notice }}</p>{% endif %}
+{% if view.refusal %}<div role="alert" class="error-summary"><p><strong>{{ view.refusal }}</strong></p></div>{% endif %}
+<search>
+<form method="get" action="/console/waitlist/">
+  <label for="status">Statut</label>
+  <fieldset role="group">
+    <select id="status" name="status">
+      <option value="">Tous</option>
+      {% for c in view.status_choices %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+    </select>
+    <button type="submit">Filtrer</button>
+  </fieldset>
+</form>
+</search>
+{% if view.rows %}
+<div class="overflow-auto" tabindex="0" role="region" aria-label="Entrées de la liste d'attente">
+  <table>
+    <caption>Liste d'attente : {{ view.summary }}</caption>
+    <thead><tr>{% for header in view.headers %}<th scope="col">{{ header }}</th>{% endfor %}<th scope="col">Actions</th></tr></thead>
+    <tbody>
+    {% for row in view.rows %}
+      <tr>
+        {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+        <td class="actions">
+          {% if row.offer_url %}
+          <form method="post" action="{{ row.offer_url }}" class="inline-form">
+            {% csrf_token %}
+            <input type="hidden" name="status" value="{{ view.status }}">
+            <button type="submit" class="outline" aria-label="Proposer un créneau à {{ row.label }}">Proposer un créneau</button>
+          </form>
+          {% endif %}
+          {% if row.accept_url %}
+          <form method="post" action="{{ row.accept_url }}" class="inline-form">
+            {% csrf_token %}
+            <input type="hidden" name="status" value="{{ view.status }}">
+            <button type="submit" aria-label="Accepter pour le patient {{ row.label }}">Accepter pour le patient</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>Aucune entrée pour ce statut.</p>
+{% endif %}
+<nav aria-label="Pagination" class="pagination">
+  <p>{{ view.summary }}</p>
+  {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Page précédente</a>{% endif %}
+  {% if view.next_url %}<a href="{{ view.next_url }}">Page suivante ›</a>{% endif %}
+</nav>
+{% endblock %}
