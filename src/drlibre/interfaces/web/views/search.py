@@ -13,6 +13,7 @@ def home(request: HttpRequest) -> HttpResponse:
     app = container()
     criteria = SearchCriteria.parse(request.GET.dict())
     kind = kind_of(request.GET.get("list"))
+    # The shown list's total is reused, so its query runs once per page.
     match kind:
         case Kind.PROVIDERS:
             page = app.search_providers.execute(criteria)
@@ -24,7 +25,7 @@ def home(request: HttpRequest) -> HttpResponse:
         criteria=criteria,
         kind=kind,
         page=page,
-        counts=app.count_search_results.execute(criteria),
+        counts=app.count_search_results.execute(criteria, **{kind.value: page.total}),
         options=app.list_filter_options.execute(),
     )
     return render(request, "search/home.html", {"view": view})

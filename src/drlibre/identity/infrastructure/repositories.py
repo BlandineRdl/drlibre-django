@@ -1,10 +1,12 @@
 from datetime import datetime
 
-from drlibre.identity.application.ports.outbound import Sessions, SignInLinks, Users
+from drlibre.identity.application.ports.outbound import ApiTokens, Sessions, SignInLinks, Users
+from drlibre.identity.domain.api_token import ApiToken
 from drlibre.identity.domain.session import Session
 from drlibre.identity.domain.sign_in_link import SignInLink
 from drlibre.identity.domain.user import Email, Role, User
 from drlibre.identity.infrastructure.django.models import (
+    ApiTokenRecord,
     SessionRecord,
     SignInLinkRecord,
     UserRecord,
@@ -137,3 +139,32 @@ class DjangoSignInLinks(SignInLinks):
         SignInLinkRecord.objects.filter(id=link.id.value).update(
             used_at=link.used_at, cancelled_at=link.cancelled_at
         )
+
+
+def _to_api_token(record: ApiTokenRecord) -> ApiToken:
+    return ApiToken(
+        id=Id(record.id),
+        token_hash=record.token_hash,
+        user_id=Id(record.user_id),
+        label=record.label,
+        expires_at=record.expires_at,
+    )
+
+
+class DjangoApiTokens(ApiTokens):
+    def add(self, token: ApiToken) -> None:
+        ApiTokenRecord.objects.create(
+            id=token.id.value,
+            token_hash=token.token_hash,
+            user_id=token.user_id.value,
+            label=token.label,
+            expires_at=token.expires_at,
+        )
+
+    def by_token_hash(self, token_hash: str) -> ApiToken | None:
+        record = ApiTokenRecord.objects.filter(token_hash=token_hash).first()
+        return _to_api_token(record) if record else None
+
+    def delete_for_user(self, user_id: Id) -> int:
+        deleted, _ = ApiTokenRecord.objects.filter(user_id=user_id.value).delete()
+        return deleted

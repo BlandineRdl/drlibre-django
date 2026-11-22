@@ -9,6 +9,7 @@ from drlibre.notifications.application.use_cases.reminded_appointments import (
     RemindedAppointmentsUseCase,
 )
 from drlibre.search.infrastructure.sql_queries import SqlSearchQueries
+from tests.fakes.api_tokens import InMemoryApiTokens
 from tests.fakes.appointment_history import InMemoryAppointmentHistory
 from tests.fakes.audit_actors import InMemoryAuditActors
 from tests.fakes.audit_log import InMemoryAuditLog
@@ -35,9 +36,18 @@ from tests.fakes.booking_options import InMemoryBookingOptionQueries
 from tests.fakes.clinician_agenda import InMemoryClinicianAgenda
 from tests.fakes.clock import FixedClock
 from tests.fakes.database_probe import InMemoryDatabaseProbe
+from tests.fakes.directory import InMemoryDirectoryQueries
 from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
+from tests.fakes.interop import (
+    InMemoryAppointmentResponseQueries,
+    InMemoryAuditEventQueries,
+    InMemoryCommunicationQueries,
+    InMemoryConditionalWrites,
+    InMemoryInteropAppointmentQueries,
+    InMemoryPatientQueries,
+)
 from tests.fakes.journal_actors import InMemoryJournalActors
 from tests.fakes.notifications import InMemoryNotifications
 from tests.fakes.organisation import (
@@ -53,6 +63,7 @@ from tests.fakes.organisation import (
 )
 from tests.fakes.password_hasher import InMemoryPasswordHasher
 from tests.fakes.rate_limiter import InMemoryRateLimiter
+from tests.fakes.readers import InMemoryReaders
 from tests.fakes.reporting import InMemoryActivityQueries, InMemoryAdmins
 from tests.fakes.scheduling import (
     FixedSchedulingDirectory,
@@ -85,6 +96,7 @@ class FakeWorld:
         self.audit = InMemoryAuditLog()
         self.users = InMemoryUsers()
         self.sessions = InMemorySessions()
+        self.api_tokens = InMemoryApiTokens()
         self.links = InMemorySignInLinks()
         self.hasher = InMemoryPasswordHasher()
         self.failures = InMemoryFailedSignIns()
@@ -139,6 +151,18 @@ class FakeWorld:
             holds=self.holds,
         )
         self.notifications = InMemoryNotifications()
+        self.directory_queries = InMemoryDirectoryQueries(
+            hospitals=self.hospitals,
+            departments=self.departments,
+            rooms=self.rooms,
+            appointment_types=self.appointment_types,
+            specialties=self.specialties,
+            profiles=self.profiles,
+            users=self.users,
+            rules=self.availability_rules,
+            time_offs=self.time_offs,
+            stamp=self.clock.at,
+        )
         self.notify = NotifyUseCase(clock=self.clock, notifications=self.notifications)
         self.notices = OutboxBookingNotices(
             outbox=self.outbox,
@@ -153,6 +177,7 @@ class FakeWorld:
             self.audit,
             self.users,
             self.sessions,
+            self.api_tokens,
             self.links,
             self.hospitals,
             self.specialties,
@@ -184,6 +209,7 @@ class FakeWorld:
             audit=self.audit,
             users=self.users,
             sessions=self.sessions,
+            api_tokens=self.api_tokens,
             hasher=self.hasher,
             failures=self.failures,
             tokens=self.tokens,
@@ -250,6 +276,26 @@ class FakeWorld:
             # Search is a read side tested on PostgreSQL: the real adapter, never reached by fakes.
             search_queries=SqlSearchQueries(),
             activity_queries=self.activity,
+            readers=InMemoryReaders(self.users, self.profiles),
+            directory_queries=self.directory_queries,
+            patient_queries=InMemoryPatientQueries(
+                users=self.users, appointments=self.booking_appointments.rows
+            ),
+            interop_appointments=InMemoryInteropAppointmentQueries(
+                appointments=self.booking_appointments,
+                waitlist=self.waitlist,
+                holds=self.holds,
+                profiles=self.profiles,
+                clock=self.clock,
+            ),
+            appointment_responses=InMemoryAppointmentResponseQueries(
+                waitlist=self.waitlist, clock=self.clock
+            ),
+            communications=InMemoryCommunicationQueries(
+                notifications=self.notifications, users=self.users
+            ),
+            audit_events=InMemoryAuditEventQueries(log=self.audit, users=self.users),
+            conditional_writes=InMemoryConditionalWrites(),
             admins=InMemoryAdmins(self.users),
             journal_actors=InMemoryJournalActors(self.users),
             notifications=self.notifications,

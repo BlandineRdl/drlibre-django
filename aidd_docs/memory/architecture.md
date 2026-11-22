@@ -20,6 +20,11 @@
 - One composition root wires ports to adapters, so web, API, FHIR and Celery run the same use cases.
 - Ports are `typing.Protocol` classes that adapters inherit explicitly, checked by Pyrefly.
 - Auth is custom: hashed session tokens, email code and sign-in link, hashed bearer tokens.
+- FHIR R4 facade: a second `NinjaAPI` at `/fhir` (`interfaces/fhir/`), `application/fhir+json`, every `DomainError` an `OperationOutcome` with `ErrorCode.http_status`.
+- One registry (`interfaces/fhir/registry.py`) declares each resource's interactions, search parameters, `_include` and `_sort`; it serves `/fhir/metadata`, refuses undeclared parameters (`invalid_input`) and answers 405 `not-supported` on undeclared interactions.
+- `interop` is a read context: SQL reads of organisation, identity, scheduling, booking, notifications and audit tables, scoped in the SQL by `Reader` (anonymous, patient, clinician, admin), each row with its version; plus `ConditionalWrites` for `If-Match`. A time-off reason reaches only the admin and its own clinician (`Reader.reads_reasons_of`); `UpdateProfile` refuses an actor other than the user (`forbidden`), admins edit through `SaveUser`.
+- FHIR writes call the screens' use cases; reference writes check `require_admin` at the FHIR door, as the console's `require_role`.
+- A specialty is both a `CodeSystem` and a `ValueSet` (one included concept) sharing its id, as a hospital is an `Organization` and a `Location`; both write through `SaveSpecialty`/`DeleteSpecialty`.
 
 ## Constraints
 - p95 under 200 ms, search included, proven by load tests.
@@ -76,12 +81,24 @@
 - Actor scope: `actor_scope` maps a profile to clinician, `Staff.is_admin` to admin, else patient; `scoped_appointment` lets an admin read any appointment (`not_found` if absent), others keep their guards; admins follow staff rules (no 24 h, `for_patient=False`), clinical notes stay `forbidden` to them.
 - Admin `BookForPatient` requires a clinician; the named room must be active in the type's department (`not_found`), then free (`conflict`); source `STAFF`.
 - `reporting` is a read-only context: `ActivityQueries` in SQL plus pure `available_minutes`, minutes in each clinician's hospital zone; utilisation counts active clinicians' appointments only, RDV counts every clinician's; ratios with a zero denominator show « n/a »; bar widths are `.bar-N` classes, the CSP forbids inline styles.
+- `ActivityQueries.activity` reads tally, days and busiest clinicians in one statement; each clinician's zone and today come from a materialised CTE, so each appointment converts its zone once (#25).
 - The audit journal is read through audit's `ViewAuditJournal` (admin only); its `JournalActors` port (`IdentityJournalActors`) resolves the actor filter's email and the page's actor emails through identity; an unknown email matches no entry.
 - `ExportAppointments` (admin only) writes one `booking.appointments_exported` audit entry `{count}`; `csv_cell` prefixes `'` before `= + - @ \t \r`.
 - The audit log is read through `AuditQueries.page` (newest first, total) and `entity_types()`, called by `ViewAuditJournal`, whose `AuditJournal` carries the zone (`settings.TIME_ZONE`) its dates are read and shown in, named.
+- `entity_types()` is a loose index scan (recursive CTE, one probe per type) on `audit_entry_target_at`, never a scan of the append-only journal (#26).
 - Index `appointment_start` on `start` (`booking.0005`) serves the admin list, export and dashboard across hospitals.
 - API admin `GET /appointments` takes the list filters, `from`/`to` keep the date of the aware datetime; `POST /jobs/reminders` runs `RunReminders` synchronously and returns `{count}`.
 - The admin file history shows clinician actions as « Personnel ».
+- Bearer tokens: identity `ApiTokenRecord` (sha256 hash, user, label, expiry), issued and revoked by `manage.py api_token <email> [--days N] [--revoke]`, audited; `AuthenticateToken` refuses an unknown, expired or inactive user's token, so a deactivated user loses access at once; `must_change_password` gets 403 `forbidden`.
+- A bearer authenticates only under `/fhir/` and `/api/` (`interfaces/paths.py`), never a web page; under `/fhir/` only the bearer counts, the session cookie is ignored, so `/fhir/` is exempt from `SameOriginMiddleware` and `DomainErrorPagesMiddleware`.
+- `If-Match` runs in `ConditionalWrites.run` under the write's own lock order, then compares the version: appointment profile, patient, row; `Schedule` profile, rule; `PractitionerRole` profile; `Patient`, `Practitioner`, `Communication` the user row; a reference record its own row (organisation use cases and `SaveUser` take no row lock); 412 `conflict` when stale.
+- `interop/infrastructure/conditional_writes.py` locks other contexts' rows through their ORM models: the second accepted exception beside booking's `schedule_locks`.
+- `ConditionalWrites.run` runs the write in its outer transaction, so any refusal rolls back every use case it ran (`notAvailable`); it locks profile and user rows `FOR UPDATE`, as the use cases re-lock them (no lock upgrade), other rows `FOR NO KEY UPDATE`, so foreign-key inserts (bookings of a locked type) don't wait; the waitlist accept's commit-then-raise does not go through it.
+- Every FHIR resource inherits `DomainResource`: its `text` (dom-6) is generated by `narrative` from its own elements at serialisation, clinical notes left out; a `text` a client sends is accepted, never compared.
+- `Slot` ids are lower-case unpadded base32 of (profile, type, start), stable and decodable; scheduling's `FindSlotStates` searches them (`free` from `scheduling_slot`, other statuses for staff only), `ReadSlotState` reads one by id.
+- An accepted waitlist entry and its appointment share one id: `Appointment/<entry>` goes from `proposed` to `booked`; `AppointmentResponse` is a `BOOKED` entry.
+- `SqlInteropAppointmentQueries` takes the `Clock` so an expired hold is never served as `pending`.
+- `Communication` and `AuditEvent` are read by interop SQL; only the admin reads `AuditEvent`.
 - Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 
 ## Flow
@@ -89,6 +106,8 @@
 flowchart LR
   Browser --> Web --> UseCases --> Postgres
   ApiClient --> Api --> UseCases
+  FhirClient --> Fhir --> UseCases
+  Fhir --> Interop --> Postgres
   Beat --> Worker --> UseCases
   UseCases --> Mailpit
 ```

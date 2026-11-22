@@ -12,7 +12,7 @@ from drlibre.scheduling.application.use_cases.computed_slots import SlotComputat
 from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.domain.appointment import AppointmentStatus
-from drlibre.scheduling.domain.slot import Slot
+from drlibre.scheduling.domain.slot import Period, Slot, SlotState, SlotStatus
 from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from tests.builders_scheduling import appointment, rule, time_off
@@ -32,6 +32,7 @@ class Outcome:
         self.type = Id()
         self.people: dict[str, Id] = {}
         self.slots: tuple[Slot, ...] = ()
+        self.states: tuple[SlotState, ...] = ()
         self.error: DomainError | None = None
         self.answer: tuple[int, str] = (0, "")
 
@@ -298,7 +299,7 @@ def department_slots(world: FakeWorld, outcome: Outcome, start: str, end: str) -
     ask(world, outcome, None, start, end)
 
 
-def local(outcome: Outcome, slot: Slot) -> datetime:
+def local(outcome: Outcome, slot: Slot | SlotState) -> datetime:
     return slot.start.astimezone(outcome.tz)
 
 
@@ -350,3 +351,50 @@ def refused(outcome: Outcome, code: str) -> None:
 @then(parsers.parse('the API answers {status:d} "{code}"'))
 def api_answers(outcome: Outcome, status: int, code: str) -> None:
     assert outcome.answer == (status, code)
+
+
+@given(parsers.parse('"{name}" has an open hold from "{start}" to "{end}"'))
+def has_hold(world: FakeWorld, outcome: Outcome, name: str, start: str, end: str) -> None:
+    expires = world.clock.at + timedelta(minutes=10)
+    world.slot_holds.rows.append(
+        (Id(), outcome.person(name), Period(outcome.at(start), outcome.at(end)), expires)
+    )
+
+
+def ask_states(
+    world: FakeWorld, outcome: Outcome, name: str, start: str, end: str, *, staff: bool
+) -> None:
+    try:
+        outcome.states = world.app.find_slot_states.execute(
+            appointment_type_id=outcome.type,
+            clinician_id=outcome.person(name),
+            start=outcome.at(start),
+            end=outcome.at(end),
+            statuses=frozenset(SlotStatus),
+            staff=staff,
+        )
+    except DomainError as error:
+        outcome.error = error
+
+
+@when(parsers.parse('the staff ask the slot states of "{name}" from "{start}" to "{end}"'))
+def staff_states(world: FakeWorld, outcome: Outcome, name: str, start: str, end: str) -> None:
+    ask_states(world, outcome, name, start, end, staff=True)
+
+
+@when(parsers.parse('a patient asks the busy slot states of "{name}" from "{start}" to "{end}"'))
+def patient_states(world: FakeWorld, outcome: Outcome, name: str, start: str, end: str) -> None:
+    ask_states(world, outcome, name, start, end, staff=False)
+
+
+@then(parsers.re(r'the states are "(?P<states>[^"]*)"'))
+def states_are(outcome: Outcome, states: str) -> None:
+    assert outcome.error is None
+    found = [f"{local(outcome, s):%H:%M} {s.status}" for s in outcome.states]
+    assert found == [s.strip() for s in states.split(",") if s.strip()]
+
+
+@then(parsers.parse('every state names the rule of "{name}"'))
+def states_name_rule(world: FakeWorld, outcome: Outcome, name: str) -> None:
+    (only,) = world.availability_rules.for_clinician(outcome.person(name))
+    assert {s.rule_id for s in outcome.states} == {only.id}

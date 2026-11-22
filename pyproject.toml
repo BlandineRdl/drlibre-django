@@ -111,6 +111,7 @@ forbidden_modules = [
     "drlibre.booking",
     "drlibre.health",
     "drlibre.identity",
+    "drlibre.interop",
     "drlibre.notifications",
     "drlibre.organisation",
     "drlibre.reporting",
@@ -123,7 +124,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Each context layers infrastructure over application over domain"
 type = "layers"
-containers = ["drlibre.audit", "drlibre.booking", "drlibre.health", "drlibre.identity", "drlibre.notifications", "drlibre.organisation", "drlibre.reporting", "drlibre.scheduling", "drlibre.search"]
+containers = ["drlibre.audit", "drlibre.booking", "drlibre.health", "drlibre.identity", "drlibre.interop", "drlibre.notifications", "drlibre.organisation", "drlibre.reporting", "drlibre.scheduling", "drlibre.search"]
 layers = ["infrastructure", "application", "(domain)"]
 
 [[tool.importlinter.contracts]]
@@ -180,6 +181,22 @@ forbidden_modules = [
     "drlibre.identity",
     "drlibre.notifications",
     "drlibre.organisation",
+    "drlibre.scheduling",
+    "drlibre.search",
+]
+
+[[tool.importlinter.contracts]]
+name = "Interop's core imports no other context"
+type = "forbidden"
+source_modules = ["drlibre.interop.domain", "drlibre.interop.application"]
+forbidden_modules = [
+    "drlibre.audit",
+    "drlibre.booking",
+    "drlibre.health",
+    "drlibre.identity",
+    "drlibre.notifications",
+    "drlibre.organisation",
+    "drlibre.reporting",
     "drlibre.scheduling",
     "drlibre.search",
 ]

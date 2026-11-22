@@ -43,9 +43,10 @@ class JoinWaitlistUseCase(JoinWaitlist):
         from_date: date,
         to_date: date,
         patient_email: str | None,
+        patient_id: Id | None = None,
     ) -> WaitlistEntry:
         with self._uow:
-            patient_id = self._patient(actor_id, patient_email)
+            patient_id = self._patient(actor_id, patient_email, patient_id)
             kind = self._placement.bookable_type(appointment_type_id)
             if clinician_id is not None:
                 self._placement.clinician_of(kind, clinician_id)
@@ -83,14 +84,17 @@ class JoinWaitlistUseCase(JoinWaitlist):
             )
             return entry
 
-    def _patient(self, actor_id: Id, patient_email: str | None) -> Id:
-        """The actor for themself, or the emailed active patient when the actor is an admin."""
-        if patient_email is None:
+    def _patient(self, actor_id: Id, patient_email: str | None, patient_id: Id | None) -> Id:
+        """The actor for themself, or the named active patient when the actor is an admin."""
+        if patient_email is None and patient_id in (None, actor_id):
             refuse_non_patient(self._patients, actor_id)
             return actor_id
         if not self._staff.is_admin(actor_id):
             raise DomainError(ErrorCode.FORBIDDEN, "Seul un admin inscrit un autre patient.")
-        found = self._patients.active_patient_by_email(patient_email)
+        if patient_email is not None:
+            found = self._patients.active_patient_by_email(patient_email)
+        else:
+            found = patient_id if patient_id and self._patients.is_active(patient_id) else None
         if found is None:
             raise DomainError(ErrorCode.NOT_FOUND, "Patient introuvable.")
         return found

@@ -14,3 +14,6 @@ __pycache__/
 staticfiles/
 .python-doctor/
 .playwright-mcp/
+
+# HL7 FHIR validator jar, fetched by scripts/fhir-validate.sh
+.cache/

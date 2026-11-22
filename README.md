@@ -43,6 +43,12 @@ The 600 showcase patients (`prenom.nom@patients.drlibre.localhost`) have no pass
 
 Signed in, `GET /api/v1/slots?type=…&clinician=…&start=…&end=…` lists free slots.
 
+### FHIR R4
+Under `/fhir`, fictitious and localhost only. Fixed bearer tokens: `demo-admin-token`, `demo-clinician-token`, `demo-patient-token`; issue others with `docker compose exec web python manage.py api_token <email> [--days N] [--revoke]`.
+- `curl -i localhost:8000/fhir/metadata` lists every resource, interaction and search parameter.
+- `curl 'localhost:8000/fhir/HealthcareService'` then `curl 'localhost:8000/fhir/Slot?service-type=<id>&start=ge2026-12-01T00:00:00%2B01:00&start=lt2026-12-08T00:00:00%2B01:00'` find free slots without a token.
+- `curl -H 'Authorization: Bearer demo-patient-token' localhost:8000/fhir/Appointment` lists the demo patient's appointments.
+
 ## Develop
 1. `uv sync` and `uv run pre-commit install`.
 2. With the stack up: `uv run pytest`.

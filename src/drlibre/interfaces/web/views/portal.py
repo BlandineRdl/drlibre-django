@@ -214,7 +214,7 @@ def profile(request: HttpRequest) -> HttpResponse:
         return private(render(request, "portal/profile.html", {"view": view}))
     values = {key: request.POST.get(key, "") for key in ("phone", "birth_date")}
     try:
-        c.update_profile.execute(user_id=identity.user_id, **values)
+        c.update_profile.execute(actor_id=identity.user_id, user_id=identity.user_id, **values)
     except DomainError as error:
         if error.code is not ErrorCode.INVALID_INPUT:
             raise
