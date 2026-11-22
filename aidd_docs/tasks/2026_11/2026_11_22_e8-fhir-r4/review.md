@@ -29,3 +29,15 @@
 - `DjangoConditionalWrites` takes `FOR UPDATE`, which also blocks inserts' `FOR KEY SHARE` on that row. For example, an admin `If-Match` update of an `AppointmentType` stalls bookings of that type until it commits. No deadlock found (`RefreshSlots` takes no profile lock). A two-writer test would settle it; `select_for_update(no_key=True)` would avoid the stall.
 - Reactivating a user brings back their unexpired tokens (`save_user.py:69` closes sessions only). The spec doesn't say whether that is intended.
 - An unbounded `Slot` search computes every state in memory before paging (`routers/slots.py:182`). `FindFreeSlots` caps it at 31 days, and `load-results.md` was not re-checked.
+
+## Round 2
+### Findings
+- `src/drlibre/interop/infrastructure/conditional_writes.py:50` : `FOR NO KEY UPDATE` was upgraded to `FOR UPDATE` mid-write when the use case re-locked the profile (`scheduling/infrastructure/repositories.py:35`) or the user (`booking/infrastructure/schedule_locks.py:21-35`), a lock-upgrade deadlock risk — fixed: profile and user rows take `FOR UPDATE`, rows no use case re-locks (appointment, rule, reference records) keep `FOR NO KEY UPDATE`; race tests pass with the locks, 7 of 8 fail without — 🟡 major
+- `config/middleware.py:75` : the `"/api/"` literal repeats `API_PREFIX` — fixed, imported from `drlibre.interfaces.paths` — 🟢 minor
+- `src/drlibre/interfaces/fhir/routers/patients.py:159-166` : a clinician's PUT on their own patient with a stale `If-Match` answered 412 instead of 403 — fixed: a non-owner non-admin is refused `forbidden` before the version and the fields, from the reader's scope like `_visible`; `UpdateProfile` still refuses; scenario « pas le praticien, même avec un `If-Match` périmé » — 🟢 minor
+
+### Decisions
+- `communications.py` once-read rule stays in the router: it maps FHIR field mutability, not a business rule.
+- `reference_writes.py` own-role and own-schedule guards are URL/actor consistency checks; the use cases derive the profile from the actor.
+- `scripts/seed_showcase.py` comes from the pre-existing user commit `2f6d3fb` (also on `feat/ui-polish`), out of E8 scope; flagged in the PR.
+- Spec §2 line 30 limits tokens to FHIR, `INSTALL.md:17` says API/FHIR: API and FHIR kept, spec wording unchanged.
