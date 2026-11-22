@@ -1,0 +1,225 @@
+from collections.abc import Iterable
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
+
+from django.conf import settings
+from django.http import HttpRequest, HttpResponse
+from ninja import Router
+
+from drlibre.bootstrap.container import container
+from drlibre.interfaces.fhir.access import caller, reader
+from drlibre.interfaces.fhir.bundle import base_url
+from drlibre.interfaces.fhir.mappers import appointment as to
+from drlibre.interfaces.fhir.mappers import directory
+from drlibre.interfaces.fhir.mappers import patient as patients
+from drlibre.interfaces.fhir.outcome import fhir_response
+from drlibre.interfaces.fhir.params import (
+    DateBound,
+    Prefix,
+    SearchQuery,
+    date_bound,
+    refuse_undeclared,
+    search_query,
+)
+from drlibre.interfaces.fhir.registry import (
+    Interaction,
+    ParamType,
+    ResourceRules,
+    SearchParam,
+    declare,
+)
+from drlibre.interfaces.fhir.routers.directory import LOCATION, PRACTITIONER
+from drlibre.interfaces.fhir.routers.patients import PATIENT
+from drlibre.interfaces.fhir.routing import (
+    bundle_response,
+    entries_of,
+    missing,
+    parse_id,
+    read_body,
+    reference,
+    resource_response,
+    token,
+)
+from drlibre.interfaces.fhir.schemas.appointment import Appointment
+from drlibre.interfaces.fhir.schemas.bundle import BundleEntry
+from drlibre.interfaces.fhir.version import etag
+from drlibre.interop.application.ports.inbound import (
+    AppointmentFilter,
+    AppointmentRow,
+    LocationFilter,
+    Paging,
+    PatientFilter,
+    PractitionerFilter,
+    Reader,
+    RoleFilter,
+)
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
+from drlibre.shared_kernel.ids import Id
+from drlibre.shared_kernel.validation import invalid_field
+
+router = Router(tags=["appointments"])
+
+APPOINTMENT = declare(
+    ResourceRules(
+        type="Appointment",
+        interactions=(Interaction.READ, Interaction.SEARCH, Interaction.CREATE),
+        search=(
+            SearchParam("patient", ParamType.REFERENCE),
+            SearchParam("practitioner", ParamType.REFERENCE),
+            SearchParam("location", ParamType.REFERENCE),
+            SearchParam("status", ParamType.TOKEN),
+            SearchParam("date", ParamType.DATE),
+            SearchParam("service-type", ParamType.TOKEN),
+        ),
+        includes=("Appointment:patient", "Appointment:practitioner", "Appointment:location"),
+        sorts=("date",),
+    )
+)
+_AFTER = timedelta(microseconds=1)
+
+
+def _visible(appointment_id: Id, who: Reader) -> AppointmentRow:
+    """The appointment as the reader sees it; another forbidden, an absent one not_found."""
+    queries = container().interop_appointments
+    found = queries.appointments(AppointmentFilter(ids=(appointment_id,)), who).items
+    if found:
+        return found[0]
+    if queries.exists(appointment_id):
+        raise DomainError(ErrorCode.FORBIDDEN, "Ce rendez-vous ne vous est pas ouvert.")
+    raise missing()
+
+
+@router.get("/Appointment/{resource_id}")
+def read_appointment(request: HttpRequest, resource_id: str) -> HttpResponse:
+    caller(request)
+    refuse_undeclared(request.GET, frozenset())
+    row = _visible(parse_id(resource_id), reader(request))
+    return resource_response(to.appointment(row), to.version_of(row))
+
+
+def _interval(bound: DateBound) -> tuple[datetime, datetime]:
+    """The instants a day, read in the hospital zone, or an instant stands for."""
+    if isinstance(bound.value, datetime):
+        return bound.value, bound.value + _AFTER
+    day: date = bound.value
+    zone = ZoneInfo(settings.TIME_ZONE)
+    first = datetime.combine(day, time(), tzinfo=zone)
+    return first, datetime.combine(day + timedelta(days=1), time(), tzinfo=zone)
+
+
+def _dates(query: SearchQuery) -> tuple[datetime | None, datetime | None]:
+    """The `date` bounds as a start from (included) and before (excluded)."""
+    start_from = start_before = None
+    for raw in query.values("date"):
+        bound = date_bound("date", raw)
+        first, after = _interval(bound)
+        if bound.prefix in (Prefix.EQ, Prefix.GE):
+            start_from = first
+        if bound.prefix is Prefix.GT:
+            start_from = after
+        if bound.prefix in (Prefix.EQ, Prefix.LE):
+            start_before = after
+        if bound.prefix is Prefix.LT:
+            start_before = first
+    return start_from, start_before
+
+
+def _statuses(query: SearchQuery) -> tuple[tuple[str, str], ...]:
+    pairs: list[tuple[str, str]] = []
+    for raw in (v for value in query.values("status") for v in value.split(",") if v):
+        found = to.statuses_of(raw)
+        if not found:
+            raise invalid_field("status", f"Valeur non prise en charge : {raw}.")
+        pairs += found
+    return tuple(pairs)
+
+
+def _service_type(query: SearchQuery) -> Id | None:
+    raw = token(query, "service-type")
+    if raw is None:
+        return None
+    try:
+        return Id.parse(raw)
+    except ValueError as error:
+        raise invalid_field("service-type", "Saisissez l'id d'un HealthcareService.") from error
+
+
+def _ids(found: Iterable[Id | None]) -> tuple[Id, ...]:
+    return tuple(dict.fromkeys(i for i in found if i is not None))
+
+
+def _included(
+    rows: tuple[AppointmentRow, ...], query: SearchQuery, who: Reader
+) -> list[BundleEntry]:
+    entries: list[BundleEntry] = []
+    if "Appointment:patient" in query.includes:
+        found = _ids(r.patient_id for r in rows)
+        page = container().patient_queries.patients(PatientFilter(ids=found), who)
+        entries += entries_of(PATIENT, page.items, patients.patient, include=True)
+    if "Appointment:practitioner" in query.includes:
+        found = _ids(r.practitioner_id for r in rows)
+        listed = container().directory_queries.practitioners(PractitionerFilter(ids=found), who)
+        entries += entries_of(PRACTITIONER, listed.items, directory.practitioner, include=True)
+    if "Appointment:location" in query.includes:
+        found = _ids(r.room_id for r in rows)
+        rooms = container().directory_queries.locations(LocationFilter(ids=found), who)
+        entries += entries_of(LOCATION, rooms.items, directory.location, include=True)
+    return entries
+
+
+@router.get("/Appointment")
+def search_appointment(request: HttpRequest) -> HttpResponse:
+    caller(request)
+    query = search_query(request.GET, APPOINTMENT)
+    who = reader(request)
+    start_from, start_before = _dates(query)
+    criteria = AppointmentFilter(
+        patient=reference(query, "patient", "Patient"),
+        practitioner=reference(query, "practitioner", "Practitioner"),
+        room=reference(query, "location", "Location"),
+        appointment_type=_service_type(query),
+        statuses=_statuses(query),
+        start_from=start_from,
+        start_before=start_before,
+    )
+    paging = Paging(count=query.count, page=query.page, descending=query.sort[:1] == ("-date",))
+    page = container().interop_appointments.appointments(criteria, who, paging)
+    entries = entries_of(APPOINTMENT, page.items, to.appointment)
+    entries += _included(page.items, query, who)
+    return bundle_response(APPOINTMENT, query, page.total, entries)
+
+
+def _profile_of(practitioner_id: Id | None, who: Reader) -> Id | None:
+    """The clinician profile of a practitioner user; one the reader cannot see is not_found."""
+    if practitioner_id is None:
+        return None
+    roles = container().directory_queries.roles(RoleFilter(practitioner=practitioner_id), who)
+    found = [r.id for r in roles.items if not r.is_admin]
+    if not found:
+        raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
+    return found[0]
+
+
+@router.post("/Appointment")
+def create_appointment(request: HttpRequest) -> HttpResponse:
+    identity = caller(request)
+    refuse_undeclared(request.GET, frozenset())
+    asked = to.booking_request(read_body(request, Appointment))
+    who = reader(request)
+    named = _profile_of(asked.practitioner_id, who)
+    if asked.profile_id is not None and named not in (None, asked.profile_id):
+        raise invalid_field("Appointment.participant", "Le praticien n'est pas celui du créneau.")
+    booked = container().book_appointment_as_caller.execute(
+        actor_id=identity.user_id,
+        appointment_type_id=asked.appointment_type_id,
+        start=asked.start,
+        clinician_id=asked.profile_id or named,
+        patient_id=asked.patient_id,
+        room_id=asked.room_id,
+    )
+    row = _visible(booked.id, who)
+    model = to.appointment(row)
+    response = fhir_response(model.model_dump_json(by_alias=True, exclude_none=True), status=201)
+    response["Location"] = f"{base_url()}/Appointment/{booked.id}"
+    response["ETag"] = etag(to.version_of(row))
+    return response

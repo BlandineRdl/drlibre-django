@@ -40,7 +40,11 @@ from tests.fakes.directory import InMemoryDirectoryQueries
 from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
-from tests.fakes.interop import InMemoryConditionalWrites, InMemoryPatientQueries
+from tests.fakes.interop import (
+    InMemoryConditionalWrites,
+    InMemoryInteropAppointmentQueries,
+    InMemoryPatientQueries,
+)
 from tests.fakes.journal_actors import InMemoryJournalActors
 from tests.fakes.notifications import InMemoryNotifications
 from tests.fakes.organisation import (
@@ -273,6 +277,13 @@ class FakeWorld:
             directory_queries=self.directory_queries,
             patient_queries=InMemoryPatientQueries(
                 users=self.users, appointments=self.booking_appointments.rows
+            ),
+            interop_appointments=InMemoryInteropAppointmentQueries(
+                appointments=self.booking_appointments,
+                waitlist=self.waitlist,
+                holds=self.holds,
+                profiles=self.profiles,
+                clock=self.clock,
             ),
             conditional_writes=InMemoryConditionalWrites(),
             admins=InMemoryAdmins(self.users),

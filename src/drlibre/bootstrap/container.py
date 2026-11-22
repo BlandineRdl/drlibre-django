@@ -217,10 +217,12 @@ from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomin
 from drlibre.interop.application.ports.inbound import (
     ConditionalWrites,
     DirectoryQueries,
+    InteropAppointmentQueries,
     PatientQueries,
     Readers,
 )
 from drlibre.interop.infrastructure.conditional_writes import DjangoConditionalWrites
+from drlibre.interop.infrastructure.sql_appointments import SqlInteropAppointmentQueries
 from drlibre.interop.infrastructure.sql_directory import SqlDirectoryQueries
 from drlibre.interop.infrastructure.sql_patients import SqlPatientQueries
 from drlibre.interop.infrastructure.sql_readers import SqlReaders
@@ -474,6 +476,7 @@ class Adapters:
     readers: Readers
     directory_queries: DirectoryQueries
     patient_queries: PatientQueries
+    interop_appointments: InteropAppointmentQueries
     conditional_writes: ConditionalWrites
     admins: Admins
     journal_actors: JournalActors
@@ -500,6 +503,7 @@ class Container:
     readers: Readers
     directory_queries: DirectoryQueries
     patient_queries: PatientQueries
+    interop_appointments: InteropAppointmentQueries
     conditional_writes: ConditionalWrites
     change_password: ChangePassword
     update_profile: UpdateProfile
@@ -669,6 +673,7 @@ def wire(a: Adapters) -> Container:
         readers=a.readers,
         directory_queries=a.directory_queries,
         patient_queries=a.patient_queries,
+        interop_appointments=a.interop_appointments,
         conditional_writes=a.conditional_writes,
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
@@ -1298,6 +1303,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         readers=SqlReaders(),
         directory_queries=SqlDirectoryQueries(),
         patient_queries=SqlPatientQueries(),
+        interop_appointments=SqlInteropAppointmentQueries(clock=clock),
         conditional_writes=DjangoConditionalWrites(),
         admins=IdentityAdmins(user_queries),
         journal_actors=IdentityJournalActors(users=user_queries, staff=user_queries),

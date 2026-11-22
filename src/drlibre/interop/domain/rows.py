@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from enum import StrEnum
 
 from drlibre.shared_kernel.ids import Id
 
@@ -156,4 +157,43 @@ class PatientRow:
     phone: str | None
     birth_date: date | None
     active: bool
+    updated_at: datetime
+
+
+class AppointmentKind(StrEnum):
+    """The record an `Appointment` resource stands for."""
+
+    APPOINTMENT = "appointment"
+    WAITLIST = "waitlist"
+    HOLD = "hold"
+
+
+HELD = "HELD"
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentRow:
+    """An appointment, a waitlist entry not yet booked or an open hold, as its reader sees it."""
+
+    id: Id
+    kind: AppointmentKind
+    # The record's own status: an appointment's, an entry's, or HELD for a hold.
+    status: str
+    patient_id: Id | None
+    # An offered entry's offered clinician, a waiting one's preferred clinician; a profile id.
+    clinician_id: Id | None
+    practitioner_id: Id | None
+    appointment_type_id: Id
+    room_id: Id | None
+    # An offered entry's offered start and end; none for a waiting entry.
+    start: datetime | None
+    end: datetime | None
+    # A waitlist entry's window.
+    earliest: datetime | None
+    latest: datetime | None
+    source: str | None
+    reason: str | None
+    cancellation_reason: str | None
+    # Filled for the appointment's own clinician only.
+    clinical_notes: str | None
     updated_at: datetime

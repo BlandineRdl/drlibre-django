@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 
 from drlibre.shared_kernel.ids import Id
@@ -115,3 +115,18 @@ class PatientFilter:
     email: str | None = None
     phone: str | None = None
     birth_date: date | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentFilter:
+    """`practitioner` is a clinician's user; `statuses` pairs a record kind with its own status."""
+
+    ids: tuple[Id, ...] = ()
+    patient: Id | None = None
+    practitioner: Id | None = None
+    room: Id | None = None
+    appointment_type: Id | None = None
+    statuses: tuple[tuple[str, str], ...] = ()
+    # The start lies from `start_from` included to `start_before` excluded.
+    start_from: datetime | None = None
+    start_before: datetime | None = None

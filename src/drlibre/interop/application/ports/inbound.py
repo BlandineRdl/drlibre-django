@@ -4,6 +4,7 @@ from enum import StrEnum
 from typing import Protocol
 
 from drlibre.interop.domain.filters import (
+    AppointmentFilter,
     LocationFilter,
     LocationKind,
     Near,
@@ -19,6 +20,9 @@ from drlibre.interop.domain.filters import (
 )
 from drlibre.interop.domain.reader import Reader, ReaderKind
 from drlibre.interop.domain.rows import (
+    HELD,
+    AppointmentKind,
+    AppointmentRow,
     AvailabilityRow,
     DepartmentRow,
     HospitalRow,
@@ -36,11 +40,16 @@ from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page
 
 __all__ = [
+    "HELD",
+    "AppointmentFilter",
+    "AppointmentKind",
+    "AppointmentRow",
     "AvailabilityRow",
     "ConditionalWrites",
     "DepartmentRow",
     "DirectoryQueries",
     "HospitalRow",
+    "InteropAppointmentQueries",
     "LocationFilter",
     "LocationKind",
     "Locked",
@@ -132,6 +141,18 @@ class PatientQueries(Protocol):
 
     def exists(self, patient_id: Id) -> bool:
         """Whether a patient has that id, whoever reads: hidden is not absent."""
+        ...
+
+
+class InteropAppointmentQueries(Protocol):
+    def appointments(
+        self, criteria: AppointmentFilter, reader: Reader, paging: Paging | None = None
+    ) -> Page[AppointmentRow]:
+        """By start: a patient's own and entries, a clinician's agenda and holds, all for admins."""
+        ...
+
+    def exists(self, appointment_id: Id) -> bool:
+        """Whether an appointment, unbooked entry or open hold has that id, whoever reads."""
         ...
 
 
