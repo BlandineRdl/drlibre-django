@@ -95,6 +95,7 @@ def test_a_cancelled_card_shows_its_status_and_cancellation_reason_without_a_roo
     card = appointment_card(entry(appointment=cancelled, room=None, allowed_actions=frozenset()))
 
     assert card.status == "Statut : Annulé"
+    assert card.status_key == "cancelled"
     assert "Rythmologie" in card.lines
     assert "Motif de l'annulation : Empêchement" in card.lines
 

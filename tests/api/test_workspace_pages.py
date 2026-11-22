@@ -96,7 +96,9 @@ def test_the_day_lists_own_appointments_by_hour_with_the_time_zone_named(
     assert "Agenda du Lundi 23/11/2026" in body
     assert "Fuseau : Europe/Paris" in body
     assert '<h2 id="hour-1">09:00</h2>' in body
-    assert "Ana Martin · Consultation · Salle : Salle 1 · Statut : Réservé" in body
+    assert "<strong>Ana Martin</strong>" in body
+    assert "Statut : </span>Réservé" in body
+    assert "Consultation · Salle : Salle 1" in body
     assert "Zoé Autre" not in body
 
 
@@ -148,10 +150,7 @@ def test_the_week_shows_appointments_by_type_and_time_off_blocks(workspace: Work
     body = main(response)
     assert response.status_code == 200
     assert "Fuseau : Europe/Paris" in body
-    assert (
-        f'class="appointment" style="--type-colour:#336699"><a href="{workspace.base}">'
-        "Consultation</a>"
-    ) in body
+    assert (f'class="appointment hue-5"><a href="{workspace.base}">Consultation</a>') in body
     assert body.count(">Consultation</a>") == 1
     assert body.count('class="time-off">Absence</td>') == 2
 

@@ -404,7 +404,8 @@ def book_page(
             tuple(
                 ChoiceView(str(p.user_id), f"{p.full_name} · {p.email}", False) for p in patients
             ),
-            choice.patient,
+            # A single match is the patient searched for, so it is ticked already.
+            choice.patient or (str(patients[0].user_id) if len(patients) == 1 else ""),
         ),
         types=_picked(_choices(types, None), choice.appointment_type),
         clinicians=_picked(_choices(clinicians, None), choice.clinician),
