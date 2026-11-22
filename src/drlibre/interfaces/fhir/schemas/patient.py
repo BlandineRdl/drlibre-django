@@ -2,14 +2,14 @@ from typing import Literal
 
 from drlibre.interfaces.fhir.schemas.common import (
     ContactPoint,
+    DomainResource,
     Extension,
-    FhirModel,
     HumanName,
     Meta,
 )
 
 
-class Patient(FhirModel):
+class Patient(DomainResource):
     """Read in full; on update, `id` and `meta` may be left out."""
 
     resource_type: Literal["Patient"] = "Patient"

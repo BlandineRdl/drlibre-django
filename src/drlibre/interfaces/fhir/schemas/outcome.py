@@ -1,6 +1,6 @@
 from typing import Literal
 
-from drlibre.interfaces.fhir.schemas.common import CodeableConcept, FhirModel
+from drlibre.interfaces.fhir.schemas.common import CodeableConcept, DomainResource, FhirModel
 
 
 class OperationOutcomeIssue(FhirModel):
@@ -11,6 +11,6 @@ class OperationOutcomeIssue(FhirModel):
     expression: tuple[str, ...] | None = None
 
 
-class OperationOutcome(FhirModel):
+class OperationOutcome(DomainResource):
     resource_type: Literal["OperationOutcome"] = "OperationOutcome"
     issue: tuple[OperationOutcomeIssue, ...]

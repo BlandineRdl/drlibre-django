@@ -1,9 +1,14 @@
 from typing import Literal
 
-from drlibre.interfaces.fhir.schemas.common import CodeableConcept, FhirModel, Meta, Reference
+from drlibre.interfaces.fhir.schemas.common import (
+    CodeableConcept,
+    DomainResource,
+    Meta,
+    Reference,
+)
 
 
-class Slot(FhirModel):
+class Slot(DomainResource):
     resource_type: Literal["Slot"] = "Slot"
     id: str
     meta: Meta

@@ -1,14 +1,20 @@
 from datetime import datetime
 from typing import Literal
 
-from drlibre.interfaces.fhir.schemas.common import CodeableConcept, FhirModel, Meta, Reference
+from drlibre.interfaces.fhir.schemas.common import (
+    CodeableConcept,
+    DomainResource,
+    FhirModel,
+    Meta,
+    Reference,
+)
 
 
 class CommunicationPayload(FhirModel):
     content_string: str
 
 
-class Communication(FhirModel):
+class Communication(DomainResource):
     """A notification; its recipient may fill `received` once, nothing else."""
 
     resource_type: Literal["Communication"] = "Communication"

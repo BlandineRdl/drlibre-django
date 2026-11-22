@@ -12,6 +12,7 @@ from drlibre.interfaces.fhir import FhirParser
 from drlibre.interfaces.fhir.access import caller
 from drlibre.interfaces.fhir.bundle import searchset
 from drlibre.interfaces.fhir.diff import changes
+from drlibre.interfaces.fhir.narrative import narrative
 from drlibre.interfaces.fhir.outcome import error_outcome
 from drlibre.interfaces.fhir.params import DateBound, Prefix, date_bound, search_query
 from drlibre.interfaces.fhir.registry import Interaction, ParamType, ResourceRules, SearchParam
@@ -228,3 +229,22 @@ def test_a_stale_version_is_a_conflict_answered_412() -> None:
     (issue,) = json.loads(response.content)["issue"]
     assert response.status_code == 412
     assert (issue["code"], issue["details"]["coding"][0]["code"]) == ("conflict", "conflict")
+
+
+@pytest.mark.integration
+@pytest.mark.django_db
+def test_every_answer_carries_a_readable_summary(call: Call) -> None:
+    """Spec §15.1 : chaque ressource FHIR R4 porte son résumé lisible généré (dom-6)."""
+    text = call("GET", "/fhir/metadata").json()["text"]
+
+    assert text["status"] == "generated"
+    assert text["div"].startswith('<div xmlns="http://www.w3.org/1999/xhtml">')
+    assert "CapabilityStatement" in text["div"]
+
+
+def test_a_readable_summary_escapes_its_values_and_leaves_out_clinical_notes() -> None:
+    """Spec §15.3 : les notes cliniques restent hors du résumé lisible."""
+    div = narrative({"resourceType": "Appointment", "status": "<b>", "comment": "secret"})["div"]
+
+    assert "&lt;b&gt;" in div
+    assert "secret" not in div

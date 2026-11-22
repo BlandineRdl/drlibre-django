@@ -1,7 +1,14 @@
 from datetime import datetime
 from typing import Literal
 
-from drlibre.interfaces.fhir.schemas.common import Coding, Extension, FhirModel, Meta, Reference
+from drlibre.interfaces.fhir.schemas.common import (
+    Coding,
+    DomainResource,
+    Extension,
+    FhirModel,
+    Meta,
+    Reference,
+)
 
 
 class AuditEventAgent(FhirModel):
@@ -25,7 +32,7 @@ class AuditEventEntity(FhirModel):
     detail: tuple[AuditEventDetail, ...] | None = None
 
 
-class AuditEvent(FhirModel):
+class AuditEvent(DomainResource):
     """An audit entry, read only; the correlation id rides in an extension."""
 
     resource_type: Literal["AuditEvent"] = "AuditEvent"

@@ -2,6 +2,7 @@ from typing import Literal
 
 from drlibre.interfaces.fhir.schemas.common import (
     CodeableConcept,
+    DomainResource,
     Extension,
     FhirModel,
     Meta,
@@ -15,7 +16,7 @@ class Participant(FhirModel):
     status: str = "accepted"
 
 
-class Appointment(FhirModel):
+class Appointment(DomainResource):
     """Read in full; on create, the server fills `id`, `meta`, `end` and the source."""
 
     resource_type: Literal["Appointment"] = "Appointment"

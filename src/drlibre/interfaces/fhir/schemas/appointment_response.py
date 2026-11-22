@@ -1,9 +1,9 @@
 from typing import Literal
 
-from drlibre.interfaces.fhir.schemas.common import FhirModel, Meta, Reference
+from drlibre.interfaces.fhir.schemas.common import DomainResource, Meta, Reference
 
 
-class AppointmentResponse(FhirModel):
+class AppointmentResponse(DomainResource):
     """An accepted offer; on create the server fills `id`, `meta` and the actor, its patient."""
 
     resource_type: Literal["AppointmentResponse"] = "AppointmentResponse"

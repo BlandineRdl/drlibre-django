@@ -4,6 +4,7 @@ from drlibre.interfaces.fhir.schemas.common import (
     Address,
     CodeableConcept,
     ContactPoint,
+    DomainResource,
     Extension,
     FhirModel,
     HumanName,
@@ -14,7 +15,7 @@ from drlibre.interfaces.fhir.schemas.common import (
 )
 
 
-class Organization(FhirModel):
+class Organization(DomainResource):
     resource_type: Literal["Organization"] = "Organization"
     id: str | None = None
     meta: Meta | None = None
@@ -33,7 +34,7 @@ class Position(FhirModel):
     latitude: float
 
 
-class Location(FhirModel):
+class Location(DomainResource):
     resource_type: Literal["Location"] = "Location"
     id: str | None = None
     meta: Meta | None = None
@@ -50,7 +51,7 @@ class Location(FhirModel):
     part_of: Reference | None = None
 
 
-class HealthcareService(FhirModel):
+class HealthcareService(DomainResource):
     resource_type: Literal["HealthcareService"] = "HealthcareService"
     id: str | None = None
     meta: Meta | None = None
@@ -67,7 +68,7 @@ class Concept(FhirModel):
     display: str
 
 
-class CodeSystem(FhirModel):
+class CodeSystem(DomainResource):
     resource_type: Literal["CodeSystem"] = "CodeSystem"
     id: str | None = None
     meta: Meta | None = None
@@ -93,7 +94,7 @@ class ValueSetCompose(FhirModel):
     include: tuple[ValueSetInclude, ...]
 
 
-class ValueSet(FhirModel):
+class ValueSet(DomainResource):
     resource_type: Literal["ValueSet"] = "ValueSet"
     id: str | None = None
     meta: Meta | None = None
@@ -105,7 +106,7 @@ class ValueSet(FhirModel):
     compose: ValueSetCompose
 
 
-class Practitioner(FhirModel):
+class Practitioner(DomainResource):
     resource_type: Literal["Practitioner"] = "Practitioner"
     id: str | None = None
     meta: Meta | None = None
@@ -126,7 +127,7 @@ class NotAvailable(FhirModel):
     during: Period
 
 
-class PractitionerRole(FhirModel):
+class PractitionerRole(DomainResource):
     resource_type: Literal["PractitionerRole"] = "PractitionerRole"
     id: str | None = None
     meta: Meta | None = None
@@ -142,7 +143,7 @@ class PractitionerRole(FhirModel):
     not_available: tuple[NotAvailable, ...] | None = None
 
 
-class Schedule(FhirModel):
+class Schedule(DomainResource):
     """A client writes it without id, meta, `active` or the horizon, all computed."""
 
     resource_type: Literal["Schedule"] = "Schedule"

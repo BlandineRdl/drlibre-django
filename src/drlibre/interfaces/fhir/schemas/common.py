@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, model_serializer
 from pydantic.alias_generators import to_camel
+
+from drlibre.interfaces.fhir.narrative import narrative
 
 
 class FhirModel(BaseModel):
@@ -68,3 +71,20 @@ class Address(FhirModel):
     city: str | None = None
     postal_code: str | None = None
     country: str | None = None
+
+
+class Narrative(FhirModel):
+    status: str
+    div: str
+
+
+class DomainResource(FhirModel):
+    """A resource with its readable `text`; a sent one is regenerated, never compared."""
+
+    text: Narrative | None = None
+
+    @model_serializer(mode="wrap")
+    def _with_text(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        dumped = handler(self)
+        dumped["text"] = narrative(dumped)
+        return dumped

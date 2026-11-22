@@ -6,7 +6,12 @@ from ninja import Router
 from drlibre.interfaces.fhir.bundle import base_url
 from drlibre.interfaces.fhir.params import refuse_undeclared
 from drlibre.interfaces.fhir.registry import ResourceRules, declared
-from drlibre.interfaces.fhir.schemas.common import CodeableConcept, Coding, FhirModel
+from drlibre.interfaces.fhir.schemas.common import (
+    CodeableConcept,
+    Coding,
+    DomainResource,
+    FhirModel,
+)
 
 router = Router(tags=["metadata"])
 
@@ -47,7 +52,7 @@ class Implementation(FhirModel):
     url: str
 
 
-class CapabilityStatement(FhirModel):
+class CapabilityStatement(DomainResource):
     resource_type: Literal["CapabilityStatement"] = "CapabilityStatement"
     status: Literal["active"] = "active"
     date: str = RELEASED
