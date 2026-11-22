@@ -17,21 +17,23 @@
     <button type="submit">Afficher</button>
   </fieldset>
 </form>
-<nav aria-label="Semaines" class="pagination">
+<nav aria-label="Semaines" class="pagination week-nav">
   {% if view.previous_url %}<a href="{{ view.previous_url }}">‹ Semaine précédente</a>{% endif %}
   <h2>{{ view.week_label }}</h2>
   {% if view.next_url %}<a href="{{ view.next_url }}">Semaine suivante ›</a>{% endif %}
 </nav>
-{% if view.empty_week_text %}<p>{{ view.empty_week_text }}</p>{% endif %}
+{% if view.empty_week_text %}
+<p class="notice">{{ view.empty_week_text }}{% if view.next_slot_url %} <a href="{{ view.next_slot_url }}">{{ view.next_slot_text }} ›</a>{% endif %}</p>
+{% endif %}
 <div class="week-strip">
   {% for day in view.days %}
-  <section aria-label="{{ day.label }}">
+  <section aria-label="{{ day.label }}"{% if day.past %} class="is-past"{% endif %}>
     <h3>{{ day.label }}</h3>
     {% if day.slots %}
     <ul class="slot-list">
       {% for slot in day.slots %}<li><a href="{{ slot.url }}" role="button" class="outline secondary">{{ slot.label }}</a></li>{% endfor %}
     </ul>
-    {% else %}<p>{{ day.empty_text }}</p>{% endif %}
+    {% else %}<p class="day-empty">{{ day.empty_text }}</p>{% endif %}
   </section>
   {% endfor %}
 </div>

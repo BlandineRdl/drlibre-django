@@ -357,11 +357,14 @@ def _base(criteria: SearchCriteria, horizon: Horizon) -> tuple[str, Params]:
     if criteria.text:
         params["text"] = _like(criteria.text)
         conditions.append(
-            """(h.name ILIKE %(text)s OR h.city ILIKE %(text)s OR u.full_name ILIKE %(text)s
- OR sp.name ILIKE %(text)s OR d.name ILIKE %(text)s
+            """(unaccent(h.name) ILIKE unaccent(%(text)s)
+ OR unaccent(h.city) ILIKE unaccent(%(text)s)
+ OR unaccent(u.full_name) ILIKE unaccent(%(text)s)
+ OR unaccent(sp.name) ILIKE unaccent(%(text)s)
+ OR unaccent(d.name) ILIKE unaccent(%(text)s)
  OR EXISTS (SELECT 1 FROM organisation_appointmenttyperecord t2
             WHERE t2.department_id = d.id AND t2.active AND t2.bookable_online
-              AND t2.name ILIKE %(text)s))"""
+              AND unaccent(t2.name) ILIKE unaccent(%(text)s)))"""
         )
     if criteria.specialty:
         params["specialty"] = criteria.specialty.value
@@ -371,7 +374,7 @@ def _base(criteria: SearchCriteria, horizon: Horizon) -> tuple[str, Params]:
         conditions.append("h.id = %(hospital)s")
     if criteria.city:
         params["city"] = _like(criteria.city)
-        conditions.append("h.city ILIKE %(city)s")
+        conditions.append("unaccent(h.city) ILIKE unaccent(%(city)s)")
     type_filter = ""
     if criteria.appointment_type:
         params["type"] = criteria.appointment_type.value

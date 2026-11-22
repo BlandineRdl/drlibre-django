@@ -14,6 +14,11 @@ def local(instant: datetime, time_zone: str) -> datetime:
     return instant.astimezone(ZoneInfo(time_zone))
 
 
+def zone_name(time_zone: str, *, heading: bool = False) -> str:
+    """The zone by its city, as people say it: « Europe/Paris » reads « heure de Paris »."""
+    return f"{'Heure' if heading else 'heure'} de {time_zone.rsplit('/', 1)[-1].replace('_', ' ')}"
+
+
 def day_label(day: date) -> str:
     return f"{DAYS[day.weekday()]} {day:%d/%m}"
 

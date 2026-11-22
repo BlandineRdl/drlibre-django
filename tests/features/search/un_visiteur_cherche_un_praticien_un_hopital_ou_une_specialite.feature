@@ -24,6 +24,9 @@ Feature: Un visiteur cherche un praticien, un hôpital ou une spécialité
       | rhumato  | Dr Alice Martin |
       | cœur     | Dr Alice Martin |
       | BILAN    | Dr Alice Martin |
+      | hopital  | Dr Alice Martin |
+      | coeur    | Dr Alice Martin |
+      | RHUMATÔ  | Dr Alice Martin |
 
   Scenario: Les résultats forment trois listes entre lesquelles le visiteur bascule : praticiens, hôpitaux, spécialités.
     When the visitor opens "/?q=nord"

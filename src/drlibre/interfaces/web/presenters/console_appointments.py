@@ -1,6 +1,6 @@
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from drlibre.booking.application.ports.inbound import (
@@ -14,6 +14,7 @@ from drlibre.booking.application.ports.inbound import (
     Source,
 )
 from drlibre.identity.application.ports.inbound import PatientMatch
+from drlibre.interfaces.web.presenters.audit_labels import action_label
 from drlibre.interfaces.web.presenters.forms import ChoiceView, FormView, build_form
 from drlibre.interfaces.web.presenters.portal import (
     REASON_FIELD,
@@ -21,11 +22,11 @@ from drlibre.interfaces.web.presenters.portal import (
     WeekStripView,
     refusal_text,
     rule_reasons,
+    status_key,
     week_strip,
 )
-from drlibre.interfaces.web.presenters.slots import local
+from drlibre.interfaces.web.presenters.slots import day_label, local, zone_name
 from drlibre.interfaces.web.presenters.workspace import (
-    ACTION_LABELS,
     ACTOR_LABELS,
     NONE,
     STATUS_ACTIONS,
@@ -103,6 +104,9 @@ def filter_query(f: AdminAppointmentFilter) -> dict[str, str]:
     return {k: v for k, v in pairs.items() if v}
 
 
+INVERTED_DATES = "La date « Du » est après la date « Au » : aucun rendez-vous ne peut correspondre."
+
+
 @dataclass(frozen=True, slots=True)
 class FilterView:
     start: str
@@ -118,6 +122,7 @@ class AppointmentRowView:
     label: str
     cells: tuple[str, ...]
     open_url: str
+    status_key: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +136,8 @@ class AppointmentsListView:
     export_url: str
     book_url: str
     zone_note: str
+    status_column: int = HEADERS.index("Statut")
+    date_warning: str = ""
 
 
 def _choices(
@@ -159,6 +166,7 @@ def _row(row: AdminAppointmentRow) -> AppointmentRowView:
             row.room or NONE,
         ),
         open_url=appointment_url(a.id),
+        status_key=status_key(a.status),
     )
 
 
@@ -176,7 +184,9 @@ def list_page(
         return f"{CONSOLE_APPOINTMENTS_URL}?{urlencode({**kept, 'page': number})}"
 
     noun = "résultat" if page.total == 1 else "résultats"
+    inverted = bool(shown.start_date and shown.end_date and shown.start_date > shown.end_date)
     return AppointmentsListView(
+        date_warning=INVERTED_DATES if inverted else "",
         filters=FilterView(
             start=kept.get("from", ""),
             end=kept.get("to", ""),
@@ -272,7 +282,13 @@ def file_page(
         notice=NOTICES.get(notice, ""),
         refusal=refusal_text(refusal) if refusal else "",
         reasons=rule_reasons(refusal),
-        facts=(*appointment_facts(file), FactView("Source", SOURCE_LABELS[a.source])),
+        facts=(
+            *appointment_facts(file),
+            FactView("Praticien", file.clinician_name),
+            FactView("Hôpital", file.hospital_name),
+            FactView("Fuseau", f"{zone_name(zone)} ({zone})"),
+            FactView("Source", SOURCE_LABELS[a.source]),
+        ),
         buttons=tuple(
             ButtonView(text, f"{text} : {label}", appointment_url(a.id, segment))
             for action, (segment, text) in STATUS_ACTIONS.items()
@@ -285,7 +301,7 @@ def file_page(
         history=tuple(
             HistoryRowView(
                 at=f"{local(h.at, zone):%d/%m/%Y %H:%M}",
-                action=ACTION_LABELS.get(h.action, h.action),
+                action=action_label(h.action),
                 actor=ACTOR_LABELS[h.actor],
             )
             for h in file.history
@@ -362,6 +378,8 @@ class BookPage:
     time_zone: str
     action: str
     cancel_url: str
+    next_slot_text: str = ""
+    next_slot_url: str = ""
 
 
 def _picked(options: tuple[ChoiceView, ...], raw: str) -> tuple[ChoiceView, ...]:
@@ -377,9 +395,11 @@ def book_page(
     rooms: tuple[BookingOption, ...],
     week: FreeWeek | None,
     error: DomainError | None = None,
+    upcoming: tuple[datetime, ...] = (),
 ) -> BookPage:
     """Patient, type, clinician, then the week's free slots with an optional room."""
     strip = None
+    following = None
     if week is not None:
         strip = week_strip(week, BOOK_URL)
 
@@ -391,6 +411,9 @@ def book_page(
             previous_url=week_url(week.previous_monday),
             next_url=week_url(week.next_monday),
         )
+        sunday = week.monday + timedelta(days=6)
+        later = (local(s, week.time_zone) for s in upcoming)
+        following = None if week.slots else next((s for s in later if s.date() > sunday), None)
     return BookPage(
         refusal=refusal_text(error) if error else "",
         reasons=rule_reasons(error),
@@ -400,7 +423,8 @@ def book_page(
             tuple(
                 ChoiceView(str(p.user_id), f"{p.full_name} · {p.email}", False) for p in patients
             ),
-            choice.patient,
+            # A single match is the patient searched for, so it is ticked already.
+            choice.patient or (str(patients[0].user_id) if len(patients) == 1 else ""),
         ),
         types=_picked(_choices(types, None), choice.appointment_type),
         clinicians=_picked(_choices(clinicians, None), choice.clinician),
@@ -409,4 +433,12 @@ def book_page(
         time_zone=week.time_zone if week else "",
         action=BOOK_URL,
         cancel_url=CONSOLE_APPOINTMENTS_URL,
+        next_slot_text=(
+            f"Prochain créneau libre : {day_label(following.date())} à {following:%H:%M}"
+            if following
+            else ""
+        ),
+        next_slot_url=(
+            f"{BOOK_URL}?{choice.query(week=following.date().isoformat())}" if following else ""
+        ),
     )

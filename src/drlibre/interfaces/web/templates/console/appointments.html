@@ -10,6 +10,7 @@
 </div>
 <p>{{ view.zone_note }}</p>
 <search>
+{% if view.date_warning %}<div role="alert" class="error-summary"><p>{{ view.date_warning }}</p></div>{% endif %}
 <form method="get" action="/console/appointments/">
   <div class="grid">
     <div>
@@ -55,14 +56,14 @@
 </form>
 </search>
 {% if view.rows %}
-<div class="overflow-auto" tabindex="0" role="region" aria-label="Rendez-vous de tous les hôpitaux">
+<div class="overflow-auto appointments-table" tabindex="0" role="region" aria-label="Rendez-vous de tous les hôpitaux">
   <table>
     <caption>Rendez-vous, plus récents d'abord : {{ view.summary }}</caption>
     <thead><tr>{% for header in view.headers %}<th scope="col">{{ header }}</th>{% endfor %}<th scope="col">Fiche</th></tr></thead>
     <tbody>
     {% for row in view.rows %}
       <tr>
-        {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+        {% for cell in row.cells %}{% if forloop.counter0 == view.status_column %}<td><span class="badge status-{{ row.status_key }}">{{ cell }}</span></td>{% else %}<td>{{ cell }}</td>{% endif %}{% endfor %}
         <td><a href="{{ row.open_url }}" aria-label="Ouvrir le rendez-vous {{ row.label }}">Ouvrir</a></td>
       </tr>
     {% endfor %}

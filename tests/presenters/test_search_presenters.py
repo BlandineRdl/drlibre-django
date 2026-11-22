@@ -46,7 +46,7 @@ def test_a_provider_card_shows_local_starts_as_booking_links_and_the_type() -> N
     assert view.slots[0].url == (
         f"/booking/new?type={KIND}&clinician={CLINICIAN}&start=2026-11-23T08:00:00Z"
     )
-    assert "Heures de Europe/Paris" in view.lines
+    assert "Heure de Paris" in view.lines
     assert view.empty_text == ""
 
 

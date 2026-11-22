@@ -15,6 +15,7 @@ from drlibre.booking.application.ports.inbound import (
     HistoryActor,
     RoomsDayView,
 )
+from drlibre.interfaces.web.presenters.audit_labels import action_label
 from drlibre.interfaces.web.presenters.availability import (
     GRID_ROWS,
     GRID_START,
@@ -32,6 +33,7 @@ from drlibre.interfaces.web.presenters.portal import (
     WeekStripView,
     refusal_text,
     rule_reasons,
+    status_key,
     week_strip,
 )
 from drlibre.interfaces.web.presenters.slots import day_label, local
@@ -75,13 +77,6 @@ NOTICES = {
     "cancelled": "Le rendez-vous est annulé.",
     "moved": "Le rendez-vous est déplacé.",
     "notes": "Les notes cliniques sont enregistrées.",
-}
-ACTION_LABELS = {
-    "booking.appointment_booked": "RDV réservé",
-    "booking.appointment_cancelled": "RDV annulé",
-    "booking.appointment_rescheduled": "RDV déplacé",
-    "booking.appointment_status_changed": "Statut modifié",
-    "booking.appointment_notes_written": "Notes cliniques enregistrées",
 }
 ACTOR_LABELS = {
     HistoryActor.PATIENT: "Patient",
@@ -158,6 +153,7 @@ class AgendaRowView:
     cancel_url: str
     page_url: str
     label: str
+    status_key: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +204,7 @@ def _row(entry: ClinicianEntry, zone: str) -> AgendaRowView:
         cancel_url=_cancel_url(entry),
         page_url=appointment_url(entry.appointment.id),
         label=label,
+        status_key=status_key(entry.appointment.status),
     )
 
 
@@ -274,6 +271,7 @@ def calendar_page(
 class FactView:
     label: str
     value: str
+    badge: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -316,7 +314,7 @@ def appointment_facts(file: AppointmentFile) -> tuple[FactView, ...]:
         FactView("Type", entry.appointment_type),
         FactView("Salle", entry.room or NONE),
         FactView("Motif", a.reason or NONE),
-        FactView("Statut", STATUS_LABELS[a.status]),
+        FactView("Statut", STATUS_LABELS[a.status], status_key(a.status)),
     ]
     if a.cancellation_reason:
         facts.append(FactView("Motif de l'annulation", a.cancellation_reason))
@@ -362,7 +360,7 @@ def appointment_page(
         history=tuple(
             HistoryRowView(
                 at=f"{local(h.at, zone):%d/%m/%Y %H:%M}",
-                action=ACTION_LABELS.get(h.action, h.action),
+                action=action_label(h.action),
                 actor=ACTOR_LABELS[h.actor],
             )
             for h in file.history

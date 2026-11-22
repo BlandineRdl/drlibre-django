@@ -212,8 +212,8 @@ class BookingNotices(Protocol):
         """Write the patient's « RDV réservé » notification in the unit of work; no email."""
         ...
 
-    def rescheduled(self, appointment: Appointment) -> None:
-        """Write the patient's « RDV déplacé » notification and queue its email."""
+    def rescheduled(self, appointment: Appointment, previous_start: datetime | None = None) -> None:
+        """Write the « RDV déplacé » notification and queue its email, recalling the old date."""
         ...
 
     def cancelled(self, appointment: Appointment) -> None:

@@ -66,7 +66,7 @@ def says(scene: Scene, text: str) -> None:
 
 @then(parsers.parse('the menu says "{label}"'))
 def menu_says(scene: Scene, label: str) -> None:
-    assert f'<a href="/portal/notifications">{label}</a>' in page_text(scene)
+    assert f'<span class="visually-hidden">{label}</span>' in page_text(scene)
 
 
 @then(parsers.parse('the action "{label}" leads to the public search'))

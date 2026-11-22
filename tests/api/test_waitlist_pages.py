@@ -24,7 +24,9 @@ def test_every_waitlist_page_renders_for_a_passwordless_patient_and_an_admin() -
 
         assert (portal.status_code, listing.status_code, new.status_code) == (200, 200, 200)
         assert portal["Cache-Control"] == "no-store"
-        assert 'href="/portal/waitlist">Liste d\'attente</a>' in page(portal)
+        assert 'href="/portal/waitlist" aria-current="page">Liste d&#x27;attente</a>' in page(
+            portal
+        )
         assert [r.status_code for r in refused] == [403, 403]
 
 

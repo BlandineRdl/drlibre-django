@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from drlibre.booking.application.ports.outbound import (
     BookingDirectory,
@@ -47,10 +48,14 @@ class OutboxBookingNotices(BookingNotices):
     def booked(self, appointment: Appointment) -> None:
         self._in_app(appointment, AppointmentEvent.BOOKED, self._venue(appointment))
 
-    def rescheduled(self, appointment: Appointment) -> None:
+    def rescheduled(self, appointment: Appointment, previous_start: datetime | None = None) -> None:
         venue = self._venue(appointment)
         self._in_app(appointment, AppointmentEvent.RESCHEDULED, venue)
-        self._email(appointment, emails.RESCHEDULED, venue)
+        subject, headline = emails.RESCHEDULED
+        if previous_start is not None and venue is not None:
+            was = previous_start.astimezone(ZoneInfo(venue.time_zone))
+            headline = f"{headline} Il était prévu le {was:%d/%m/%Y à %H:%M}."
+        self._email(appointment, (subject, headline), venue)
 
     def cancelled(self, appointment: Appointment) -> None:
         venue = self._venue(appointment)

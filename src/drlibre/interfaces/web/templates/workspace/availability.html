@@ -18,7 +18,7 @@
         <th scope="row">{{ row.day }}</th><td>{{ row.hours }}</td><td>{{ row.step }}</td><td>{{ row.room }}</td>
         <td class="actions">
           <a href="{{ row.edit_url }}" aria-label="Modifier la plage {{ row.label }}">Modifier</a>
-          <a href="{{ row.delete_url }}" aria-label="Supprimer la plage {{ row.label }}">Supprimer</a>
+          <a href="{{ row.delete_url }}" class="danger-link" aria-label="Supprimer la plage {{ row.label }}">Supprimer</a>
         </td>
       </tr>
     {% endfor %}

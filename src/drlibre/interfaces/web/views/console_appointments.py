@@ -238,7 +238,7 @@ def _book_view(
     options = c.booking_option_queries.booking_options(kind_id) if kind_id else None
     clinicians = options.clinicians if options else ()
     clinician = next((o.id for o in clinicians if str(o.id) == choice.clinician), None)
-    free = None
+    free, upcoming = None, ()
     if kind_id is not None and clinician is not None and parse_id(choice.patient):
         free = c.find_free_week.execute(
             appointment_type_id=kind_id,
@@ -246,6 +246,13 @@ def _book_view(
             week=day_param(week),
             for_patient=False,
         )
+        if not free.slots:
+            upcoming = tuple(
+                s.start
+                for s in c.next_bookable_slots.execute(
+                    appointment_type_id=kind_id, clinician_id=clinician
+                )
+            )
     view = book_page(
         choice,
         patients=c.patient_lookup.active_patients(choice.search) if choice.search else (),
@@ -254,6 +261,7 @@ def _book_view(
         rooms=options.rooms if options else (),
         week=free,
         error=error,
+        upcoming=upcoming,
     )
     status = error.code.http_status if error else 200
     return _render(request, "console/book.html", {"view": view}, status=status)

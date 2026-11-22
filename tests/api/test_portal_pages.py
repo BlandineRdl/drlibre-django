@@ -75,7 +75,7 @@ def test_every_portal_page_renders_for_a_passwordless_patient(portal: Portal) ->
 
     assert {url: r.status_code for url, r in responses.items()} == dict.fromkeys(urls, 200)
     assert all("/account/password" not in page(r) for r in responses.values())
-    assert 'href="/portal/notifications">Notifications (1 non lue)</a>' in page(
+    assert '<span class="visually-hidden">Notifications (1 non lue)</span>' in page(
         responses["/portal/"]
     )
 
@@ -90,7 +90,7 @@ def test_cancelling_with_a_reason_moves_it_to_the_past_and_raises_the_unread_cou
     assert done["Location"] == "/portal/appointments?done=cancelled"
     assert '<p role="status" class="notice">Le rendez-vous est annulé.</p>' in listed
     assert "Notifications (2 non lues)" in listed
-    _, past = listed.split('<h2 id="past-heading">Passés</h2>')
+    _, past = listed.split('<h2 id="past-heading">Passés et annulés</h2>')
     assert f'href="{portal.base}.ics"' in past
     assert f'href="{portal.base}/cancel"' not in listed
     assert portal.stored().cancellation_reason == "Empêchement"

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from drlibre.booking.application.ports.inbound import Appointment, AppointmentStatus, HoldSummary
@@ -177,3 +178,17 @@ def test_a_long_calendar_line_is_folded_at_75_octets() -> None:
     )
 
     assert all(len(line.encode()) <= 75 for line in text.split("\r\n"))
+
+
+def test_a_cancelled_appointment_calendar_file_says_so() -> None:
+    """Story agenda : le .ics d'un RDV annulé porte STATUS:CANCELLED."""
+    cancelled = replace(appointment(), status=AppointmentStatus.CANCELLED)
+
+    text = calendar_file(
+        cancelled, summary="x", location="y", stamped_at=datetime(2026, 11, 20, 10, tzinfo=UTC)
+    )
+
+    assert "STATUS:CANCELLED" in text.split("\r\n")
+    assert "STATUS:" not in calendar_file(
+        appointment(), summary="x", location="y", stamped_at=datetime(2026, 11, 20, 10, tzinfo=UTC)
+    )

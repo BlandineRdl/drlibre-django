@@ -37,6 +37,11 @@ Feature: Le visiteur consulte les pages publiques des praticiens, hôpitaux et s
     When the visitor opens "/providers/[id:Dr Alice Martin]?type=[type:Bilan long]&week=2026-11-23"
     Then the page says "10:00"
     And the page never says "14:00"
+    When the visitor opens "/providers/[id:Dr Alice Martin]"
+    Then the page says "Aucun créneau libre cette semaine."
+    And the page says "Passé"
+    And the page says "Prochain créneau libre : lun. 23/11 à 09:00"
+    And the page links to "/providers/[id:Dr Alice Martin]?type=[type:Consultation cardio]&week=2026-11-23"
 
   Scenario Outline: La semaine par défaut est celle d'aujourd'hui ; la navigation s'arrête à l'horizon de 90 jours.
     When the visitor opens "/providers/[id:Dr Alice Martin]<address>"

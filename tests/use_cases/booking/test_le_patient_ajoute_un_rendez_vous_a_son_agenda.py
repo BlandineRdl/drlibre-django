@@ -13,7 +13,7 @@ def calendar_url(scene: Scene) -> str:
 
 @then(parsers.parse('the appointment is listed under "{heading}" with its calendar file'))
 def listed_with_file(scene: Scene, heading: str) -> None:
-    upcoming, past = page_text(scene).split('<h2 id="past-heading">Passés</h2>')
+    upcoming, past = page_text(scene).split('<h2 id="past-heading">Passés et annulés</h2>')
     part = upcoming if heading == "À venir" else past
     assert f'href="{calendar_url(scene)}"' in part
 

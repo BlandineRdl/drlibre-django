@@ -99,7 +99,7 @@ class RescheduleAppointmentUseCase(RescheduleAppointment):
             self._appointments.save(moved)
             self._slot_refresh.refresh(moved.clinician_id)
             self._audit.record(self._rescheduled_entry(moved, actor_id, now))
-            self._notices.rescheduled(moved)
+            self._notices.rescheduled(moved, current.start)
             return moved
 
     def _rescheduled_entry(self, moved: Appointment, actor: Id, at: datetime) -> AuditEntry:

@@ -11,6 +11,7 @@ from drlibre.booking.application.ports.inbound import (
     PatientAppointments,
 )
 from drlibre.identity.application.ports.inbound import User
+from drlibre.interfaces.web.presenters.console import NavLink
 from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_form
 from drlibre.interfaces.web.presenters.slots import day_label, local, slot_instant
 from drlibre.notifications.application.ports.inbound import Notification, NotificationKind
@@ -95,6 +96,7 @@ class AppointmentCardView:
     move_url: str
     cancel_url: str
     calendar_url: str
+    status_key: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +196,24 @@ def appointment_url(entry: AgendaEntry, action: str) -> str:
     return f"{APPOINTMENTS_URL}/{entry.appointment.id}/{action}"
 
 
+def portal_nav(path: str, home_url: str) -> tuple[NavLink, ...]:
+    """The patient's sections; the longest matching prefix marks the current page."""
+    sections = (
+        (home_url, "Mon espace"),
+        (APPOINTMENTS_URL, "Mes RDV"),
+        ("/portal/waitlist", "Liste d'attente"),
+    )
+    subpages = (NOTIFICATIONS_URL, PROFILE_URL)
+    matches = [url for url, _ in sections if path.startswith(url) and not path.startswith(subpages)]
+    current = max(matches, key=len, default="")
+    return tuple(NavLink(url, label, url == current) for url, label in sections)
+
+
+def status_key(status: AppointmentStatus) -> str:
+    """The CSS suffix of a status badge, such as `checked-in`."""
+    return status.value.lower().replace("_", "-")
+
+
 def appointment_day(entry: AgendaEntry) -> date:
     """The local day of the appointment, whose week the strip opens on."""
     return local(entry.appointment.start, entry.time_zone).date()
@@ -227,6 +247,7 @@ def appointment_card(entry: AgendaEntry) -> AppointmentCardView:
         else "",
         cancel_url=appointment_url(entry, "cancel") if PatientAction.CANCEL in allowed else "",
         calendar_url=f"{APPOINTMENTS_URL}/{a.id}.ics",
+        status_key=status_key(a.status),
     )
 
 

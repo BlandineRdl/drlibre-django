@@ -15,7 +15,7 @@
     <thead><tr><th scope="col">Heure</th>{% for day in view.days %}<th scope="col"><abbr title="{{ day.long }}">{{ day.short }}</abbr></th>{% endfor %}</tr></thead>
     <tbody>
     {% for row in view.rows %}
-      <tr><th scope="row">{{ row.time }}</th>{% for cell in row.cells %}<td{% if cell.kind %} class="{{ cell.kind }}"{% endif %}{% if cell.colour %} style="--type-colour:{{ cell.colour }}"{% endif %}>{% if cell.url %}<a href="{{ cell.url }}">{{ cell.text }}</a>{% else %}{{ cell.text }}{% endif %}</td>{% endfor %}</tr>
+      <tr><th scope="row">{{ row.time }}</th>{% for cell in row.cells %}<td{% if cell.kind %} class="{{ cell.kind }}{% if cell.hue_class %} {{ cell.hue_class }}{% endif %}"{% endif %}>{% if cell.url %}<a href="{{ cell.url }}">{{ cell.text }}</a>{% else %}{{ cell.text }}{% endif %}</td>{% endfor %}</tr>
     {% endfor %}
     </tbody>
   </table>

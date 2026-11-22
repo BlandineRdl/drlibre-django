@@ -446,6 +446,8 @@ class AppointmentFile:
     time_zone: str
     patient_age: int | None
     history: tuple[HistoryLine, ...]
+    clinician_name: str = ""
+    hospital_name: str = ""
 
 
 class ClinicianAppointment(Protocol):

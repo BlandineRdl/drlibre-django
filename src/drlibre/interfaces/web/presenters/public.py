@@ -16,6 +16,7 @@ from drlibre.interfaces.web.presenters.slots import (
     first_available_url,
     local,
     slot_label,
+    zone_name,
 )
 from drlibre.search.application.ports.inbound import (
     DEFAULT_PAGE_SIZE,
@@ -33,6 +34,7 @@ class DayView:
     label: str
     slots: tuple[SlotLinkView, ...]
     empty_text: str
+    past: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +50,8 @@ class ProviderPageView:
     zone_note: str
     week_value: str
     empty_week_text: str
+    next_slot_text: str = ""
+    next_slot_url: str = ""
 
 
 def _provider_url(provider_id: object, type_id: object, week: date | None = None) -> str:
@@ -65,10 +69,12 @@ def provider_page_view(page: ProviderWeek) -> ProviderPageView:
         if at.date() in by_day:
             link = clinician_booking_url(page.type_id, detail.id, start)
             by_day[at.date()].append(SlotLinkView(f"{at:%H:%M}", link))
+    past = page.today or page.monday
     days = tuple(
-        DayView(day_label(day), tuple(slots), "" if slots else NO_SLOT_THAT_DAY)
+        DayView(day_label(day), tuple(slots), _empty_day(day < past, slots), day < past)
         for day, slots in by_day.items()
     )
+    following = page.next_start and local(page.next_start, zone)
     sunday = page.monday + timedelta(days=6)
     return ProviderPageView(
         name=detail.full_name,
@@ -91,10 +97,20 @@ def provider_page_view(page: ProviderWeek) -> ProviderPageView:
             _provider_url(detail.id, page.type_id, page.next_monday) if page.next_monday else ""
         ),
         days=days,
-        zone_note=f"Heures de {zone}.",
+        zone_note=f"Heures affichées à l'{zone_name(zone)} ({zone}).",
         week_value=page.monday.isoformat(),
         empty_week_text="" if page.starts else "Aucun créneau libre cette semaine.",
+        next_slot_text=f"Prochain créneau libre : {day_label(following.date())} à {following:%H:%M}"
+        if following
+        else "",
+        next_slot_url=_provider_url(detail.id, page.type_id, following.date()) if following else "",
     )
+
+
+def _empty_day(past: bool, slots: list[SlotLinkView]) -> str:
+    if slots:
+        return ""
+    return "Passé" if past else NO_SLOT_THAT_DAY
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,7 +157,7 @@ def hospital_page_view(page: HospitalPage) -> HospitalPageView:
         specialties=detail.specialties,
         first_by_type=firsts,
         providers=tuple(provider_result(p) for p in page.providers),
-        zone_note=f"Heures de {zone}.",
+        zone_note=f"Heures affichées à l'{zone_name(zone)} ({zone}).",
     )
 
 

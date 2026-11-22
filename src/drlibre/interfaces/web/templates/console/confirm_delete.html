@@ -15,7 +15,7 @@
 <p>Cette action est définitive.</p>
 <form method="post" action="{{ confirm.action }}" class="actions">
   {% csrf_token %}
-  <button type="submit" class="contrast">Supprimer</button>
+  <button type="submit" class="danger">Supprimer</button>
   <a href="{{ confirm.cancel_url }}">Annuler</a>
 </form>
 {% endif %}

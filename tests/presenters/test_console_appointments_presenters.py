@@ -1,4 +1,5 @@
-from datetime import UTC, datetime, timedelta
+from dataclasses import replace
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -13,12 +14,15 @@ from drlibre.booking.application.ports.inbound import (
 from drlibre.interfaces.web.presenters.console_appointments import (
     CSV_HEADERS,
     AppointmentsListView,
+    BookChoice,
     appointment_filter,
+    book_page,
     csv_cell,
     csv_rows,
     file_page,
     list_page,
 )
+from drlibre.scheduling.application.ports.inbound import FreeWeek
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page
 from tests.builders_booking import existing_appointment
@@ -54,6 +58,14 @@ def test_unusable_filter_values_fall_back_to_no_filter() -> None:
     )
 
     assert shown == AdminAppointmentFilter()
+
+
+def test_a_from_date_after_the_to_date_is_explained() -> None:
+    """Story liste admin : « Du » après « Au » s'explique au lieu d'une liste vide muette."""
+    inverted = appointment_filter({"from": "2026-11-30", "to": "2026-11-01"})
+
+    assert "après la date « Au »" in listed(Page((), 0, 1), inverted).date_warning
+    assert listed(Page((), 0, 1), AdminAppointmentFilter()).date_warning == ""
 
 
 def test_pagination_and_export_keep_the_filters() -> None:
@@ -143,3 +155,27 @@ def test_the_file_shows_its_source_and_no_notes() -> None:
 
     assert ("Source", "En ligne") in [(f.label, f.value) for f in view.facts]
     assert not hasattr(view, "notes")
+
+
+def test_the_admin_file_names_the_clinician_the_hospital_and_the_zone() -> None:
+    """Story fiche admin : praticien, hôpital et fuseau nommés."""
+    shown = replace(file(entry()), clinician_name="Claire Martin", hospital_name="Hôpital Nord")
+
+    facts = {f.label: f.value for f in file_page(shown, week=None).facts}
+
+    assert (facts["Praticien"], facts["Hôpital"]) == ("Claire Martin", "Hôpital Nord")
+    assert facts["Fuseau"] == "heure de Paris (Europe/Paris)"
+
+
+def test_an_empty_booking_week_points_to_the_next_free_slot() -> None:
+    """Story réserver pour un patient : une semaine vide renvoie au prochain créneau libre."""
+    choice = BookChoice(patient="p", appointment_type="t", clinician="c")
+    week = FreeWeek(date(2026, 11, 16), None, date(2026, 11, 23), "Europe/Paris", ())
+    upcoming = (datetime(2026, 11, 22, 9, tzinfo=UTC), datetime(2026, 11, 24, 8, tzinfo=UTC))
+
+    view = book_page(
+        choice, patients=(), types=(), clinicians=(), rooms=(), week=week, upcoming=upcoming
+    )
+
+    assert view.next_slot_text == "Prochain créneau libre : mar. 24/11 à 09:00"
+    assert parse_qs(urlsplit(view.next_slot_url).query)["week"] == ["2026-11-24"]

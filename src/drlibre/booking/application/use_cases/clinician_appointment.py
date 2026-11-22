@@ -21,7 +21,6 @@ from drlibre.booking.application.use_cases.actor_scope import (
     scoped_appointment,
 )
 from drlibre.booking.application.use_cases.clinician_read_helpers import (
-    time_zone_of,
     with_actions,
 )
 from drlibre.booking.application.use_cases.own_clinician_appointment import CLINICIANS_ONLY
@@ -77,7 +76,10 @@ class ClinicianAppointmentUseCase(ClinicianAppointment):
         if is_admin:
             # Clinical notes stay the clinician's alone (spec 3.1).
             entry = replace(entry, appointment=replace(entry.appointment, clinical_notes=None))
-        time_zone = time_zone_of(self._directory, found.clinician_id)
+        venue = self._directory.venue(found.clinician_id)
+        if venue is None:
+            raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
+        time_zone = venue.time_zone
         today = self._clock.now().astimezone(ZoneInfo(time_zone)).date()
         # A clinician passed the guard as the appointment's clinician user.
         clinician_user = None if is_admin else actor_id
@@ -90,4 +92,6 @@ class ClinicianAppointmentUseCase(ClinicianAppointment):
             time_zone=time_zone,
             patient_age=_age(entry.patient_birth_date, today),
             history=history,
+            clinician_name=venue.provider_name,
+            hospital_name=venue.hospital_name,
         )

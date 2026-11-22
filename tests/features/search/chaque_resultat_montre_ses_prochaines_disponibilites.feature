@@ -104,6 +104,6 @@ Feature: Chaque résultat montre ses prochaines disponibilités
     And "Dr Léa Hoarau" is free at "2026-11-23 09:00"
     When the visitor opens "/?q=hoarau"
     Then the page says "lun. 23/11 09:00"
-    And the page says "Heures de Indian/Reunion"
+    And the page says "Heure de Reunion"
     When the visitor opens "/api/v1/search/providers?q=hoarau"
     Then the zone of every start is +04:00

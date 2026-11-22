@@ -22,7 +22,7 @@
 </form>
 </search>
 {% if view.rows %}
-<div class="overflow-auto" tabindex="0" role="region" aria-label="Entrées du journal d'audit">
+<div class="overflow-auto audit-log" tabindex="0" role="region" aria-label="Entrées du journal d'audit">
   <table>
     <caption>Journal d'audit, plus récentes d'abord : {{ view.summary }}</caption>
     <thead><tr>{% for header in view.headers %}<th scope="col">{{ header }}</th>{% endfor %}</tr></thead>

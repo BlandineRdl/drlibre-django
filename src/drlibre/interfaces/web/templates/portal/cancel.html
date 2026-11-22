@@ -5,5 +5,5 @@
 <h1>{{ view.form.title }}</h1>
 {% include "portal/_card.html" with card=view.appointment heading_level="h2" %}
 <p>L'annulation est définitive.</p>
-{% include "_form.html" with form=view.form %}
+{% include "_form.html" with form=view.form submit_class="danger" %}
 {% endblock %}

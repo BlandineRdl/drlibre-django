@@ -60,7 +60,7 @@
     <h3>{{ view.strip.week_label }}</h3>
     {% if view.strip.next_url %}<a href="{{ view.strip.next_url }}">Semaine suivante ›</a>{% endif %}
   </nav>
-  {% if view.strip.empty_week_text %}<p>{{ view.strip.empty_week_text }}</p>{% endif %}
+  {% if view.strip.empty_week_text %}<p class="notice">{{ view.strip.empty_week_text }}{% if view.next_slot_url %} <a href="{{ view.next_slot_url }}">{{ view.next_slot_text }} ›</a>{% endif %}</p>{% endif %}
   <form method="post" action="{{ view.action }}">
     {% csrf_token %}
     <input type="hidden" name="q" value="{{ view.choice.search }}">

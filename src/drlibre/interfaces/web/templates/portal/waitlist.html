@@ -3,6 +3,15 @@
 {% block timezone %}{{ view.zone_note }}{% endblock %}
 {% block content %}
 <h1>Liste d'attente</h1>
+<div class="narrow">
+<section class="explainer" aria-label="Comment ça marche">
+  <p>Aucun créneau ne vous convient ? Inscrivez-vous pour un type de RDV et une période.</p>
+  <ol>
+    <li>Dès qu'un RDV de ce type se libère dans vos dates, il vous est proposé par email et dans vos notifications.</li>
+    <li>Les premiers inscrits sont servis en premier.</li>
+    <li>Le créneau proposé n'est pas réservé : acceptez-le vite depuis cette page.</li>
+  </ol>
+</section>
 {% if view.notice %}<p role="status" class="notice">{{ view.notice }}</p>{% endif %}
 {% if view.refusal %}<div role="alert" class="error-summary"><p><strong>{{ view.refusal }}</strong></p></div>{% endif %}
 <section aria-labelledby="entries-heading">
@@ -30,4 +39,5 @@
   <h2 id="join-heading">{{ view.form.title }}</h2>
   {% include "_form.html" with form=view.form %}
 </section>
+</div>
 {% endblock %}
