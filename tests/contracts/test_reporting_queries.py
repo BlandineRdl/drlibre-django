@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, time
 import pytest
 
 from drlibre.reporting.domain.available_minutes import Absence
-from drlibre.reporting.domain.dashboard import DayCount, Range, Tally
+from drlibre.reporting.domain.dashboard import BUSIEST_COUNT, DayCount, Range, Tally
 from tests.builders_reporting import ActivityScene, fake_activity, real_activity
 
 REAL = [pytest.mark.integration, pytest.mark.django_db]
@@ -27,10 +27,10 @@ def test_the_tally_counts_each_figure_of_the_range(scene: ActivityScene) -> None
     scene.appointment(dr, datetime(2026, 11, 16, 9), 30, "CANCELLED", "ONLINE")
     scene.appointment(dr, datetime(2026, 11, 13, 9), 30, "BOOKED", "ONLINE")
 
-    assert scene.queries.tally(NOW, Range.WEEK) == Tally(
+    assert scene.queries.activity(NOW, Range.WEEK, BUSIEST_COUNT).tally == Tally(
         appointments=4, cancellations=1, no_shows=1, online=3, active_minutes=105
     )
-    assert scene.queries.tally(NOW, Range.TODAY) == Tally(1, 0, 0, 1, 30)
+    assert scene.queries.activity(NOW, Range.TODAY, BUSIEST_COUNT).tally == Tally(1, 0, 0, 1, 30)
 
 
 def test_active_minutes_leave_out_a_deactivated_clinician_whose_appointments_still_count(
@@ -42,7 +42,7 @@ def test_active_minutes_leave_out_a_deactivated_clinician_whose_appointments_sti
     scene.appointment(dr, datetime(2026, 11, 20, 9), 30, "BOOKED", "ONLINE")
     scene.appointment(gone, datetime(2026, 11, 20, 9), 60, "COMPLETED", "STAFF")
 
-    assert scene.queries.tally(NOW, Range.TODAY) == Tally(2, 0, 0, 1, 30)
+    assert scene.queries.activity(NOW, Range.TODAY, BUSIEST_COUNT).tally == Tally(2, 0, 0, 1, 30)
 
 
 def test_a_day_is_the_local_day_of_the_clinician_hospital(scene: ActivityScene) -> None:
@@ -53,8 +53,10 @@ def test_a_day_is_the_local_day_of_the_clinician_hospital(scene: ActivityScene) 
     scene.appointment(cayenne, datetime(2026, 11, 20, 23, 30), 30, "BOOKED", "ONLINE")
     scene.appointment(paris, datetime(2026, 11, 20, 23, 30), 30, "BOOKED", "ONLINE")
 
-    assert scene.queries.tally(late, Range.TODAY).appointments == 1
-    assert scene.queries.per_day(late, Range.WEEK) == (DayCount(date(2026, 11, 20), 2),)
+    assert scene.queries.activity(late, Range.TODAY, BUSIEST_COUNT).tally.appointments == 1
+    assert scene.queries.activity(late, Range.WEEK, BUSIEST_COUNT).per_day == (
+        DayCount(date(2026, 11, 20), 2),
+    )
 
 
 def test_days_list_not_cancelled_appointments_oldest_first(scene: ActivityScene) -> None:
@@ -65,7 +67,7 @@ def test_days_list_not_cancelled_appointments_oldest_first(scene: ActivityScene)
     scene.appointment(dr, datetime(2026, 11, 18, 10), 30, "BOOKED", "ONLINE")
     scene.appointment(dr, datetime(2026, 11, 17, 9), 30, "CANCELLED", "ONLINE")
 
-    assert scene.queries.per_day(NOW, Range.WEEK) == (
+    assert scene.queries.activity(NOW, Range.WEEK, BUSIEST_COUNT).per_day == (
         DayCount(date(2026, 11, 18), 2),
         DayCount(date(2026, 11, 20), 1),
     )
@@ -82,7 +84,7 @@ def test_the_busiest_clinicians_rank_by_count_then_name(scene: ActivityScene) ->
     scene.appointment(c, datetime(2026, 11, 19, 9), 30, "COMPLETED", "ONLINE")
     scene.appointment(b, datetime(2026, 11, 19, 9), 30, "CANCELLED", "ONLINE")
 
-    ranked = scene.queries.busiest(NOW, Range.WEEK, 2)
+    ranked = scene.queries.activity(NOW, Range.WEEK, 2).busiest
 
     assert [(r.clinician_id, r.name, r.count) for r in ranked] == [(c, "Dr C", 2), (a, "Dr A", 1)]
 

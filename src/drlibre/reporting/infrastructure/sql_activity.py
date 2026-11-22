@@ -5,31 +5,35 @@ from django.db import connection
 
 from drlibre.reporting.application.ports.outbound import ActivityQueries
 from drlibre.reporting.domain.available_minutes import Absence, ClinicianSchedule, RuleHours
-from drlibre.reporting.domain.dashboard import BusyClinician, DayCount, Range, Tally
+from drlibre.reporting.domain.dashboard import Activity, BusyClinician, DayCount, Range, Tally
 from drlibre.shared_kernel.ids import Id
 
-# Appointments of the range, each with its local day in its clinician's hospital zone.
-_IN_RANGE = """
-WITH located AS (
-    SELECT a.clinician_id, a.start, a."end", a.status, a.source,
-           u.active AND u.role = 'CLINICIAN' AS clinician_active,
-           (a.start AT TIME ZONE h.time_zone)::date AS day,
-           (%(now)s::timestamptz AT TIME ZONE h.time_zone)::date AS today
-    FROM booking_appointmentrecord a
-    JOIN organisation_clinicianprofilerecord c ON c.id = a.clinician_id
+# One read of the range: each clinician's zone and today first, so each row converts once.
+_ACTIVITY = """
+WITH staff AS MATERIALIZED (
+    SELECT c.id, u.full_name, u.active AND u.role = 'CLINICIAN' AS clinician_active,
+           h.time_zone, (%(now)s::timestamptz AT TIME ZONE h.time_zone)::date AS today
+    FROM organisation_clinicianprofilerecord c
     JOIN identity_userrecord u ON u.id = c.user_id
     JOIN organisation_departmentrecord d ON d.id = c.department_id
     JOIN organisation_hospitalrecord h ON h.id = d.hospital_id
+), located AS MATERIALIZED (
+    SELECT a.clinician_id, a.start, a."end", a.status, a.source, s.full_name,
+           s.clinician_active, s.today, (a.start AT TIME ZONE s.time_zone)::date AS day
+    FROM booking_appointmentrecord a
+    JOIN staff s ON s.id = a.clinician_id
     WHERE a.start >= %(earliest)s AND a.start < %(latest)s
-), in_range AS (
+), in_range AS MATERIALIZED (
     SELECT * FROM located WHERE day > today - %(length)s AND day <= today
+), per_day AS (
+    SELECT day, COUNT(*) AS count FROM in_range WHERE status <> 'CANCELLED' GROUP BY day
+), busiest AS (
+    SELECT clinician_id, full_name, COUNT(*) AS count FROM in_range
+    WHERE status <> 'CANCELLED'
+    GROUP BY clinician_id, full_name
+    ORDER BY count DESC, full_name, clinician_id
+    LIMIT %(limit)s
 )
-"""
-
-_TALLY = "".join(
-    (
-        _IN_RANGE,
-        """
 SELECT COUNT(*) FILTER (WHERE status <> 'CANCELLED') AS appointments,
        COUNT(*) FILTER (WHERE status = 'CANCELLED') AS cancellations,
        COUNT(*) FILTER (WHERE status = 'NO_SHOW') AS no_shows,
@@ -38,38 +42,17 @@ SELECT COUNT(*) FILTER (WHERE status <> 'CANCELLED') AS appointments,
        ) AS online,
        COALESCE(FLOOR(SUM(EXTRACT(EPOCH FROM "end" - start)) FILTER (
            WHERE status NOT IN ('CANCELLED', 'NO_SHOW') AND clinician_active
-       ) / 60), 0)::int AS active_minutes
+       ) / 60), 0)::int AS active_minutes,
+       (SELECT array_agg(day ORDER BY day) FROM per_day) AS days,
+       (SELECT array_agg(count ORDER BY day) FROM per_day) AS day_counts,
+       (SELECT array_agg(clinician_id ORDER BY count DESC, full_name, clinician_id)
+        FROM busiest) AS busy_ids,
+       (SELECT array_agg(full_name ORDER BY count DESC, full_name, clinician_id)
+        FROM busiest) AS busy_names,
+       (SELECT array_agg(count ORDER BY count DESC, full_name, clinician_id)
+        FROM busiest) AS busy_counts
 FROM in_range
-""",
-    )
-)
-
-_PER_DAY = "".join(
-    (
-        _IN_RANGE,
-        """
-SELECT day, COUNT(*) AS count FROM in_range
-WHERE status <> 'CANCELLED'
-GROUP BY day ORDER BY day
-""",
-    )
-)
-
-_BUSIEST = "".join(
-    (
-        _IN_RANGE,
-        """
-SELECT r.clinician_id, u.full_name, COUNT(*) AS count
-FROM in_range r
-JOIN organisation_clinicianprofilerecord c ON c.id = r.clinician_id
-JOIN identity_userrecord u ON u.id = c.user_id
-WHERE r.status <> 'CANCELLED'
-GROUP BY r.clinician_id, u.full_name
-ORDER BY count DESC, u.full_name, r.clinician_id
-LIMIT %(limit)s
-""",
-    )
-)
+"""
 
 _WAITLIST = """
 SELECT COUNT(*) AS size FROM booking_waitlistentryrecord WHERE status IN ('WAITING', 'OFFERED')
@@ -112,20 +95,19 @@ def _range(now: datetime, period: Range) -> dict[str, Any]:
 
 
 class SqlActivityQueries(ActivityQueries):
-    """Reads booking, organisation, identity and scheduling tables, one statement per figure."""
+    """Reads booking, organisation, identity and scheduling tables."""
 
-    def tally(self, now: datetime, period: Range) -> Tally:
-        (row,) = _rows(_TALLY, _range(now, period))
-        return Tally(**row)
-
-    def per_day(self, now: datetime, period: Range) -> tuple[DayCount, ...]:
-        rows = _rows(_PER_DAY, _range(now, period))
-        return tuple(DayCount(row["day"], row["count"]) for row in rows)
-
-    def busiest(self, now: datetime, period: Range, limit: int) -> tuple[BusyClinician, ...]:
-        rows = _rows(_BUSIEST, {**_range(now, period), "limit": limit})
-        return tuple(
-            BusyClinician(Id(row["clinician_id"]), row["full_name"], row["count"]) for row in rows
+    def activity(self, now: datetime, period: Range, limit: int) -> Activity:
+        (row,) = _rows(_ACTIVITY, {**_range(now, period), "limit": limit})
+        figures = ("appointments", "cancellations", "no_shows", "online", "active_minutes")
+        days = zip(row["days"] or (), row["day_counts"] or (), strict=True)
+        busy = zip(
+            row["busy_ids"] or (), row["busy_names"] or (), row["busy_counts"] or (), strict=True
+        )
+        return Activity(
+            tally=Tally(*(row[name] for name in figures)),
+            per_day=tuple(DayCount(day, count) for day, count in days),
+            busiest=tuple(BusyClinician(Id(i), name, count) for i, name, count in busy),
         )
 
     def waitlist_size(self) -> int:
