@@ -153,8 +153,6 @@ def update_patient(request: HttpRequest, resource_id: str) -> HttpResponse:
     incoming = read_body(request, Patient)
     if incoming.id not in (None, resource_id):
         raise invalid_field("Patient.id", "L'id doit être celui de l'adresse.")
-    if identity.role is not Role.ADMIN and identity.user_id != patient_id:
-        raise DomainError(ErrorCode.FORBIDDEN, "Seul le patient met à jour sa fiche.")
 
     def write() -> None:
         current = to.patient(_visible(patient_id, who))
@@ -163,7 +161,9 @@ def update_patient(request: HttpRequest, resource_id: str) -> HttpResponse:
             _save_user(identity, patient_id, incoming)
             return
         changes(to.fields(current), to.fields(incoming), writable=_PROFILE)
-        container().update_profile.execute(user_id=patient_id, **to.profile_values(incoming))
+        container().update_profile.execute(
+            actor_id=identity.user_id, user_id=patient_id, **to.profile_values(incoming)
+        )
 
     container().conditional_writes.run(
         target=WriteTarget.user(user_id=patient_id),

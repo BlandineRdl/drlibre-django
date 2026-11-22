@@ -187,6 +187,6 @@ class UseSignInLink(Protocol):
 
 
 class UpdateProfile(Protocol):
-    def execute(self, *, user_id: Id, phone: str, birth_date: str) -> None:
-        """Set or clear (empty) the user's phone and ISO birth date; invalid_input per field."""
+    def execute(self, *, actor_id: Id, user_id: Id, phone: str, birth_date: str) -> None:
+        """Set or clear (empty) one's own phone and ISO birth date; forbidden for another user."""
         ...

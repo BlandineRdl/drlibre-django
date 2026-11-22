@@ -66,7 +66,7 @@ def test_two_updates_of_one_patient_from_one_version_save_one_and_refuse_the_oth
             expected=expected,
             current=_held(race, stamp),
             write=lambda: container().update_profile.execute(
-                user_id=patient.id, phone=phone, birth_date="1980-01-01"
+                actor_id=patient.id, user_id=patient.id, phone=phone, birth_date="1980-01-01"
             ),
         )
 
