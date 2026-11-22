@@ -32,6 +32,8 @@ _MODELS: dict[Locked, type[models.Model]] = {
     Locked.APPOINTMENT_TYPE: AppointmentTypeRecord,
     Locked.SPECIALTY: SpecialtyRecord,
 }
+# Use cases re-lock these FOR UPDATE: a weaker lock first would be upgraded mid-write.
+_RELOCKED = frozenset({Locked.CLINICIAN, Locked.USER})
 
 
 class DjangoConditionalWrites(ConditionalWrites):
@@ -47,7 +49,8 @@ class DjangoConditionalWrites(ConditionalWrites):
     ) -> T:
         with transaction.atomic():
             for kind, row_id in target.rows:
-                rows = _MODELS[kind].objects.select_for_update(no_key=True).filter(pk=row_id.value)
+                locked = _MODELS[kind].objects.select_for_update(no_key=kind not in _RELOCKED)
+                rows = locked.filter(pk=row_id.value)
                 list(rows.values_list("pk", flat=True))
             if expected is not None and current() != expected:
                 raise StaleVersionError
