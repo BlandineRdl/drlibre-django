@@ -1,4 +1,5 @@
 from bisect import bisect_left
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -22,7 +23,20 @@ from drlibre.shared_kernel.validation import invalid_field
 MAX_RANGE = timedelta(days=31)
 
 
-class FindFreeSlotsUseCase(FindFreeSlots):
+@dataclass(frozen=True, slots=True)
+class OpenSlots:
+    """What a free-slot read resolved, and its open slots per clinician."""
+
+    kind: AppointmentType
+    clinicians: tuple[Id, ...]
+    within: Period
+    now: datetime
+    found: tuple[ClinicianSlot, ...]
+
+
+class FreeSlotRead:
+    """The free-slot read shared by FindFreeSlots and FindSlotStates, kept per clinician."""
+
     def __init__(
         self,
         *,
@@ -40,7 +54,7 @@ class FindFreeSlotsUseCase(FindFreeSlots):
         self._rooms = rooms
         self._computation = computation
 
-    def execute(
+    def open(
         self,
         *,
         appointment_type_id: Id,
@@ -48,7 +62,8 @@ class FindFreeSlotsUseCase(FindFreeSlots):
         start: datetime,
         end: datetime,
         ignoring_appointment: Id | None = None,
-    ) -> tuple[Slot, ...]:
+    ) -> OpenSlots:
+        """The open slots of each clinician, by start then clinician, the shared free read."""
         within = Period(start, end)
         kind = self._directory.appointment_type(appointment_type_id)
         if kind is None or not kind.active:
@@ -79,8 +94,7 @@ class FindFreeSlotsUseCase(FindFreeSlots):
             ),
         )
         found = self._with_free_room(found, kind, ignoring_appointment)
-        by_start = {s.slot.start: s.slot for s in found}
-        return tuple(by_start[at] for at in sorted(by_start))
+        return OpenSlots(kind, clinicians, within, now, found)
 
     def _with_free_room(
         self, found: tuple[ClinicianSlot, ...], kind: AppointmentType, ignoring: Id | None
@@ -108,6 +122,46 @@ class FindFreeSlotsUseCase(FindFreeSlots):
             return len({b.room_id for b in near if b.period.end > slot.start})
 
         return tuple(s for s in found if taken(s.slot) < len(rooms))
+
+
+class FindFreeSlotsUseCase(FindFreeSlots):
+    def __init__(
+        self,
+        *,
+        clock: Clock,
+        directory: SchedulingDirectory,
+        queries: SlotQueries,
+        holds: SlotHolds,
+        rooms: RoomBookings,
+        computation: SlotComputation,
+    ):
+        self._read = FreeSlotRead(
+            clock=clock,
+            directory=directory,
+            queries=queries,
+            holds=holds,
+            rooms=rooms,
+            computation=computation,
+        )
+
+    def execute(
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id | None,
+        start: datetime,
+        end: datetime,
+        ignoring_appointment: Id | None = None,
+    ) -> tuple[Slot, ...]:
+        found = self._read.open(
+            appointment_type_id=appointment_type_id,
+            clinician_id=clinician_id,
+            start=start,
+            end=end,
+            ignoring_appointment=ignoring_appointment,
+        ).found
+        by_start = {s.slot.start: s.slot for s in found}
+        return tuple(by_start[at] for at in sorted(by_start))
 
 
 def _local_span(period: Period, tz: ZoneInfo) -> timedelta:

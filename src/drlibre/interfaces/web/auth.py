@@ -10,6 +10,7 @@ from django.shortcuts import redirect, render
 from drlibre.bootstrap import act_as, stop_acting
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
+from drlibre.interfaces.paths import API_PREFIXES, FHIR_PREFIX
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 type View = Callable[..., HttpResponseBase]
@@ -47,29 +48,46 @@ def clear_session_cookie(response: HttpResponse) -> None:
 
 
 def session_token(request: HttpRequest) -> str | None:
+    # FHIR clients authenticate by bearer only, so a cookie there opens no CSRF surface.
+    if request.path.startswith(FHIR_PREFIX):
+        return None
     return request.COOKIES.get(settings.SESSION_COOKIE_NAME)
 
 
+def bearer_token(request: HttpRequest) -> str | None:
+    # A bearer opens the APIs only, never a web page.
+    if not request.path.startswith(API_PREFIXES):
+        return None
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    return (token.strip() or None) if scheme.lower() == "bearer" else None
+
+
 class SessionMiddleware:
-    """Resolve who holds the session cookie on every request, on the server."""
+    """Resolve who holds the bearer token on the APIs, else the session cookie, on every request."""
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
+        bearer = bearer_token(request)
+        if bearer:
+            return self._respond(request, container().authenticate_token.execute(token=bearer))
         token = session_token(request)
         identity = container().authenticate_session.execute(token=token) if token else None
-        setattr(request, _ATTR, identity)
-        acting = act_as(identity.user_id.value if identity else None)
-        try:
-            response = self.get_response(request)
-        finally:
-            stop_acting(acting)
+        response = self._respond(request, identity)
         if token and identity is None and settings.SESSION_COOKIE_NAME not in response.cookies:
             clear_session_cookie(response)
         elif token and identity and identity.session_renewed:
             set_session_cookie(response, token, identity.session_expires_at)
         return response
+
+    def _respond(self, request: HttpRequest, identity: Identity | None) -> HttpResponse:
+        setattr(request, _ATTR, identity)
+        acting = act_as(identity.user_id.value if identity else None)
+        try:
+            return self.get_response(request)
+        finally:
+            stop_acting(acting)
 
 
 def forbidden_page(request: HttpRequest) -> HttpResponse:

@@ -64,3 +64,36 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: uv run pytest
+
+  fhir-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: drlibre
+          POSTGRES_PASSWORD: drlibre
+          POSTGRES_DB: drlibre
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U drlibre -d drlibre"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run python manage.py migrate --noinput --verbosity 0
+      - run: uv run python -m scripts.seed
+      # The runner's preinstalled Java runs the pinned HL7 validator against the seeded app.
+      - run: uv run gunicorn config.wsgi:application --bind 127.0.0.1:8000 --daemon
+      - run: curl -fsS --retry 30 --retry-connrefused --retry-delay 1 localhost:8000/api/v1/health
+      - run: ./scripts/fhir-validate.sh

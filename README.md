@@ -12,6 +12,10 @@ Hospital appointment scheduling, a hexagonal Django back end. Portfolio sandbox,
    - patient: `patient@drlibre.localhost`
    - passwordless patient, signs in by email link only: `visiteur@drlibre.localhost`
 5. Both demo clinicians work Monday to Friday, 09:00–12:00 and 14:00–17:00 (Paris): edit at `/workspace/availability/` and `/workspace/time-off/`; signed in, `GET /api/v1/slots?type=…&clinician=…&start=…&end=…` lists free slots.
+6. FHIR R4 under `/fhir` (fictitious, localhost only): fixed bearer tokens `demo-admin-token`, `demo-clinician-token`, `demo-patient-token`; issue others with `docker compose exec web python manage.py api_token <email> [--days N] [--revoke]`.
+   - `curl -i localhost:8000/fhir/metadata` lists every resource, interaction and search parameter.
+   - `curl 'localhost:8000/fhir/HealthcareService'` then `curl 'localhost:8000/fhir/Slot?service-type=<id>&start=ge2026-12-01T00:00:00%2B01:00&start=lt2026-12-08T00:00:00%2B01:00'` find free slots without a token.
+   - `curl -H 'Authorization: Bearer demo-patient-token' localhost:8000/fhir/Appointment` lists the demo patient's appointments.
 
 ## Develop
 1. `uv sync` and `uv run pre-commit install`.

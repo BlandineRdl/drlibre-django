@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 
+from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.validation import invalid_field
 
 
@@ -35,3 +37,23 @@ class Slot:
     @property
     def period(self) -> Period:
         return Period(self.start, self.end)
+
+
+class SlotStatus(StrEnum):
+    """Spec §15.2: free, or taken by an active appointment, an open hold or time off."""
+
+    FREE = "free"
+    BUSY = "busy"
+    TENTATIVE = "busy-tentative"
+    UNAVAILABLE = "busy-unavailable"
+
+
+@dataclass(frozen=True, slots=True)
+class SlotState:
+    """One start of a clinician's rule, in UTC, with what holds it."""
+
+    clinician_id: Id
+    rule_id: Id
+    start: datetime
+    end: datetime
+    status: SlotStatus

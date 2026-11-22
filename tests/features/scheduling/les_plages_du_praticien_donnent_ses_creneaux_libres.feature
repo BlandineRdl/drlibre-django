@@ -108,3 +108,27 @@ Feature: Les plages du praticien donnent ses créneaux libres
       | praticien inconnu            | the clinician "Z" is unknown                      | Z         |
       | praticien inactif            | the clinician "A" is inactive                     | A         |
       | praticien d'un autre service | an active clinician "B" in another department     | B         |
+
+  Scenario: Règle §15.2 : pour le personnel, un créneau des plages est libre, occupé par un RDV actif, retenu ou indisponible pendant une absence
+    Given "A" has a rule on weekday 1 from "09:00" to "12:00" every 30 minutes
+    And "A" has an open hold from "2026-11-23 09:00" to "2026-11-23 09:30"
+    And "A" has a "BOOKED" appointment from "2026-11-23 10:00" to "2026-11-23 10:30"
+    And "A" is off from "2026-11-23 11:00" to "2026-11-23 11:30"
+    When the staff ask the slot states of "A" from "2026-11-23 00:00" to "2026-11-24 00:00"
+    Then the states are "09:00 busy-tentative, 09:30 busy-tentative, 10:00 busy, 10:30 busy, 11:00 busy-unavailable, 11:30 free"
+    And every state names the rule of "A"
+
+  Scenario: Règle §15.2 : pour le personnel, un créneau des plages est libre, occupé par un RDV actif, retenu ou indisponible pendant une absence (hors du personnel)
+    Given "A" has a rule on weekday 1 from "09:00" to "12:00" every 30 minutes
+    When a patient asks the busy slot states of "A" from "2026-11-23 00:00" to "2026-11-24 00:00"
+    Then the request is refused as "forbidden"
+
+  Scenario Outline: Règle §15.2 : pour le personnel, un créneau des plages est libre, occupé par un RDV actif, retenu ou indisponible pendant une absence (<case>)
+    Given "A" has a rule every day from "09:00" to "12:00" every 30 minutes
+    When the staff ask the slot states of "A" from "<from>" to "<to>"
+    Then the states are ""
+
+    Examples:
+      | case                   | from             | to               |
+      | période déjà passée    | 2026-11-15 00:00 | 2026-11-20 08:00 |
+      | période après l'horizon | 2027-03-01 00:00 | 2027-03-08 00:00 |

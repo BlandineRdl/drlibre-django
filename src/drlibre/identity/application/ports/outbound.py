@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Protocol
 
+from drlibre.identity.domain.api_token import ApiToken
 from drlibre.identity.domain.session import Session
 from drlibre.identity.domain.sign_in_link import SignInLink
 from drlibre.identity.domain.user import Email, User
@@ -45,6 +46,20 @@ class Sessions(Protocol):
 
     def delete_for_user(self, user_id: Id) -> int:
         """Remove every session of the user and return how many there were."""
+        ...
+
+
+class ApiTokens(Protocol):
+    def add(self, token: ApiToken) -> None:
+        """Store a new token."""
+        ...
+
+    def by_token_hash(self, token_hash: str) -> ApiToken | None:
+        """Return the token with this hash, or None."""
+        ...
+
+    def delete_for_user(self, user_id: Id) -> int:
+        """Remove every token of the user and return how many there were."""
         ...
 
 

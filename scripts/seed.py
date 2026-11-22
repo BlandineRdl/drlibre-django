@@ -20,7 +20,11 @@ from drlibre.booking.infrastructure.django.models import (  # noqa: E402
     WaitlistEntryRecord,
 )
 from drlibre.bootstrap.container import Container, container  # noqa: E402
-from drlibre.identity.infrastructure.django.models import UserRecord  # noqa: E402
+from drlibre.identity.domain.session import hash_token  # noqa: E402
+from drlibre.identity.infrastructure.django.models import (  # noqa: E402
+    ApiTokenRecord,
+    UserRecord,
+)
 from drlibre.organisation.application.ports.inbound import SaveRecord  # noqa: E402
 from drlibre.organisation.infrastructure.django.models import (  # noqa: E402
     AppointmentTypeRecord,
@@ -153,6 +157,13 @@ USERS = (
     ("CLINICIAN", "Hugo Bernard", SECOND_CLINICIAN_EMAIL),
     ("PATIENT", "Paul Patient", "patient@drlibre.localhost"),
 )
+# Fixed bearer tokens for FHIR demos, localhost only; documented in README.md.
+DEMO_TOKENS = (
+    ("demo-admin-token", ADMIN_EMAIL),
+    ("demo-clinician-token", CLINICIAN_EMAIL),
+    ("demo-patient-token", "patient@drlibre.localhost"),
+)
+DEMO_TOKEN_DAYS = 365
 
 
 def _by_code(page: Callable[[PageRequest], Page[Any]], code: str) -> Id | None:
@@ -230,6 +241,19 @@ def seed_users(app: Container) -> None:
         )
         app.change_password.execute(
             user_id=user_id, current_password=_TEMPORARY, new_password=DEMO_PASSWORD
+        )
+
+
+def seed_api_tokens(app: Container) -> None:
+    # A rerun keeps one row per token and pushes its expiry a year ahead.
+    expires_at = datetime.now(UTC) + timedelta(days=DEMO_TOKEN_DAYS)
+    for token, email in DEMO_TOKENS:
+        user_id = _user_id(app, email)
+        if user_id is None:
+            continue
+        ApiTokenRecord.objects.update_or_create(
+            token_hash=hash_token(token),
+            defaults={"user_id": user_id.value, "label": "demo", "expires_at": expires_at},
         )
 
 
@@ -652,6 +676,7 @@ def seed_load(app: Container) -> None:
 # Each seeder gets or creates its rows, so the whole seed can run again safely.
 SEEDERS: list[Callable[[Container], None]] = [
     seed_users,
+    seed_api_tokens,
     seed_referential,
     seed_clinician_profile,
     seed_availability,
