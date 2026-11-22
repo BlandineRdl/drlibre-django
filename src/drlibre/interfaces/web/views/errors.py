@@ -3,6 +3,7 @@ from collections.abc import Callable
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
+from drlibre.interfaces.paths import API_PREFIXES
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 _PAGES = {ErrorCode.NOT_FOUND: "errors/404.html", ErrorCode.FORBIDDEN: "errors/403.html"}
@@ -26,7 +27,7 @@ class DomainErrorPagesMiddleware:
         return self.get_response(request)
 
     def process_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse | None:
-        if not isinstance(exception, DomainError) or request.path.startswith(("/api/", "/fhir/")):
+        if not isinstance(exception, DomainError) or request.path.startswith(API_PREFIXES):
             return None
         template = _PAGES.get(exception.code, "errors/403.html")
         context = {"message": exception.message}

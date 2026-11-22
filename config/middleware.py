@@ -7,6 +7,8 @@ import structlog
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
+from drlibre.interfaces.paths import FHIR_PREFIX
+
 HEADER = "x-correlation-id"
 _VALID = re.compile(r"[\x21-\x7e]{1,128}")
 logger = structlog.get_logger("drlibre.request")
@@ -53,7 +55,7 @@ class SameOriginMiddleware:
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         # FHIR ignores the session cookie, so a cross-origin call carries no ambient credential.
-        fhir = request.path.startswith("/fhir/")
+        fhir = request.path.startswith(FHIR_PREFIX)
         if not fhir and request.method not in _SAFE_METHODS and _is_cross_origin(request):
             return _forbidden(request)
         return self.get_response(request)

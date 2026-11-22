@@ -10,6 +10,7 @@ from django.shortcuts import redirect, render
 from drlibre.bootstrap import act_as, stop_acting
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
+from drlibre.interfaces.paths import API_PREFIXES, FHIR_PREFIX
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 type View = Callable[..., HttpResponseBase]
@@ -17,7 +18,6 @@ type View = Callable[..., HttpResponseBase]
 HOMES = {Role.ADMIN: "/console/", Role.CLINICIAN: "/workspace/", Role.PATIENT: "/portal/"}
 FORCED_CHANGE_PAGE = "/account/password"
 _ATTR = "drlibre_identity"
-FHIR_PREFIX = "/fhir/"
 
 
 def identity_of(request: HttpRequest) -> Identity | None:
@@ -55,12 +55,15 @@ def session_token(request: HttpRequest) -> str | None:
 
 
 def bearer_token(request: HttpRequest) -> str | None:
+    # A bearer opens the APIs only, never a web page.
+    if not request.path.startswith(API_PREFIXES):
+        return None
     scheme, _, token = request.headers.get("Authorization", "").partition(" ")
     return (token.strip() or None) if scheme.lower() == "bearer" else None
 
 
 class SessionMiddleware:
-    """Resolve who holds the bearer token, else the session cookie, on every request."""
+    """Resolve who holds the bearer token on the APIs, else the session cookie, on every request."""
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
