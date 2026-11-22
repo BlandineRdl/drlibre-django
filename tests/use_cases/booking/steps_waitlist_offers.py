@@ -434,3 +434,8 @@ def posts_accept(world: FakeWorld, scene: Scene, web: Client, who: str, email: s
     scene.page = post_api(world, scene, web, caller_of(scene, who), url, {})
     if scene.page.status_code == 201:
         scene.appointment = world.booking_appointments.get(Id.parse(scene.page.json()["id"]))
+
+
+@then(parsers.parse('the appointment keeps the id of the entry of "{email}"'))
+def keeps_entry_id(world: FakeWorld, scene: Scene, email: str) -> None:
+    assert booked(scene).id == entry_of(world, scene, email).id

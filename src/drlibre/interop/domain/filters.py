@@ -130,3 +130,11 @@ class AppointmentFilter:
     # The start lies from `start_from` included to `start_before` excluded.
     start_from: datetime | None = None
     start_before: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentResponseFilter:
+    """An `AppointmentResponse` shares its id with the entry and the appointment it accepted."""
+
+    ids: tuple[Id, ...] = ()
+    patient: Id | None = None

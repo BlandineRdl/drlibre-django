@@ -197,3 +197,12 @@ class AppointmentRow:
     # Filled for the appointment's own clinician only.
     clinical_notes: str | None
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentResponseRow:
+    """A booked waitlist entry: its patient accepted the appointment of the same id."""
+
+    id: Id
+    patient_id: Id
+    updated_at: datetime

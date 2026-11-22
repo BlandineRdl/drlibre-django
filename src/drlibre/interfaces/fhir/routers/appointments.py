@@ -208,12 +208,39 @@ def _profile_of(practitioner_id: Id | None, who: Reader) -> Id | None:
     return found[0]
 
 
+def _created(appointment_id: Id, who: Reader) -> HttpResponse:
+    row = _visible(appointment_id, who)
+    model = to.appointment(row)
+    response = fhir_response(model.model_dump_json(by_alias=True, exclude_none=True), status=201)
+    response["Location"] = f"{base_url()}/Appointment/{appointment_id}"
+    response["ETag"] = etag(to.version_of(row))
+    return response
+
+
+def _join(actor_id: Id, resource: Appointment, who: Reader) -> HttpResponse:
+    """The use case `POST /api/v1/waitlist` calls; the patient is named by id, not email."""
+    asked = to.waitlist_request(resource)
+    entry = container().join_waitlist.execute(
+        actor_id=actor_id,
+        appointment_type_id=asked.appointment_type_id,
+        clinician_id=_profile_of(asked.practitioner_id, who),
+        from_date=asked.from_date,
+        to_date=asked.to_date,
+        patient_email=None,
+        patient_id=asked.patient_id,
+    )
+    return _created(entry.id, who)
+
+
 @router.post("/Appointment")
 def create_appointment(request: HttpRequest) -> HttpResponse:
     identity = caller(request)
     refuse_undeclared(request.GET, frozenset())
-    asked = to.booking_request(read_body(request, Appointment))
+    resource = read_body(request, Appointment)
     who = reader(request)
+    if resource.status == "waitlist":
+        return _join(identity.user_id, resource, who)
+    asked = to.booking_request(resource)
     named = _profile_of(asked.practitioner_id, who)
     if asked.profile_id is not None and named not in (None, asked.profile_id):
         raise invalid_field("Appointment.participant", "Le praticien n'est pas celui du créneau.")
@@ -225,12 +252,7 @@ def create_appointment(request: HttpRequest) -> HttpResponse:
         patient_id=asked.patient_id,
         room_id=asked.room_id,
     )
-    row = _visible(booked.id, who)
-    model = to.appointment(row)
-    response = fhir_response(model.model_dump_json(by_alias=True, exclude_none=True), status=201)
-    response["Location"] = f"{base_url()}/Appointment/{booked.id}"
-    response["ETag"] = etag(to.version_of(row))
-    return response
+    return _created(booked.id, who)
 
 
 def _apply(intent: to.Intent, actor_id: Id, appointment_id: Id, incoming: Appointment) -> None:

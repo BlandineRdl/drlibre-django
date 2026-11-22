@@ -11,6 +11,9 @@ from ninja.renderers import JSONRenderer
 from drlibre.interfaces.fhir.access import gate
 from drlibre.interfaces.fhir.metadata import router as metadata_router
 from drlibre.interfaces.fhir.outcome import error_outcome, not_supported
+from drlibre.interfaces.fhir.routers.appointment_responses import (
+    router as appointment_responses_router,
+)
 from drlibre.interfaces.fhir.routers.appointments import router as appointments_router
 from drlibre.interfaces.fhir.routers.directory import router as directory_router
 from drlibre.interfaces.fhir.routers.patients import router as patients_router
@@ -44,6 +47,7 @@ fhir.add_router("/", directory_router)
 fhir.add_router("/", slots_router)
 fhir.add_router("/", patients_router)
 fhir.add_router("/", appointments_router)
+fhir.add_router("/", appointment_responses_router)
 
 
 @fhir.exception_handler(DomainError)

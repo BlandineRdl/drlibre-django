@@ -55,10 +55,11 @@ class Appointment:
         duration: timedelta,
         source: Source,
         reason: str | None = None,
+        id: Id | None = None,
     ) -> "Appointment":
         """A new BOOKED appointment whose end is the start plus the type's duration."""
         return cls(
-            id=Id(),
+            id=id or Id(),
             patient_id=patient_id,
             clinician_id=clinician_id,
             appointment_type_id=appointment_type_id,

@@ -5,6 +5,7 @@ from typing import Protocol
 
 from drlibre.interop.domain.filters import (
     AppointmentFilter,
+    AppointmentResponseFilter,
     LocationFilter,
     LocationKind,
     Near,
@@ -22,6 +23,7 @@ from drlibre.interop.domain.reader import Reader, ReaderKind
 from drlibre.interop.domain.rows import (
     HELD,
     AppointmentKind,
+    AppointmentResponseRow,
     AppointmentRow,
     AvailabilityRow,
     DepartmentRow,
@@ -43,6 +45,9 @@ __all__ = [
     "HELD",
     "AppointmentFilter",
     "AppointmentKind",
+    "AppointmentResponseFilter",
+    "AppointmentResponseQueries",
+    "AppointmentResponseRow",
     "AppointmentRow",
     "AvailabilityRow",
     "ConditionalWrites",
@@ -153,6 +158,18 @@ class InteropAppointmentQueries(Protocol):
 
     def exists(self, appointment_id: Id) -> bool:
         """Whether an appointment, unbooked entry or open hold has that id, whoever reads."""
+        ...
+
+
+class AppointmentResponseQueries(Protocol):
+    def responses(
+        self, criteria: AppointmentResponseFilter, reader: Reader, paging: Paging | None = None
+    ) -> Page[AppointmentResponseRow]:
+        """Accepted offers by acceptance: a patient's own, all for the admin, none for others."""
+        ...
+
+    def exists(self, response_id: Id) -> bool:
+        """Whether a booked entry has that id, whoever reads."""
         ...
 
 

@@ -492,8 +492,9 @@ class JoinWaitlist(Protocol):
         from_date: date,
         to_date: date,
         patient_email: str | None,
+        patient_id: Id | None = None,
     ) -> WaitlistEntry:
-        """A WAITING entry for the actor, or for the emailed patient when an admin names one."""
+        """A WAITING entry for the actor, or for the patient an admin names by email or id."""
         ...
 
 

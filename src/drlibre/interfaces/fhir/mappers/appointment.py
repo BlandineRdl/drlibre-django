@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 
 from drlibre.interfaces.fhir.bundle import base_url
@@ -150,7 +150,7 @@ def _start_of(resource: Appointment) -> datetime | None:
 def booking_request(resource: Appointment) -> BookingRequest:
     """A `proposed` appointment as a booking; `end`, `meta` and the source are the server's."""
     if resource.status != "proposed":
-        raise invalid_field("Appointment.status", "Créez un RDV au statut proposed.")
+        raise invalid_field("Appointment.status", "Créez un RDV au statut proposed ou waitlist.")
     for name, path in _REFUSED_ON_CREATE.items():
         if getattr(resource, name) is not None:
             raise invalid_field(path, "Ce champ ne se saisit pas à la réservation.")
@@ -176,6 +176,55 @@ def booking_request(resource: Appointment) -> BookingRequest:
         practitioner_id=_one(resource, "Practitioner"),
         patient_id=_one(resource, "Patient"),
         room_id=_one(resource, "Location"),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class WaitlistRequest:
+    """What a `waitlist` appointment asks: a type, days in its zone, maybe a practitioner."""
+
+    appointment_type_id: Id
+    from_date: date
+    to_date: date
+    practitioner_id: Id | None
+    patient_id: Id | None
+
+
+_REFUSED_ON_JOIN = {
+    "start": "Appointment.start",
+    "end": "Appointment.end",
+    "slot": "Appointment.slot",
+    **_REFUSED_ON_CREATE,
+}
+_PERIOD = "Appointment.requestedPeriod"
+
+
+def _day(raw: str | None) -> date:
+    try:
+        return date.fromisoformat(raw or "")
+    except ValueError as error:
+        raise invalid_field(_PERIOD, "Saisissez des dates AAAA-MM-JJ.") from error
+
+
+def waitlist_request(resource: Appointment) -> WaitlistRequest:
+    """A `waitlist` appointment as a join; the offered slot and its room are the server's."""
+    for name, path in _REFUSED_ON_JOIN.items():
+        if getattr(resource, name) is not None:
+            raise invalid_field(path, "Ce champ ne se saisit pas à l'inscription.")
+    if _references(resource, "Location"):
+        raise invalid_field("Appointment.participant", "La salle ne se choisit pas.")
+    kind = _type_of(resource)
+    if kind is None:
+        raise invalid_field("Appointment.serviceType", "Précisez le type de RDV.")
+    periods = resource.requested_period or ()
+    if len(periods) != 1:
+        raise invalid_field(_PERIOD, "Précisez une seule période.")
+    return WaitlistRequest(
+        appointment_type_id=kind,
+        from_date=_day(periods[0].start),
+        to_date=_day(periods[0].end),
+        practitioner_id=_one(resource, "Practitioner"),
+        patient_id=_one(resource, "Patient"),
     )
 
 

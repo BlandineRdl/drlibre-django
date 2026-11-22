@@ -41,6 +41,7 @@ from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
 from tests.fakes.interop import (
+    InMemoryAppointmentResponseQueries,
     InMemoryConditionalWrites,
     InMemoryInteropAppointmentQueries,
     InMemoryPatientQueries,
@@ -284,6 +285,9 @@ class FakeWorld:
                 holds=self.holds,
                 profiles=self.profiles,
                 clock=self.clock,
+            ),
+            appointment_responses=InMemoryAppointmentResponseQueries(
+                waitlist=self.waitlist, clock=self.clock
             ),
             conditional_writes=InMemoryConditionalWrites(),
             admins=InMemoryAdmins(self.users),

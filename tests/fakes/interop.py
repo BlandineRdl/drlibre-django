@@ -7,6 +7,9 @@ from drlibre.interop.application.ports.inbound import (
     HELD,
     AppointmentFilter,
     AppointmentKind,
+    AppointmentResponseFilter,
+    AppointmentResponseQueries,
+    AppointmentResponseRow,
     AppointmentRow,
     ConditionalWrites,
     InteropAppointmentQueries,
@@ -178,3 +181,44 @@ class InMemoryInteropAppointmentQueries(InteropAppointmentQueries):
 
     def exists(self, appointment_id: Id) -> bool:
         return any(r.id == appointment_id for r in self._rows(Reader.anonymous()))
+
+
+class InMemoryAppointmentResponseQueries(AppointmentResponseQueries):
+    """Booked entries of the fake waitlist, stamped now."""
+
+    def __init__(self, *, waitlist: InMemoryWaitlist, clock: Clock) -> None:
+        self._waitlist = waitlist
+        self._clock = clock
+
+    def _rows(self) -> list[AppointmentResponseRow]:
+        now = self._clock.now()
+        booked = (w for w in self._waitlist.rows.values() if w.status is WaitlistStatus.BOOKED)
+        return [AppointmentResponseRow(w.id, w.patient_id, now) for w in booked]
+
+    @staticmethod
+    def _sees(reader: Reader, row: AppointmentResponseRow) -> bool:
+        return reader.is_admin or (
+            reader.kind is ReaderKind.PATIENT and row.patient_id == reader.user_id
+        )
+
+    def responses(
+        self, criteria: AppointmentResponseFilter, reader: Reader, paging: Paging | None = None
+    ) -> Page[AppointmentResponseRow]:
+        found = sorted(
+            (
+                r
+                for r in self._rows()
+                if self._sees(reader, r)
+                and (not criteria.ids or r.id in criteria.ids)
+                and criteria.patient in (None, r.patient_id)
+            ),
+            key=lambda r: (r.updated_at, str(r.id)),
+            reverse=bool(paging and paging.descending),
+        )
+        if paging is None:
+            return Page(tuple(found), len(found), 1)
+        window = found[paging.offset : paging.offset + paging.count]
+        return Page(tuple(window), len(found), paging.page)
+
+    def exists(self, response_id: Id) -> bool:
+        return any(r.id == response_id for r in self._rows())

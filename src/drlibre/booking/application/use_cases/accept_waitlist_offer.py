@@ -96,6 +96,8 @@ class AcceptWaitlistOfferUseCase(AcceptWaitlistOffer):
                 actor_id=actor_id,
                 for_patient=for_patient,
                 announce=False,
+                # Spec §15.3: the entry and its appointment are one FHIR resource.
+                appointment_id=entry.id,
             )
         except DomainError as refusal:
             if refusal.code is not ErrorCode.CONFLICT:
