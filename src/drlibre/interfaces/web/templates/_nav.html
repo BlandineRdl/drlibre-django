@@ -1,19 +1,39 @@
-<ul>
-  <li><a href="/"{% if request.path == "/" %} aria-current="page"{% endif %}>Rechercher</a></li>
-  {% if shell.signed_in %}
-  {% if shell.is_clinician %}
-  {% for link in shell.workspace_nav %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
-  {% elif shell.is_patient %}
-  {% for link in shell.patient_nav %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
-  {% else %}
-  <li><a href="{{ shell.home_url }}"{% if shell.home_current %} aria-current="page"{% endif %}>Mon espace</a></li>
-  {% endif %}
-  {% if shell.can_change_password %}<li><a href="/account/password"{% if request.path == "/account/password" %} aria-current="page"{% endif %}>Mot de passe</a></li>{% endif %}
+<ul class="nav-links">
+  {% for link in shell.links %}<li><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
+</ul>
+<ul class="nav-tools">
+  <li class="nav-mobile">
+    <details class="dropdown">
+      <summary>Menu</summary>
+      <ul dir="rtl">
+        {% for link in shell.links %}<li dir="ltr"><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
+      </ul>
+    </details>
+  </li>
+  {% if shell.bell %}
   <li>
-    <form method="post" action="/sign-out" class="inline-form">
-      {% csrf_token %}
-      <button type="submit" class="secondary outline">Déconnexion</button>
-    </form>
+    <a href="{{ shell.bell.url }}" class="bell"{% if shell.bell.current %} aria-current="page"{% endif %}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      <span class="visually-hidden">{{ shell.bell.label }}</span>
+      {% if shell.bell.unread %}<span class="bell-count" aria-hidden="true">{{ shell.bell.unread }}</span>{% endif %}
+    </a>
+  </li>
+  {% endif %}
+  {% if shell.account %}
+  <li>
+    <details class="dropdown account-menu">
+      <summary><span class="avatar" aria-hidden="true">{{ shell.account.initials }}</span><span class="account-name">{{ shell.account.first_name }}</span><span class="visually-hidden"> : menu du compte</span></summary>
+      <ul dir="rtl">
+        <li dir="ltr" class="account-head"><strong>{{ shell.account.full_name }}</strong><span class="role-tag">{{ shell.account.role_label }}</span></li>
+        {% for link in shell.account.links %}<li dir="ltr"><a href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a></li>{% endfor %}
+        <li dir="ltr">
+          <form method="post" action="/sign-out" class="inline-form">
+            {% csrf_token %}
+            <button type="submit" class="menu-danger">Déconnexion</button>
+          </form>
+        </li>
+      </ul>
+    </details>
   </li>
   {% else %}
   <li><a href="/sign-in" class="nav-cta">Se connecter</a></li>

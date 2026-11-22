@@ -12,7 +12,7 @@
   <a class="skip-link" href="#main">Aller au contenu</a>
   <header class="site-header">
     <nav aria-label="Principale" class="main-nav container">
-      <ul><li><a href="/" class="brand"><span class="brand-mark" aria-hidden="true">D</span><strong>DrLibre</strong></a></li>{% if shell.role_label %}<li><span class="role-tag">{{ shell.role_label }}</span></li>{% endif %}</ul>
+      <ul><li><a href="/" class="brand"><span class="brand-mark" aria-hidden="true">D</span><strong>DrLibre</strong></a></li></ul>
       {% block nav %}{% include "_nav.html" %}{% endblock %}
     </nav>
   </header>
@@ -22,6 +22,7 @@
   <footer class="container site-footer">
     <small>{% block timezone %}Heures affichées dans le fuseau {{ time_zone }}.{% endblock %}</small>
   </footer>
+  <script src="{% static 'drlibre-menu.js' %}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

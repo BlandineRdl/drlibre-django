@@ -196,16 +196,16 @@ def appointment_url(entry: AgendaEntry, action: str) -> str:
     return f"{APPOINTMENTS_URL}/{entry.appointment.id}/{action}"
 
 
-def portal_nav(path: str, home_url: str, notifications: str) -> tuple[NavLink, ...]:
+def portal_nav(path: str, home_url: str) -> tuple[NavLink, ...]:
     """The patient's sections; the longest matching prefix marks the current page."""
     sections = (
         (home_url, "Mon espace"),
         (APPOINTMENTS_URL, "Mes RDV"),
         ("/portal/waitlist", "Liste d'attente"),
-        (NOTIFICATIONS_URL, notifications),
-        (PROFILE_URL, "Profil"),
     )
-    current = max((url for url, _ in sections if path.startswith(url)), key=len, default="")
+    subpages = (NOTIFICATIONS_URL, PROFILE_URL)
+    matches = [url for url, _ in sections if path.startswith(url) and not path.startswith(subpages)]
+    current = max(matches, key=len, default="")
     return tuple(NavLink(url, label, url == current) for url, label in sections)
 
 

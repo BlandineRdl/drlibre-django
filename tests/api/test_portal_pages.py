@@ -75,7 +75,7 @@ def test_every_portal_page_renders_for_a_passwordless_patient(portal: Portal) ->
 
     assert {url: r.status_code for url, r in responses.items()} == dict.fromkeys(urls, 200)
     assert all("/account/password" not in page(r) for r in responses.values())
-    assert 'href="/portal/notifications">Notifications (1 non lue)</a>' in page(
+    assert '<span class="visually-hidden">Notifications (1 non lue)</span>' in page(
         responses["/portal/"]
     )
 
