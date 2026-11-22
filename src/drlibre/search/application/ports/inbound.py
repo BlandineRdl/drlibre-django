@@ -88,8 +88,15 @@ class SearchSpecialties(Protocol):
 
 
 class CountSearchResults(Protocol):
-    def execute(self, criteria: SearchCriteria) -> ResultCounts:
-        """The size of each of the three result lists for the same criteria."""
+    def execute(
+        self,
+        criteria: SearchCriteria,
+        *,
+        providers: int | None = None,
+        hospitals: int | None = None,
+        specialties: int | None = None,
+    ) -> ResultCounts:
+        """Each of the three result list sizes for the same criteria; a size given is kept."""
         ...
 
 

@@ -41,6 +41,7 @@
 ## Fixes
 - #25 `/console/?range=30`: one statement for tally, days and busiest, each appointment's zone converted once; SQL 3 × ~50 ms → ~39 ms, median 160 → 87 ms, p95 360 → 240 ms.
 - #26 `/console/audit/`: `entity_types()` by loose index scan on `audit_entry_target_at`; 21 ms → 0.2 ms, p95 210 → 130 ms.
+- #27 `/?moment=morning`: rank on the first slot, page, then the next 3 slots of the 20 kept rows; the shown list's total is reused by the counts; providers SQL 33 + 25 ms → 25 ms per page (EXPLAIN ANALYZE, load seed), p95 not re-measured.
 
 ## Verdict
 - Rerun after #25 and #26, host under other workloads (load average ~4.5 at start, 10 cores): endpoints with unchanged code rose too, e.g. export 110 → 210 ms, `/workspace/calendar` 88 → 200 ms; a second run at load average 12 was discarded (aggregate p95 400 ms).
