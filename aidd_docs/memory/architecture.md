@@ -20,6 +20,10 @@
 - One composition root wires ports to adapters, so web, API, FHIR and Celery run the same use cases.
 - Ports are `typing.Protocol` classes that adapters inherit explicitly, checked by Pyrefly.
 - Auth is custom: hashed session tokens, email code and sign-in link, hashed bearer tokens.
+- FHIR R4 facade: a second `NinjaAPI` at `/fhir` (`interfaces/fhir/`), `application/fhir+json`, every `DomainError` an `OperationOutcome` with `ErrorCode.http_status`.
+- One registry (`interfaces/fhir/registry.py`) declares each resource's interactions, search parameters, `_include` and `_sort`; it serves `/fhir/metadata`, refuses undeclared parameters (`invalid_input`) and answers 405 `not-supported` on undeclared interactions.
+- `interop` is a read context: SQL reads of organisation, identity, scheduling, booking, notifications and audit tables, scoped in the SQL by `Reader` (anonymous, patient, clinician, admin), each row with its version; plus `ConditionalWrites` for `If-Match`.
+- FHIR writes call the screens' use cases; reference writes check `require_admin` at the FHIR door, as the console's `require_role`.
 
 ## Constraints
 - p95 under 200 ms, search included, proven by load tests.
@@ -81,6 +85,15 @@
 - Index `appointment_start` on `start` (`booking.0005`) serves the admin list, export and dashboard across hospitals.
 - API admin `GET /appointments` takes the list filters, `from`/`to` keep the date of the aware datetime; `POST /jobs/reminders` runs `RunReminders` synchronously and returns `{count}`.
 - The admin file history shows clinician actions as « Personnel ».
+- Bearer tokens: identity `ApiTokenRecord` (sha256 hash, user, label, expiry), issued and revoked by `manage.py api_token <email> [--days N] [--revoke]`, audited; `AuthenticateToken` refuses an unknown, expired or inactive user's token, so a deactivated user loses access at once; `must_change_password` gets 403 `forbidden`.
+- Under `/fhir/` only the bearer counts, the session cookie is ignored, so `/fhir/` is exempt from `SameOriginMiddleware` and `DomainErrorPagesMiddleware`.
+- `If-Match` runs in `ConditionalWrites.run` under the write's own lock order, then compares the version: appointment profile, patient, row; `Schedule` profile, rule; `PractitionerRole` profile; `Patient`, `Practitioner`, `Communication` the user row; a reference record its own row (organisation use cases and `SaveUser` take no row lock); 412 `conflict` when stale.
+- `interop/infrastructure/conditional_writes.py` locks other contexts' rows through their ORM models: the second accepted exception beside booking's `schedule_locks`.
+- `ConditionalWrites.run(all_or_nothing=True)` makes a write of several use cases atomic (`notAvailable`); the default keeps the waitlist accept's commit-then-raise.
+- `Slot` ids are lower-case unpadded base32 of (profile, type, start), stable and decodable; scheduling's `FindSlotStates` searches them (`free` from `scheduling_slot`, other statuses for staff only), `ReadSlotState` reads one by id.
+- An accepted waitlist entry and its appointment share one id: `Appointment/<entry>` goes from `proposed` to `booked`; `AppointmentResponse` is a `BOOKED` entry.
+- `SqlInteropAppointmentQueries` takes the `Clock` so an expired hold is never served as `pending`.
+- `Communication` and `AuditEvent` are read by interop SQL; only the admin reads `AuditEvent`.
 - Gunicorn serves `static/` through `django.views.static.serve`; localhost has no static server.
 
 ## Flow
@@ -88,6 +101,8 @@
 flowchart LR
   Browser --> Web --> UseCases --> Postgres
   ApiClient --> Api --> UseCases
+  FhirClient --> Fhir --> UseCases
+  Fhir --> Interop --> Postgres
   Beat --> Worker --> UseCases
   UseCases --> Mailpit
 ```
