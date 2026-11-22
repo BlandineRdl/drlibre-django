@@ -11,10 +11,12 @@ from drlibre.identity.domain.user import Role
 from drlibre.interfaces.fhir import FhirParser
 from drlibre.interfaces.fhir.access import caller
 from drlibre.interfaces.fhir.bundle import searchset
+from drlibre.interfaces.fhir.diff import changes
 from drlibre.interfaces.fhir.outcome import error_outcome
 from drlibre.interfaces.fhir.params import DateBound, Prefix, date_bound, search_query
 from drlibre.interfaces.fhir.registry import Interaction, ParamType, ResourceRules, SearchParam
 from drlibre.interfaces.fhir.version import etag, expected_version, version_id
+from drlibre.interop.application.ports.inbound import StaleVersionError
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from tests.builders import stored_session, stored_user
 from tests.fhir.conftest import Call
@@ -189,3 +191,31 @@ def test_a_body_in_another_format_is_refused() -> None:
     request = RequestFactory().post("/fhir/Sample", data="a=1", content_type="text/plain")
 
     assert refusal(lambda: FhirParser().parse_body(request)).code is ErrorCode.INVALID_INPUT
+
+
+def test_an_update_keeps_its_writable_changes_and_refuses_the_others() -> None:
+    """Plan E8: a field of another role is forbidden, a fixed one invalid_input on its path."""
+    current = {"A.mine": 1, "A.theirs": 1, "A.fixed": 1}
+
+    def change(**fields: int) -> object:
+        return changes(
+            current,
+            current | {f"A.{k}": v for k, v in fields.items()},
+            writable=frozenset({"A.mine"}),
+            reserved=frozenset({"A.theirs"}),
+        )
+
+    assert change(mine=2) == frozenset({"A.mine"})
+    assert refusal(lambda: change(theirs=2)).code is ErrorCode.FORBIDDEN
+    fixed = refusal(lambda: change(fixed=2))
+    assert fixed.code is ErrorCode.INVALID_INPUT
+    assert fixed.details["fields"][0]["field"] == "A.fixed"
+
+
+def test_a_stale_version_is_a_conflict_answered_412() -> None:
+    """Spec §15.1: an If-Match naming an older version fails with 412."""
+    response = error_outcome(StaleVersionError())
+
+    (issue,) = json.loads(response.content)["issue"]
+    assert response.status_code == 412
+    assert (issue["code"], issue["details"]["coding"][0]["code"]) == ("conflict", "conflict")

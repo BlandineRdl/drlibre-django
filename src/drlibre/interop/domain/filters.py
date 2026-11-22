@@ -104,3 +104,14 @@ class ScheduleFilter:
     starts_by: date | None = None
     ends_from: date | None = None
     active: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PatientFilter:
+    """`name` is a part of the name; `email` and `phone` match whole, `birth_date` the day."""
+
+    ids: tuple[Id, ...] = ()
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    birth_date: date | None = None

@@ -126,12 +126,12 @@ JOIN identity_userrecord u ON u.id = p.user_id
 """
 
 
-def _like(text: str) -> str:
+def like(text: str) -> str:
     escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
 
 
-class _Where:
+class Where:
     """Conditions on the `o` relation and their bound values."""
 
     def __init__(self, ids: tuple[Id, ...]) -> None:
@@ -152,8 +152,8 @@ class _Where:
         return " AND ".join(self.conditions) or "true"
 
 
-def _page(
-    relation: str, where: _Where, paging: Paging | None, order: tuple[str, ...]
+def page_of(
+    relation: str, where: Where, paging: Paging | None, order: tuple[str, ...]
 ) -> tuple[list[Row], int]:
     direction = "DESC" if paging and paging.descending else "ASC"
     ordering = ", ".join(f"o.{column} {direction}" for column in order)
@@ -270,25 +270,25 @@ class SqlDirectoryQueries(DirectoryQueries):
     def organizations(
         self, criteria: OrganizationFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[HospitalRow | DepartmentRow]:
-        where = _Where(criteria.ids)
+        where = Where(criteria.ids)
         if not reader.is_admin:
             where.add("o.active")
-        where.when(criteria.name and _like(criteria.name), "o.name ILIKE %(name)s", "name")
+        where.when(criteria.name and like(criteria.name), "o.name ILIKE %(name)s", "name")
         where.when(criteria.kind and criteria.kind.value, "o.kind = %(kind)s", "kind")
         where.when(criteria.part_of, "o.hospital_id = %(part_of)s", "part_of")
-        where.when(criteria.city and _like(criteria.city), "o.city ILIKE %(city)s", "city")
+        where.when(criteria.city and like(criteria.city), "o.city ILIKE %(city)s", "city")
         where.when(criteria.active, "o.active = %(active)s", "active")
-        rows, total = _page(_ORGANIZATIONS, where, paging, ("name", "id"))
+        rows, total = page_of(_ORGANIZATIONS, where, paging, ("name", "id"))
         items = tuple(_hospital(r) if r["kind"] == "hospital" else _department(r) for r in rows)
         return Page(items, total, _number(paging))
 
     def locations(
         self, criteria: LocationFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[HospitalRow | RoomRow]:
-        where = _Where(criteria.ids)
+        where = Where(criteria.ids)
         if not reader.is_admin:
             where.add("o.active")
-        where.when(criteria.name and _like(criteria.name), "o.name ILIKE %(name)s", "name")
+        where.when(criteria.name and like(criteria.name), "o.name ILIKE %(name)s", "name")
         where.when(criteria.kind and criteria.kind.value, "o.kind = %(kind)s", "kind")
         where.when(
             criteria.organization,
@@ -296,7 +296,7 @@ class SqlDirectoryQueries(DirectoryQueries):
             "org",
         )
         where.when(criteria.part_of, "o.kind = 'room' AND o.hospital_id = %(part_of)s", "part_of")
-        where.when(criteria.city and _like(criteria.city), "o.city ILIKE %(city)s", "city")
+        where.when(criteria.city and like(criteria.city), "o.city ILIKE %(city)s", "city")
         where.when(criteria.active, "o.active = %(active)s", "active")
         if criteria.near:
             near = criteria.near
@@ -306,19 +306,19 @@ class SqlDirectoryQueries(DirectoryQueries):
                 lon=near.longitude,
                 km=near.km,
             )
-        rows, total = _page(_LOCATIONS, where, paging, ("name", "id"))
+        rows, total = page_of(_LOCATIONS, where, paging, ("name", "id"))
         items = tuple(_hospital(r) if r["kind"] == "site" else _room(r) for r in rows)
         return Page(items, total, _number(paging))
 
     def services(
         self, criteria: ServiceFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[ServiceRow]:
-        where = _Where(criteria.ids)
+        where = Where(criteria.ids)
         if not reader.is_admin:
             where.add("o.active")
         if not reader.is_staff:
             where.add("o.bookable_online")
-        where.when(criteria.name and _like(criteria.name), "o.name ILIKE %(name)s", "name")
+        where.when(criteria.name and like(criteria.name), "o.name ILIKE %(name)s", "name")
         where.when(
             criteria.organization,
             "(o.department_id = %(org)s OR o.hospital_id = %(org)s)",
@@ -326,7 +326,7 @@ class SqlDirectoryQueries(DirectoryQueries):
         )
         where.when(criteria.specialty, "%(specialty)s = ANY(o.specialty_ids)", "specialty")
         where.when(criteria.active, "o.active = %(active)s", "active")
-        rows, total = _page(_SERVICES, where, paging, ("name", "id"))
+        rows, total = page_of(_SERVICES, where, paging, ("name", "id"))
         items = tuple(
             ServiceRow(
                 id=Id(r["id"]),
@@ -349,13 +349,13 @@ class SqlDirectoryQueries(DirectoryQueries):
     def specialties(
         self, criteria: SpecialtyFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[SpecialtyRow]:
-        where = _Where(criteria.ids)
+        where = Where(criteria.ids)
         if not reader.is_admin:
             where.add("o.active")
-        where.when(criteria.name and _like(criteria.name), "o.name ILIKE %(name)s", "name")
+        where.when(criteria.name and like(criteria.name), "o.name ILIKE %(name)s", "name")
         where.when(criteria.active, "o.active = %(active)s", "active")
         relation = "SELECT id, name, code, active, updated_at FROM organisation_specialtyrecord"
-        rows, total = _page(relation, where, paging, ("name", "id"))
+        rows, total = page_of(relation, where, paging, ("name", "id"))
         items = tuple(
             SpecialtyRow(Id(r["id"]), r["name"], r["code"], r["active"], r["updated_at"])
             for r in rows
@@ -365,13 +365,13 @@ class SqlDirectoryQueries(DirectoryQueries):
     def practitioners(
         self, criteria: PractitionerFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[PractitionerRow]:
-        where = _Where(criteria.ids)
+        where = Where(criteria.ids)
         if not reader.is_staff:
             where.add("o.active")
-        where.when(criteria.name and _like(criteria.name), "o.name ILIKE %(name)s", "name")
+        where.when(criteria.name and like(criteria.name), "o.name ILIKE %(name)s", "name")
         where.when(criteria.active, "o.active = %(active)s", "active")
         relation = _PRACTITIONERS.format(admins="OR u.role = 'ADMIN'" if reader.is_admin else "")
-        rows, total = _page(relation, where, paging, ("name", "id"))
+        rows, total = page_of(relation, where, paging, ("name", "id"))
         items = tuple(
             PractitionerRow(
                 id=Id(r["id"]),
@@ -390,7 +390,7 @@ class SqlDirectoryQueries(DirectoryQueries):
     def roles(
         self, criteria: RoleFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[RoleRow]:
-        where = _Where(criteria.ids)
+        where = Where(criteria.ids)
         if not reader.is_staff:
             where.add("o.active")
         where.when(criteria.practitioner, "o.practitioner_id = %(practitioner)s", "practitioner")
@@ -410,13 +410,13 @@ class SqlDirectoryQueries(DirectoryQueries):
         relation = _ROLES.format(online="" if reader.is_staff else "AND t.bookable_online") + (
             _ADMIN_ROLES if reader.is_admin else ""
         )
-        rows, total = _page(relation, where, paging, ("name", "id"))
+        rows, total = page_of(relation, where, paging, ("name", "id"))
         return Page(tuple(_role(r, reader) for r in rows), total, _number(paging))
 
     def schedules(
         self, criteria: ScheduleFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[ScheduleRow]:
-        where = _Where(criteria.ids)
+        where = Where(criteria.ids)
         if not reader.is_staff:
             where.add("o.active")
         where.when(
@@ -427,7 +427,7 @@ class SqlDirectoryQueries(DirectoryQueries):
             criteria.ends_from, "(o.valid_to IS NULL OR o.valid_to >= %(ends_from)s)", "ends_from"
         )
         where.when(criteria.active, "o.active = %(active)s", "active")
-        rows, total = _page(_SCHEDULES, where, paging, ("weekday", "start", "id"))
+        rows, total = page_of(_SCHEDULES, where, paging, ("weekday", "start", "id"))
         items = tuple(
             ScheduleRow(
                 id=Id(r["id"]),

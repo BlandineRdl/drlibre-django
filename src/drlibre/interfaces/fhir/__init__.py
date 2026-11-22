@@ -12,10 +12,10 @@ from drlibre.interfaces.fhir.access import gate
 from drlibre.interfaces.fhir.metadata import router as metadata_router
 from drlibre.interfaces.fhir.outcome import error_outcome, not_supported
 from drlibre.interfaces.fhir.routers.directory import router as directory_router
+from drlibre.interfaces.fhir.routers.patients import router as patients_router
 from drlibre.interfaces.fhir.routers.slots import router as slots_router
+from drlibre.interfaces.fhir.routing import require_fhir_json
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
-
-_ACCEPTED = frozenset({"application/fhir+json", "application/json"})
 
 
 class FhirRenderer(JSONRenderer):
@@ -24,9 +24,7 @@ class FhirRenderer(JSONRenderer):
 
 class FhirParser(Parser):
     def parse_body(self, request: HttpRequest) -> dict[str, Any]:
-        if request.content_type not in _ACCEPTED:
-            message = "Envoyez le corps en application/fhir+json."
-            raise DomainError(ErrorCode.INVALID_INPUT, message)
+        require_fhir_json(request)
         return super().parse_body(request)
 
 
@@ -43,6 +41,7 @@ fhir = NinjaAPI(
 fhir.add_router("/", metadata_router)
 fhir.add_router("/", directory_router)
 fhir.add_router("/", slots_router)
+fhir.add_router("/", patients_router)
 
 
 @fhir.exception_handler(DomainError)

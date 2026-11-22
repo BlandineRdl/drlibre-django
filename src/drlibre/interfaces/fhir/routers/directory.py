@@ -1,21 +1,18 @@
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta
-from typing import Any, Protocol
 
 from django.http import HttpRequest, HttpResponse
 from ninja import Router
 
 from drlibre.bootstrap.container import container
 from drlibre.interfaces.fhir.access import reader
-from drlibre.interfaces.fhir.bundle import entry, searchset
+from drlibre.interfaces.fhir.bundle import entry
 from drlibre.interfaces.fhir.mappers import directory as to
-from drlibre.interfaces.fhir.outcome import fhir_response
 from drlibre.interfaces.fhir.params import (
     Prefix,
     SearchQuery,
     date_bound,
-    reference_id,
     refuse_undeclared,
     search_query,
 )
@@ -26,9 +23,20 @@ from drlibre.interfaces.fhir.registry import (
     SearchParam,
     declare,
 )
+from drlibre.interfaces.fhir.routing import (
+    boolean,
+    bundle_response,
+    choice,
+    entries_of,
+    json_of,
+    missing,
+    paging_of,
+    parse_id,
+    read_one,
+    reference,
+    resource_response,
+)
 from drlibre.interfaces.fhir.schemas.bundle import BundleEntry
-from drlibre.interfaces.fhir.schemas.common import FhirModel
-from drlibre.interfaces.fhir.version import etag
 from drlibre.interop.application.ports.inbound import (
     DirectoryQueries,
     LocationFilter,
@@ -36,7 +44,6 @@ from drlibre.interop.application.ports.inbound import (
     Near,
     OrganizationFilter,
     OrganizationKind,
-    Paging,
     PractitionerFilter,
     PractitionerRow,
     Reader,
@@ -47,9 +54,7 @@ from drlibre.interop.application.ports.inbound import (
     SpecialtyFilter,
     SpecialtyRow,
 )
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
-from drlibre.shared_kernel.pagination import Page
 from drlibre.shared_kernel.validation import invalid_field
 
 router = Router(tags=["directory"])
@@ -144,84 +149,10 @@ SCHEDULE = declare(
 )
 
 _NOWHERE = Id(uuid.UUID(int=0))
-_BOOLEANS = {"true": True, "false": False}
 
 
 def _queries() -> DirectoryQueries:
     return container().directory_queries
-
-
-def _json(model: FhirModel) -> dict[str, Any]:
-    return model.model_dump(mode="json", by_alias=True, exclude_none=True)
-
-
-def _resource(model: FhirModel, version: str) -> HttpResponse:
-    response = fhir_response(model.model_dump_json(by_alias=True, exclude_none=True), status=200)
-    response["ETag"] = etag(version)
-    return response
-
-
-def _bundle(
-    rules: ResourceRules, query: SearchQuery, total: int, entries: Sequence[BundleEntry]
-) -> HttpResponse:
-    bundle = searchset(resource_type=rules.type, query=query, total=total, entries=entries)
-    return fhir_response(bundle.model_dump_json(by_alias=True, exclude_none=True), status=200)
-
-
-def _missing() -> DomainError:
-    return DomainError(ErrorCode.NOT_FOUND, "Ressource introuvable.")
-
-
-def _id(raw: str) -> Id:
-    try:
-        return Id.parse(raw)
-    except ValueError as error:
-        raise _missing() from error
-
-
-def _read[T](request: HttpRequest, found: Page[T]) -> T:
-    refuse_undeclared(request.GET, frozenset())
-    if not found.items:
-        raise _missing()
-    return found.items[0]
-
-
-def _paging(query: SearchQuery) -> Paging:
-    return Paging(count=query.count, page=query.page, descending=query.sort[:1] == ("-name",))
-
-
-def _token(query: SearchQuery, name: str) -> str | None:
-    raw = query.first(name)
-    return raw.rpartition("|")[2] if raw is not None else None
-
-
-def _boolean(query: SearchQuery, name: str) -> bool | None:
-    raw = _token(query, name)
-    if raw is None:
-        return None
-    if raw not in _BOOLEANS:
-        raise invalid_field(name, "Saisissez true ou false.")
-    return _BOOLEANS[raw]
-
-
-def _choice[T](query: SearchQuery, name: str, choices: dict[str, T]) -> T | None:
-    raw = _token(query, name)
-    if raw is None:
-        return None
-    if raw not in choices:
-        raise invalid_field(name, f"Valeur non prise en charge : {raw}.")
-    return choices[raw]
-
-
-def _ref(query: SearchQuery, name: str, *types: str) -> Id | None:
-    raw = query.first(name)
-    if raw is None:
-        return None
-    found = reference_id(name, raw, *types)
-    try:
-        return Id.parse(found)
-    except ValueError as error:
-        raise invalid_field(name, f"Saisissez une référence {types[0]}/<id>.") from error
 
 
 def _specialty_id(query: SearchQuery, known: dict[Id, SpecialtyRow]) -> Id | None:
@@ -257,26 +188,15 @@ def _specialties(who: Reader) -> dict[Id, SpecialtyRow]:
     return {s.id: s for s in _queries().specialties(SpecialtyFilter(), who).items}
 
 
-class _Identified(Protocol):
-    @property
-    def id(self) -> Id: ...
-
-
-def _entries[T: _Identified](
-    rules: ResourceRules, rows: Sequence[T], build: Callable[[T], FhirModel], **include: bool
-) -> list[BundleEntry]:
-    return [entry(rules.type, str(r.id), _json(build(r)), **include) for r in rows]
-
-
 # Organization: hospitals (`prov`) and departments (`dept`).
 _ORGANIZATION_KINDS = {"prov": OrganizationKind.HOSPITAL, "dept": OrganizationKind.DEPARTMENT}
 
 
 @router.get("/Organization/{resource_id}")
 def read_organization(request: HttpRequest, resource_id: str) -> HttpResponse:
-    criteria = OrganizationFilter(ids=(_id(resource_id),))
-    model = to.organization(_read(request, _queries().organizations(criteria, reader(request))))
-    return _resource(model, model.meta.version_id or "")
+    criteria = OrganizationFilter(ids=(parse_id(resource_id),))
+    model = to.organization(read_one(request, _queries().organizations(criteria, reader(request))))
+    return resource_response(model, model.meta.version_id or "")
 
 
 @router.get("/Organization")
@@ -284,14 +204,14 @@ def search_organization(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, ORGANIZATION)
     criteria = OrganizationFilter(
         name=query.first("name"),
-        kind=_choice(query, "type", _ORGANIZATION_KINDS),
-        part_of=_ref(query, "partof", "Organization"),
+        kind=choice(query, "type", _ORGANIZATION_KINDS),
+        part_of=reference(query, "partof", "Organization"),
         city=query.first("address-city"),
-        active=_boolean(query, "active"),
+        active=boolean(query, "active"),
     )
-    page = _queries().organizations(criteria, reader(request), _paging(query))
-    return _bundle(
-        ORGANIZATION, query, page.total, _entries(ORGANIZATION, page.items, to.organization)
+    page = _queries().organizations(criteria, reader(request), paging_of(query))
+    return bundle_response(
+        ORGANIZATION, query, page.total, entries_of(ORGANIZATION, page.items, to.organization)
     )
 
 
@@ -301,9 +221,9 @@ _LOCATION_KINDS = {"si": LocationKind.SITE, "ro": LocationKind.ROOM}
 
 @router.get("/Location/{resource_id}")
 def read_location(request: HttpRequest, resource_id: str) -> HttpResponse:
-    criteria = LocationFilter(ids=(_id(resource_id),))
-    model = to.location(_read(request, _queries().locations(criteria, reader(request))))
-    return _resource(model, model.meta.version_id or "")
+    criteria = LocationFilter(ids=(parse_id(resource_id),))
+    model = to.location(read_one(request, _queries().locations(criteria, reader(request))))
+    return resource_response(model, model.meta.version_id or "")
 
 
 @router.get("/Location")
@@ -311,23 +231,25 @@ def search_location(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, LOCATION)
     criteria = LocationFilter(
         name=query.first("name"),
-        kind=_choice(query, "type", _LOCATION_KINDS),
-        organization=_ref(query, "organization", "Organization"),
-        part_of=_ref(query, "partof", "Location"),
+        kind=choice(query, "type", _LOCATION_KINDS),
+        organization=reference(query, "organization", "Organization"),
+        part_of=reference(query, "partof", "Location"),
         city=query.first("address-city"),
         near=_near(query),
     )
-    page = _queries().locations(criteria, reader(request), _paging(query))
-    return _bundle(LOCATION, query, page.total, _entries(LOCATION, page.items, to.location))
+    page = _queries().locations(criteria, reader(request), paging_of(query))
+    return bundle_response(
+        LOCATION, query, page.total, entries_of(LOCATION, page.items, to.location)
+    )
 
 
 @router.get("/HealthcareService/{resource_id}")
 def read_healthcare_service(request: HttpRequest, resource_id: str) -> HttpResponse:
     who = reader(request)
-    criteria = ServiceFilter(ids=(_id(resource_id),))
-    row = _read(request, _queries().services(criteria, who))
+    criteria = ServiceFilter(ids=(parse_id(resource_id),))
+    row = read_one(request, _queries().services(criteria, who))
     model = to.healthcare_service(row, _specialties(who))
-    return _resource(model, model.meta.version_id or "")
+    return resource_response(model, model.meta.version_id or "")
 
 
 @router.get("/HealthcareService")
@@ -337,13 +259,13 @@ def search_healthcare_service(request: HttpRequest) -> HttpResponse:
     known = _specialties(who)
     criteria = ServiceFilter(
         name=query.first("name"),
-        organization=_ref(query, "organization", "Organization"),
+        organization=reference(query, "organization", "Organization"),
         specialty=_specialty_id(query, known),
-        active=_boolean(query, "active"),
+        active=boolean(query, "active"),
     )
-    page = _queries().services(criteria, who, _paging(query))
-    entries = _entries(HEALTHCARE_SERVICE, page.items, lambda r: to.healthcare_service(r, known))
-    return _bundle(HEALTHCARE_SERVICE, query, page.total, entries)
+    page = _queries().services(criteria, who, paging_of(query))
+    entries = entries_of(HEALTHCARE_SERVICE, page.items, lambda r: to.healthcare_service(r, known))
+    return bundle_response(HEALTHCARE_SERVICE, query, page.total, entries)
 
 
 _STATUSES = {"active": True, "retired": False}
@@ -351,18 +273,18 @@ _STATUSES = {"active": True, "retired": False}
 
 @router.get("/CodeSystem/{resource_id}")
 def read_code_system(request: HttpRequest, resource_id: str) -> HttpResponse:
-    criteria = SpecialtyFilter(ids=(_id(resource_id),))
-    model = to.code_system(_read(request, _queries().specialties(criteria, reader(request))))
-    return _resource(model, model.meta.version_id or "")
+    criteria = SpecialtyFilter(ids=(parse_id(resource_id),))
+    model = to.code_system(read_one(request, _queries().specialties(criteria, reader(request))))
+    return resource_response(model, model.meta.version_id or "")
 
 
 @router.get("/CodeSystem")
 def search_code_system(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, CODE_SYSTEM)
-    criteria = SpecialtyFilter(name=query.first("name"), active=_choice(query, "status", _STATUSES))
-    page = _queries().specialties(criteria, reader(request), _paging(query))
-    return _bundle(
-        CODE_SYSTEM, query, page.total, _entries(CODE_SYSTEM, page.items, to.code_system)
+    criteria = SpecialtyFilter(name=query.first("name"), active=choice(query, "status", _STATUSES))
+    page = _queries().specialties(criteria, reader(request), paging_of(query))
+    return bundle_response(
+        CODE_SYSTEM, query, page.total, entries_of(CODE_SYSTEM, page.items, to.code_system)
     )
 
 
@@ -375,9 +297,9 @@ def read_value_set(request: HttpRequest, resource_id: str) -> HttpResponse:
     refuse_undeclared(request.GET, frozenset())
     rows = _active_specialties()
     if resource_id != to.SPECIALTIES or not rows:
-        raise _missing()
+        raise missing()
     model = to.value_set(rows)
-    return _resource(model, model.meta.version_id or "")
+    return resource_response(model, model.meta.version_id or "")
 
 
 @router.get("/ValueSet")
@@ -385,33 +307,33 @@ def search_value_set(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, VALUE_SET)
     rows = _active_specialties()
     found = [to.value_set(rows)] if rows and query.page == 1 else []
-    entries = [entry(VALUE_SET.type, to.SPECIALTIES, _json(m)) for m in found]
-    return _bundle(VALUE_SET, query, 1 if rows else 0, entries)
+    entries = [entry(VALUE_SET.type, to.SPECIALTIES, json_of(m)) for m in found]
+    return bundle_response(VALUE_SET, query, 1 if rows else 0, entries)
 
 
 @router.get("/Practitioner/{resource_id}")
 def read_practitioner(request: HttpRequest, resource_id: str) -> HttpResponse:
-    criteria = PractitionerFilter(ids=(_id(resource_id),))
-    model = to.practitioner(_read(request, _queries().practitioners(criteria, reader(request))))
-    return _resource(model, model.meta.version_id or "")
+    criteria = PractitionerFilter(ids=(parse_id(resource_id),))
+    model = to.practitioner(read_one(request, _queries().practitioners(criteria, reader(request))))
+    return resource_response(model, model.meta.version_id or "")
 
 
 @router.get("/Practitioner")
 def search_practitioner(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, PRACTITIONER)
-    criteria = PractitionerFilter(name=query.first("name"), active=_boolean(query, "active"))
-    page = _queries().practitioners(criteria, reader(request), _paging(query))
-    return _bundle(
-        PRACTITIONER, query, page.total, _entries(PRACTITIONER, page.items, to.practitioner)
+    criteria = PractitionerFilter(name=query.first("name"), active=boolean(query, "active"))
+    page = _queries().practitioners(criteria, reader(request), paging_of(query))
+    return bundle_response(
+        PRACTITIONER, query, page.total, entries_of(PRACTITIONER, page.items, to.practitioner)
     )
 
 
 @router.get("/PractitionerRole/{resource_id}")
 def read_practitioner_role(request: HttpRequest, resource_id: str) -> HttpResponse:
     who = reader(request)
-    row = _read(request, _queries().roles(RoleFilter(ids=(_id(resource_id),)), who))
+    row = read_one(request, _queries().roles(RoleFilter(ids=(parse_id(resource_id),)), who))
     model = to.role(row, _specialties(who))
-    return _resource(model, model.meta.version_id or "")
+    return resource_response(model, model.meta.version_id or "")
 
 
 def _role_includes(query: SearchQuery, rows: Sequence[RoleRow], who: Reader) -> list[BundleEntry]:
@@ -421,11 +343,11 @@ def _role_includes(query: SearchQuery, rows: Sequence[RoleRow], who: Reader) -> 
         people: Sequence[PractitionerRow] = (
             _queries().practitioners(PractitionerFilter(ids=ids), who).items
         )
-        found += _entries(PRACTITIONER, people, to.practitioner, include=True)
+        found += entries_of(PRACTITIONER, people, to.practitioner, include=True)
     departments = tuple(dict.fromkeys(r.department_id for r in rows if r.department_id))
     if "PractitionerRole:organization" in query.includes and departments:
         organizations = _queries().organizations(OrganizationFilter(ids=departments), who).items
-        found += _entries(ORGANIZATION, organizations, to.organization, include=True)
+        found += entries_of(ORGANIZATION, organizations, to.organization, include=True)
     return found
 
 
@@ -435,24 +357,24 @@ def search_practitioner_role(request: HttpRequest) -> HttpResponse:
     who = reader(request)
     known = _specialties(who)
     criteria = RoleFilter(
-        practitioner=_ref(query, "practitioner", "Practitioner"),
-        organization=_ref(query, "organization", "Organization"),
+        practitioner=reference(query, "practitioner", "Practitioner"),
+        organization=reference(query, "organization", "Organization"),
         specialty=_specialty_id(query, known),
-        location=_ref(query, "location", "Location"),
-        service=_ref(query, "service", "HealthcareService"),
-        active=_boolean(query, "active"),
+        location=reference(query, "location", "Location"),
+        service=reference(query, "service", "HealthcareService"),
+        active=boolean(query, "active"),
     )
-    page = _queries().roles(criteria, who, _paging(query))
-    entries = _entries(PRACTITIONER_ROLE, page.items, lambda r: to.role(r, known))
+    page = _queries().roles(criteria, who, paging_of(query))
+    entries = entries_of(PRACTITIONER_ROLE, page.items, lambda r: to.role(r, known))
     entries += _role_includes(query, page.items, who)
-    return _bundle(PRACTITIONER_ROLE, query, page.total, entries)
+    return bundle_response(PRACTITIONER_ROLE, query, page.total, entries)
 
 
 @router.get("/Schedule/{resource_id}")
 def read_schedule(request: HttpRequest, resource_id: str) -> HttpResponse:
-    criteria = ScheduleFilter(ids=(_id(resource_id),))
-    model = to.schedule(_read(request, _queries().schedules(criteria, reader(request))))
-    return _resource(model, model.meta.version_id or "")
+    criteria = ScheduleFilter(ids=(parse_id(resource_id),))
+    model = to.schedule(read_one(request, _queries().schedules(criteria, reader(request))))
+    return resource_response(model, model.meta.version_id or "")
 
 
 def _horizon(query: SearchQuery) -> tuple[date | None, date | None]:
@@ -477,10 +399,12 @@ def search_schedule(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, SCHEDULE)
     starts_by, ends_from = _horizon(query)
     criteria = ScheduleFilter(
-        actor=_ref(query, "actor", "Practitioner", "Location"),
+        actor=reference(query, "actor", "Practitioner", "Location"),
         starts_by=starts_by,
         ends_from=ends_from,
-        active=_boolean(query, "active"),
+        active=boolean(query, "active"),
     )
-    page = _queries().schedules(criteria, reader(request), _paging(query))
-    return _bundle(SCHEDULE, query, page.total, _entries(SCHEDULE, page.items, to.schedule))
+    page = _queries().schedules(criteria, reader(request), paging_of(query))
+    return bundle_response(
+        SCHEDULE, query, page.total, entries_of(SCHEDULE, page.items, to.schedule)
+    )

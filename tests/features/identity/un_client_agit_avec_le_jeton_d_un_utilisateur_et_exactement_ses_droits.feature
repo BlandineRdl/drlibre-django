@@ -86,3 +86,72 @@ Feature: Un client agit avec le jeton d'un utilisateur et exactement ses droits
     Given on "2026-11-20" the clinician is held at "09:00", booked at "10:00" and off at "11:00" on "2026-11-23"
     When the client with the "clinician" token searches "/fhir/Slot?service-type=$online&start=ge2026-11-16T00:00:00%2B01:00&start=lt2026-11-20T11:00:00%2B01:00&status=busy,busy-tentative,busy-unavailable"
     Then the FHIR slots are ""
+
+  @integration @django_db
+  Scenario: `Patient` (nom, date de naissance, email, téléphone, actif) est lisible par le patient lui-même, par un praticien pour ses propres patients, et par l'admin ; une autre fiche existante donne `forbidden`.
+    Given two patients, a clinician who has seen the first one and an admin
+    When "first" reads the patient "first"
+    Then the patient "first" is shown with their name, birth date, email, phone and status
+    When "clinician" reads the patient "first"
+    Then the patient "first" is shown with their name, birth date, email, phone and status
+    When "admin" reads the patient "second"
+    Then the patient "second" is shown with their name, birth date, email, phone and status
+    When "first" reads the patient "second"
+    Then the client is refused with 403 and the code "forbidden"
+    When "clinician" reads the patient "second"
+    Then the client is refused with 403 and the code "forbidden"
+    When "first" reads the patient "absent"
+    Then the client is refused with 404 and the code "not_found"
+    When "nobody" reads the patient "first"
+    Then the client is refused with 401 and the code "unauthenticated"
+
+  @integration @django_db
+  Scenario: Les recherches `Patient` acceptent `name`, `email`, `phone` et `birthdate`, limitées à ce que l'utilisateur peut voir.
+    Given two patients, a clinician who has seen the first one and an admin
+    When "admin" searches the patients with "_sort=-name"
+    Then the FHIR patients found are "second, first"
+    When "admin" searches the patients with "name=durand"
+    Then the FHIR patients found are "first"
+    When "admin" searches the patients with "email=$second_email"
+    Then the FHIR patients found are "second"
+    When "admin" searches the patients with "phone=0611111111"
+    Then the FHIR patients found are "first"
+    When "admin" searches the patients with "birthdate=1990-05-01"
+    Then the FHIR patients found are "second"
+    When "clinician" searches the patients with "_sort=name"
+    Then the FHIR patients found are "first"
+    When "first" searches the patients with "name=Bruno"
+    Then no FHIR patient is found
+    When "first" searches the patients with "birthdate=ge1990-05-01"
+    Then the client is refused with 400 and the code "invalid_input"
+
+  @integration @django_db
+  Scenario: Le patient met à jour son propre téléphone et sa date de naissance ; une mise à jour avec un `If-Match` périmé échoue en 412.
+    Given two patients, a clinician who has seen the first one and an admin
+    When "first" updates the patient "first" with phone "0633333333" and birth date "1985-02-03" at the current version
+    Then the update answers 200 with a new version
+    And the patient "first" has phone "0633333333" and birth date "1985-02-03"
+    When "first" updates the patient "first" with phone "0644444444" and birth date "1985-02-03" at the previous version
+    Then the client is refused with 412 and the code "conflict"
+    And the patient "first" has phone "0633333333" and birth date "1985-02-03"
+
+  @integration @django_db
+  Scenario Outline: Le patient met à jour son propre téléphone et sa date de naissance ; une mise à jour avec un `If-Match` périmé échoue en 412. (<case>)
+    Given two patients, a clinician who has seen the first one and an admin
+    When "<who>" changes the <field> of the patient "first" to "<value>"
+    Then the client is refused with <status> and the code "<code>"
+    And the patient "first" has phone "0611111111" and birth date "1980-03-04"
+
+    Examples:
+      | case                              | who       | field     | value             | status | code          |
+      | rien d'autre : son nom            | first     | name      | Anne Autre        | 400    | invalid_input |
+      | rien d'autre : son email          | first     | email     | autre@example.org | 400    | invalid_input |
+      | pas la fiche d'un autre           | second    | birthDate | 1970-01-01        | 403    | forbidden     |
+      | pas le praticien                  | clinician | birthDate | 1970-01-01        | 403    | forbidden     |
+
+  @integration @django_db
+  Scenario: Chaque écriture laisse la même entrée d'audit que l'écran correspondant. (Patient et profil)
+    Given two patients, a clinician who has seen the first one and an admin
+    When "first" updates the patient "first" with phone "0633333333" and birth date "1985-02-03" at the current version
+    And "second" saves phone "0633333333" and birth date "1985-02-03" on the profile screen
+    Then the "first" and "second" entries "user.profile_updated" are alike but for the actor

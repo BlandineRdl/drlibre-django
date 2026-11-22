@@ -19,6 +19,7 @@ from tests.fakes.world import FakeWorld
 pytest_plugins = [
     "tests.fhir.directory_steps",
     "tests.fhir.slot_steps",
+    "tests.fhir.patient_steps",
     "tests.use_cases.booking.steps_scene",
     "tests.use_cases.booking.steps_holds",
     "tests.use_cases.booking.steps_changes",

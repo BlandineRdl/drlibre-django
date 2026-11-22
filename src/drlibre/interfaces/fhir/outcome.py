@@ -4,6 +4,7 @@ from django.http import HttpResponse
 
 from drlibre.interfaces.fhir.schemas.common import CodeableConcept, Coding
 from drlibre.interfaces.fhir.schemas.outcome import OperationOutcome, OperationOutcomeIssue
+from drlibre.interop.application.ports.inbound import StaleVersionError
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 FHIR_JSON = "application/fhir+json; charset=utf-8"
@@ -51,7 +52,9 @@ def error_outcome(error: DomainError) -> HttpResponse:
         diagnostics=json.dumps(error.details, ensure_ascii=False) if error.details else None,
         expression=_fields(error.details),
     )
-    response = _render(OperationOutcome(issue=(issue,)), status=error.code.http_status)
+    # A stale If-Match is a conflict whose HTTP answer is 412, as FHIR asks.
+    status = 412 if isinstance(error, StaleVersionError) else error.code.http_status
+    response = _render(OperationOutcome(issue=(issue,)), status=status)
     if error.code is ErrorCode.UNAUTHENTICATED:
         response["WWW-Authenticate"] = "Bearer"
     return response

@@ -146,3 +146,14 @@ class ScheduleRow:
     valid_to: date | None
     active: bool
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class PatientRow:
+    id: Id
+    full_name: str
+    email: str
+    phone: str | None
+    birth_date: date | None
+    active: bool
+    updated_at: datetime

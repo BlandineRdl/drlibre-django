@@ -22,15 +22,15 @@ from drlibre.interfaces.fhir.registry import (
     SearchParam,
     declare,
 )
-from drlibre.interfaces.fhir.routers.directory import (
-    SCHEDULE,
-    _bundle,
-    _entries,
-    _json,
-    _missing,
-    _ref,
-    _resource,
-    _token,
+from drlibre.interfaces.fhir.routers.directory import SCHEDULE
+from drlibre.interfaces.fhir.routing import (
+    bundle_response,
+    entries_of,
+    json_of,
+    missing,
+    reference,
+    resource_response,
+    token,
 )
 from drlibre.interfaces.fhir.schemas.common import CodeableConcept, Coding, Meta, Reference
 from drlibre.interfaces.fhir.schemas.slot import Slot
@@ -92,7 +92,7 @@ def read_slot(request: HttpRequest, resource_id: str) -> HttpResponse:
     refuse_undeclared(request.GET, frozenset())
     key = slot_key(resource_id)
     if key is None:
-        raise _missing()
+        raise missing()
     who = reader(request)
     state = container().read_slot_state.execute(
         appointment_type_id=key.appointment_type_id,
@@ -101,9 +101,9 @@ def read_slot(request: HttpRequest, resource_id: str) -> HttpResponse:
         staff=who.is_staff,
     )
     if state is None:
-        raise _missing()
+        raise missing()
     model = _slot(state, key.appointment_type_id, _rules((state.rule_id,), who).get(state.rule_id))
-    return _resource(model, model.meta.version_id or "")
+    return resource_response(model, model.meta.version_id or "")
 
 
 def _range(query: SearchQuery) -> tuple[datetime, datetime]:
@@ -123,7 +123,7 @@ def _range(query: SearchQuery) -> tuple[datetime, datetime]:
 
 
 def _service_type(query: SearchQuery) -> Id:
-    raw = _token(query, "service-type")
+    raw = token(query, "service-type")
     if raw is None:
         raise invalid_field("service-type", "Précisez le type de RDV.")
     try:
@@ -143,8 +143,8 @@ def _statuses(query: SearchQuery) -> frozenset[SlotStatus]:
 
 def _schedules(query: SearchQuery, who: Reader) -> tuple[ScheduleRow, ...] | None:
     """The rules `schedule` and `schedule.actor` narrow to, or None when neither is given."""
-    rule = _ref(query, "schedule", "Schedule")
-    actor = _ref(query, "schedule.actor", "Practitioner")
+    rule = reference(query, "schedule", "Schedule")
+    actor = reference(query, "schedule.actor", "Practitioner")
     if rule is None and actor is None:
         return None
     criteria = ScheduleFilter(ids=(rule,) if rule else (), actor=actor)
@@ -182,9 +182,9 @@ def search_slot(request: HttpRequest) -> HttpResponse:
     page = states[(query.page - 1) * query.count : query.page * query.count]
     rules: Mapping[Id, ScheduleRow] = _rules(tuple(dict.fromkeys(s.rule_id for s in page)), who)
     entries = [
-        entry(SLOT.type, model.id, _json(model))
+        entry(SLOT.type, model.id, json_of(model))
         for model in (_slot(s, kind, rules.get(s.rule_id)) for s in page)
     ]
     if "Slot:schedule" in query.includes:
-        entries += _entries(SCHEDULE, tuple(rules.values()), to.schedule, include=True)
-    return _bundle(SLOT, query, len(states), entries)
+        entries += entries_of(SCHEDULE, tuple(rules.values()), to.schedule, include=True)
+    return bundle_response(SLOT, query, len(states), entries)

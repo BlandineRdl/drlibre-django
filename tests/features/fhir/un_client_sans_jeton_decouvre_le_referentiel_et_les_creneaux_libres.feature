@@ -144,3 +144,9 @@ Feature: Un client sans jeton découvre le référentiel et les créneaux libres
       | sans borne de fin    | /fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00                           | 400    | invalid   | invalid_input |
       | plus de 31 jours     | /fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00&start=lt2026-12-25T00:00:00%2B01:00 | 400 | invalid | invalid_input |
       | id mal formé         | /fhir/Slot/abc                                                                                | 404    | not-found | not_found     |
+
+  Scenario: Sans jeton, toute écriture renvoie `unauthenticated` (401). (mise à jour d'un `Patient`)
+    Given two patients, a clinician who has seen the first one and an admin
+    When a client without a token updates the patient "first"
+    Then the answer is 401 with an OperationOutcome "login" and the code "unauthenticated"
+    And the patient "first" has phone "0611111111" and birth date "1980-03-04"
