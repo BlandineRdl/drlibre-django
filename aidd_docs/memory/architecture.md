@@ -22,7 +22,7 @@
 - Auth is custom: hashed session tokens, email code and sign-in link, hashed bearer tokens.
 - FHIR R4 facade: a second `NinjaAPI` at `/fhir` (`interfaces/fhir/`), `application/fhir+json`, every `DomainError` an `OperationOutcome` with `ErrorCode.http_status`.
 - One registry (`interfaces/fhir/registry.py`) declares each resource's interactions, search parameters, `_include` and `_sort`; it serves `/fhir/metadata`, refuses undeclared parameters (`invalid_input`) and answers 405 `not-supported` on undeclared interactions.
-- `interop` is a read context: SQL reads of organisation, identity, scheduling, booking, notifications and audit tables, scoped in the SQL by `Reader` (anonymous, patient, clinician, admin), each row with its version; plus `ConditionalWrites` for `If-Match`.
+- `interop` is a read context: SQL reads of organisation, identity, scheduling, booking, notifications and audit tables, scoped in the SQL by `Reader` (anonymous, patient, clinician, admin), each row with its version; plus `ConditionalWrites` for `If-Match`. A time-off reason reaches only the admin and its own clinician (`Reader.reads_reasons_of`); `UpdateProfile` refuses an actor other than the user (`forbidden`), admins edit through `SaveUser`.
 - FHIR writes call the screens' use cases; reference writes check `require_admin` at the FHIR door, as the console's `require_role`.
 - A specialty is both a `CodeSystem` and a `ValueSet` (one included concept) sharing its id, as a hospital is an `Organization` and a `Location`; both write through `SaveSpecialty`/`DeleteSpecialty`.
 
@@ -87,10 +87,10 @@
 - API admin `GET /appointments` takes the list filters, `from`/`to` keep the date of the aware datetime; `POST /jobs/reminders` runs `RunReminders` synchronously and returns `{count}`.
 - The admin file history shows clinician actions as « Personnel ».
 - Bearer tokens: identity `ApiTokenRecord` (sha256 hash, user, label, expiry), issued and revoked by `manage.py api_token <email> [--days N] [--revoke]`, audited; `AuthenticateToken` refuses an unknown, expired or inactive user's token, so a deactivated user loses access at once; `must_change_password` gets 403 `forbidden`.
-- Under `/fhir/` only the bearer counts, the session cookie is ignored, so `/fhir/` is exempt from `SameOriginMiddleware` and `DomainErrorPagesMiddleware`.
+- A bearer authenticates only under `/fhir/` and `/api/` (`interfaces/paths.py`), never a web page; under `/fhir/` only the bearer counts, the session cookie is ignored, so `/fhir/` is exempt from `SameOriginMiddleware` and `DomainErrorPagesMiddleware`.
 - `If-Match` runs in `ConditionalWrites.run` under the write's own lock order, then compares the version: appointment profile, patient, row; `Schedule` profile, rule; `PractitionerRole` profile; `Patient`, `Practitioner`, `Communication` the user row; a reference record its own row (organisation use cases and `SaveUser` take no row lock); 412 `conflict` when stale.
 - `interop/infrastructure/conditional_writes.py` locks other contexts' rows through their ORM models: the second accepted exception beside booking's `schedule_locks`.
-- `ConditionalWrites.run(all_or_nothing=True)` makes a write of several use cases atomic (`notAvailable`); the default keeps the waitlist accept's commit-then-raise.
+- `ConditionalWrites.run` runs the write in its outer transaction, so any refusal rolls back every use case it ran (`notAvailable`); its row locks are `FOR NO KEY UPDATE`, so foreign-key inserts (bookings of a locked type) don't wait; the waitlist accept's commit-then-raise does not go through it.
 - `Slot` ids are lower-case unpadded base32 of (profile, type, start), stable and decodable; scheduling's `FindSlotStates` searches them (`free` from `scheduling_slot`, other statuses for staff only), `ReadSlotState` reads one by id.
 - An accepted waitlist entry and its appointment share one id: `Appointment/<entry>` goes from `proposed` to `booked`; `AppointmentResponse` is a `BOOKED` entry.
 - `SqlInteropAppointmentQueries` takes the `Clock` so an expired hold is never served as `pending`.

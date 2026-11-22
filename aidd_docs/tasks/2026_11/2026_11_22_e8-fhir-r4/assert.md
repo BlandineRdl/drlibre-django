@@ -248,3 +248,24 @@
 - A specialty is a `CodeSystem` and a `ValueSet` sharing its product id; the admin creates, renames, deletes `ValueSet` through `SaveSpecialty`/`DeleteSpecialty`, `If-Match` on `Locked.SPECIALTY`, others get `forbidden`; read and search (`name`, `status`) for anyone, active only unless admin.
 - The aggregate `ValueSet/specialties` is gone (§15.1 product ids); the deviation scenario is replaced by Examples rows (create, rename, delete, three refusals, stale `If-Match`, audit equal to the console's) and a scenario reading one specialty as both resources.
 - Declared writes go from 28 to 31; `SAME_REFUSAL`, the 401 scenario and the CapabilityStatement test derive from the registry and pass.
+
+## Round 13
+- Head: `3fbc12f` plus the review round 1 fixes
+- Uncommitted changes: yes (the fixes, before their commits)
+- Verdict: PASS; closes review round 1 findings bearer scope, time-off reasons, `UpdateProfile` actor, `ConditionalWrites` refusal, FHIR prefix literal
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run pytest tests/fhir tests/contracts/test_interop_directory.py tests/contracts/test_conditional_writes.py` | 0 | 311 passed |
+| `uv run pytest tests/integration/test_concurrent_conditional_writes_postgres.py` | 0 | 8 passed; without the row locks 7 failed |
+| `uv run ruff check .` | 0 |  |
+| `uv run ruff format --check .` | 0 |  |
+| `uv run lint-imports` | 0 | 12 kept, 0 broken |
+| `uv run pyrefly check` | 0 | 0 errors |
+| `uv run pre-commit run --all-files` | 0 |  |
+| `uv run pytest` | 0 | 2121 passed, 11 deselected |
+
+- A bearer authenticates only under `/fhir/` and `/api/` (`interfaces/paths.py`); on `/console/` and the CSV export its holder is anonymous (redirect to sign-in); `/api/v1/appointments` still answers 200; the tests fail with the guard removed.
+- Time-off reasons reach only the admin and the owning clinician (`Reader.reads_reasons_of`), SQL and fake alike; others read « Indisponible ».
+- `UpdateProfile.execute(actor_id=…)` refuses another user `forbidden`; the FHIR router's own check is gone; scenario « Règle §15.4 : seul le patient modifie son propre téléphone et sa date de naissance ».
+- `ConditionalWrites.run` always writes inside its outer transaction, `all_or_nothing` removed; no caller commits then raises (the waitlist accept doesn't go through it); row locks are `FOR NO KEY UPDATE`, race tests still pass with the lock and fail without.
