@@ -10,7 +10,14 @@ from drlibre.interop.application.ports.inbound import (
     StaleVersionError,
     WriteTarget,
 )
-from drlibre.organisation.infrastructure.django.models import ClinicianProfileRecord
+from drlibre.organisation.infrastructure.django.models import (
+    AppointmentTypeRecord,
+    ClinicianProfileRecord,
+    DepartmentRecord,
+    HospitalRecord,
+    RoomRecord,
+    SpecialtyRecord,
+)
 from drlibre.scheduling.infrastructure.django.models import AvailabilityRuleModel
 from drlibre.shared_kernel.errors import DomainError
 
@@ -20,6 +27,11 @@ _MODELS: dict[Locked, type[models.Model]] = {
     Locked.USER: UserRecord,
     Locked.APPOINTMENT: AppointmentRecord,
     Locked.AVAILABILITY_RULE: AvailabilityRuleModel,
+    Locked.HOSPITAL: HospitalRecord,
+    Locked.DEPARTMENT: DepartmentRecord,
+    Locked.ROOM: RoomRecord,
+    Locked.APPOINTMENT_TYPE: AppointmentTypeRecord,
+    Locked.SPECIALTY: SpecialtyRecord,
 }
 
 

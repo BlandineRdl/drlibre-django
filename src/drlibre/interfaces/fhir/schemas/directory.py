@@ -16,8 +16,8 @@ from drlibre.interfaces.fhir.schemas.common import (
 
 class Organization(FhirModel):
     resource_type: Literal["Organization"] = "Organization"
-    id: str
-    meta: Meta
+    id: str | None = None
+    meta: Meta | None = None
     extension: tuple[Extension, ...] | None = None
     identifier: tuple[Identifier, ...] | None = None
     active: bool
@@ -35,8 +35,8 @@ class Position(FhirModel):
 
 class Location(FhirModel):
     resource_type: Literal["Location"] = "Location"
-    id: str
-    meta: Meta
+    id: str | None = None
+    meta: Meta | None = None
     extension: tuple[Extension, ...] | None = None
     identifier: tuple[Identifier, ...] | None = None
     status: Literal["active", "inactive"]
@@ -52,8 +52,8 @@ class Location(FhirModel):
 
 class HealthcareService(FhirModel):
     resource_type: Literal["HealthcareService"] = "HealthcareService"
-    id: str
-    meta: Meta
+    id: str | None = None
+    meta: Meta | None = None
     extension: tuple[Extension, ...] | None = None
     identifier: tuple[Identifier, ...] | None = None
     active: bool
@@ -69,9 +69,9 @@ class Concept(FhirModel):
 
 class CodeSystem(FhirModel):
     resource_type: Literal["CodeSystem"] = "CodeSystem"
-    id: str
-    meta: Meta
-    url: str
+    id: str | None = None
+    meta: Meta | None = None
+    url: str | None = None
     identifier: tuple[Identifier, ...] | None = None
     name: str
     title: str
@@ -101,8 +101,9 @@ class ValueSet(FhirModel):
 
 class Practitioner(FhirModel):
     resource_type: Literal["Practitioner"] = "Practitioner"
-    id: str
-    meta: Meta
+    id: str | None = None
+    meta: Meta | None = None
+    extension: tuple[Extension, ...] | None = None
     active: bool
     name: tuple[HumanName, ...]
     telecom: tuple[ContactPoint, ...] | None = None
@@ -121,8 +122,8 @@ class NotAvailable(FhirModel):
 
 class PractitionerRole(FhirModel):
     resource_type: Literal["PractitionerRole"] = "PractitionerRole"
-    id: str
-    meta: Meta
+    id: str | None = None
+    meta: Meta | None = None
     extension: tuple[Extension, ...] | None = None
     active: bool
     practitioner: Reference

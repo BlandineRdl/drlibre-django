@@ -35,6 +35,7 @@ from drlibre.interfaces.fhir.routing import (
     read_one,
     reference,
     resource_response,
+    version_of,
 )
 from drlibre.interfaces.fhir.schemas.bundle import BundleEntry
 from drlibre.interop.application.ports.inbound import (
@@ -60,13 +61,15 @@ from drlibre.shared_kernel.validation import invalid_field
 router = Router(tags=["directory"])
 
 _READ_SEARCH = (Interaction.READ, Interaction.SEARCH)
+# The admin writes these as on the console; `routers/reference_writes.py` serves the writes.
+_MANAGED = (*_READ_SEARCH, Interaction.CREATE, Interaction.UPDATE, Interaction.DELETE)
 _STRING, _TOKEN, _REFERENCE = ParamType.STRING, ParamType.TOKEN, ParamType.REFERENCE
 _DATE = ParamType.DATE
 
 ORGANIZATION = declare(
     ResourceRules(
         type="Organization",
-        interactions=_READ_SEARCH,
+        interactions=_MANAGED,
         search=(
             SearchParam("name", _STRING),
             SearchParam("type", _TOKEN),
@@ -80,7 +83,7 @@ ORGANIZATION = declare(
 LOCATION = declare(
     ResourceRules(
         type="Location",
-        interactions=_READ_SEARCH,
+        interactions=_MANAGED,
         search=(
             SearchParam("name", _STRING),
             SearchParam("address-city", _STRING),
@@ -95,7 +98,7 @@ LOCATION = declare(
 HEALTHCARE_SERVICE = declare(
     ResourceRules(
         type="HealthcareService",
-        interactions=_READ_SEARCH,
+        interactions=_MANAGED,
         search=(
             SearchParam("name", _STRING),
             SearchParam("organization", _REFERENCE),
@@ -108,7 +111,7 @@ HEALTHCARE_SERVICE = declare(
 CODE_SYSTEM = declare(
     ResourceRules(
         type="CodeSystem",
-        interactions=_READ_SEARCH,
+        interactions=_MANAGED,
         search=(SearchParam("name", _STRING), SearchParam("status", _TOKEN)),
     )
 )
@@ -116,7 +119,7 @@ VALUE_SET = declare(ResourceRules(type="ValueSet", interactions=_READ_SEARCH))
 PRACTITIONER = declare(
     ResourceRules(
         type="Practitioner",
-        interactions=_READ_SEARCH,
+        interactions=_MANAGED,
         search=(SearchParam("name", _STRING), SearchParam("active", _TOKEN)),
         sorts=("name",),
     )
@@ -124,7 +127,7 @@ PRACTITIONER = declare(
 PRACTITIONER_ROLE = declare(
     ResourceRules(
         type="PractitionerRole",
-        interactions=_READ_SEARCH,
+        interactions=_MANAGED,
         search=(
             SearchParam("practitioner", _REFERENCE),
             SearchParam("organization", _REFERENCE),
@@ -184,7 +187,7 @@ def _near(query: SearchQuery) -> Near | None:
     return Near(latitude, longitude, distance if unit == "km" else distance / 1000)
 
 
-def _specialties(who: Reader) -> dict[Id, SpecialtyRow]:
+def known_specialties(who: Reader) -> dict[Id, SpecialtyRow]:
     return {s.id: s for s in _queries().specialties(SpecialtyFilter(), who).items}
 
 
@@ -196,7 +199,7 @@ _ORGANIZATION_KINDS = {"prov": OrganizationKind.HOSPITAL, "dept": OrganizationKi
 def read_organization(request: HttpRequest, resource_id: str) -> HttpResponse:
     criteria = OrganizationFilter(ids=(parse_id(resource_id),))
     model = to.organization(read_one(request, _queries().organizations(criteria, reader(request))))
-    return resource_response(model, model.meta.version_id or "")
+    return resource_response(model, version_of(model))
 
 
 @router.get("/Organization")
@@ -223,7 +226,7 @@ _LOCATION_KINDS = {"si": LocationKind.SITE, "ro": LocationKind.ROOM}
 def read_location(request: HttpRequest, resource_id: str) -> HttpResponse:
     criteria = LocationFilter(ids=(parse_id(resource_id),))
     model = to.location(read_one(request, _queries().locations(criteria, reader(request))))
-    return resource_response(model, model.meta.version_id or "")
+    return resource_response(model, version_of(model))
 
 
 @router.get("/Location")
@@ -248,15 +251,15 @@ def read_healthcare_service(request: HttpRequest, resource_id: str) -> HttpRespo
     who = reader(request)
     criteria = ServiceFilter(ids=(parse_id(resource_id),))
     row = read_one(request, _queries().services(criteria, who))
-    model = to.healthcare_service(row, _specialties(who))
-    return resource_response(model, model.meta.version_id or "")
+    model = to.healthcare_service(row, known_specialties(who))
+    return resource_response(model, version_of(model))
 
 
 @router.get("/HealthcareService")
 def search_healthcare_service(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, HEALTHCARE_SERVICE)
     who = reader(request)
-    known = _specialties(who)
+    known = known_specialties(who)
     criteria = ServiceFilter(
         name=query.first("name"),
         organization=reference(query, "organization", "Organization"),
@@ -275,7 +278,7 @@ _STATUSES = {"active": True, "retired": False}
 def read_code_system(request: HttpRequest, resource_id: str) -> HttpResponse:
     criteria = SpecialtyFilter(ids=(parse_id(resource_id),))
     model = to.code_system(read_one(request, _queries().specialties(criteria, reader(request))))
-    return resource_response(model, model.meta.version_id or "")
+    return resource_response(model, version_of(model))
 
 
 @router.get("/CodeSystem")
@@ -299,7 +302,7 @@ def read_value_set(request: HttpRequest, resource_id: str) -> HttpResponse:
     if resource_id != to.SPECIALTIES or not rows:
         raise missing()
     model = to.value_set(rows)
-    return resource_response(model, model.meta.version_id or "")
+    return resource_response(model, version_of(model))
 
 
 @router.get("/ValueSet")
@@ -315,7 +318,7 @@ def search_value_set(request: HttpRequest) -> HttpResponse:
 def read_practitioner(request: HttpRequest, resource_id: str) -> HttpResponse:
     criteria = PractitionerFilter(ids=(parse_id(resource_id),))
     model = to.practitioner(read_one(request, _queries().practitioners(criteria, reader(request))))
-    return resource_response(model, model.meta.version_id or "")
+    return resource_response(model, version_of(model))
 
 
 @router.get("/Practitioner")
@@ -332,8 +335,8 @@ def search_practitioner(request: HttpRequest) -> HttpResponse:
 def read_practitioner_role(request: HttpRequest, resource_id: str) -> HttpResponse:
     who = reader(request)
     row = read_one(request, _queries().roles(RoleFilter(ids=(parse_id(resource_id),)), who))
-    model = to.role(row, _specialties(who))
-    return resource_response(model, model.meta.version_id or "")
+    model = to.role(row, known_specialties(who))
+    return resource_response(model, version_of(model))
 
 
 def _role_includes(query: SearchQuery, rows: Sequence[RoleRow], who: Reader) -> list[BundleEntry]:
@@ -355,7 +358,7 @@ def _role_includes(query: SearchQuery, rows: Sequence[RoleRow], who: Reader) -> 
 def search_practitioner_role(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, PRACTITIONER_ROLE)
     who = reader(request)
-    known = _specialties(who)
+    known = known_specialties(who)
     criteria = RoleFilter(
         practitioner=reference(query, "practitioner", "Practitioner"),
         organization=reference(query, "organization", "Organization"),
@@ -374,7 +377,7 @@ def search_practitioner_role(request: HttpRequest) -> HttpResponse:
 def read_schedule(request: HttpRequest, resource_id: str) -> HttpResponse:
     criteria = ScheduleFilter(ids=(parse_id(resource_id),))
     model = to.schedule(read_one(request, _queries().schedules(criteria, reader(request))))
-    return resource_response(model, model.meta.version_id or "")
+    return resource_response(model, version_of(model))
 
 
 def _horizon(query: SearchQuery) -> tuple[date | None, date | None]:

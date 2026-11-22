@@ -21,7 +21,7 @@ from drlibre.interfaces.fhir.params import (
 )
 from drlibre.interfaces.fhir.registry import ResourceRules
 from drlibre.interfaces.fhir.schemas.bundle import BundleEntry
-from drlibre.interfaces.fhir.schemas.common import FhirModel
+from drlibre.interfaces.fhir.schemas.common import FhirModel, Meta
 from drlibre.interfaces.fhir.version import etag
 from drlibre.interop.application.ports.inbound import Paging
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -42,6 +42,16 @@ def resource_response(model: FhirModel, version: str) -> HttpResponse:
     response = fhir_response(model.model_dump_json(by_alias=True, exclude_none=True), status=200)
     response["ETag"] = etag(version)
     return response
+
+
+class _Versioned(Protocol):
+    @property
+    def meta(self) -> Meta | None: ...
+
+
+def version_of(model: _Versioned) -> str:
+    """The version a mapped resource carries in its `meta`."""
+    return (model.meta.version_id if model.meta else None) or ""
 
 
 def bundle_response(

@@ -214,6 +214,11 @@ class Locked(StrEnum):
     USER = "user"
     APPOINTMENT = "appointment"
     AVAILABILITY_RULE = "availability_rule"
+    HOSPITAL = "hospital"
+    DEPARTMENT = "department"
+    ROOM = "room"
+    APPOINTMENT_TYPE = "appointment_type"
+    SPECIALTY = "specialty"
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +245,11 @@ class WriteTarget:
     def clinician(cls, *, clinician_id: Id, row: tuple[Locked, Id] | None = None) -> "WriteTarget":
         """A clinician's profile, then the row of theirs a write changes, as `lock_profile`."""
         return cls(((Locked.CLINICIAN, clinician_id), *((row,) if row else ())))
+
+    @classmethod
+    def record(cls, kind: Locked, record_id: Id) -> "WriteTarget":
+        """A reference record alone: its use cases take no lock, so its row is the only one."""
+        return cls(((kind, record_id),))
 
 
 class StaleVersionError(DomainError):

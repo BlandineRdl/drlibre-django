@@ -17,8 +17,8 @@ from drlibre.interfaces.fhir.routers.appointment_responses import (
 from drlibre.interfaces.fhir.routers.appointments import router as appointments_router
 from drlibre.interfaces.fhir.routers.audit_events import router as audit_events_router
 from drlibre.interfaces.fhir.routers.communications import router as communications_router
-from drlibre.interfaces.fhir.routers.directory import router as directory_router
 from drlibre.interfaces.fhir.routers.patients import router as patients_router
+from drlibre.interfaces.fhir.routers.reference_writes import router as directory_router
 from drlibre.interfaces.fhir.routers.slots import router as slots_router
 from drlibre.interfaces.fhir.routing import require_fhir_json
 from drlibre.shared_kernel.errors import DomainError, ErrorCode

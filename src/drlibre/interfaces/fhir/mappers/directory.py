@@ -107,12 +107,17 @@ def _phone(value: str | None) -> tuple[ContactPoint, ...] | None:
     return (ContactPoint(system="phone", value=value),) if value else None
 
 
+def _description(value: str) -> tuple[Extension, ...]:
+    return (Extension(url=extension_url("description"), value_string=value),) if value else ()
+
+
 def organization(row: HospitalRow | DepartmentRow) -> Organization:
     """A hospital (`prov`) or one of its departments (`dept`, `partOf` it)."""
     if isinstance(row, DepartmentRow):
         return Organization(
             id=str(row.id),
             meta=_simple(row),
+            extension=_description(row.description) or None,
             identifier=_code(row.code),
             active=row.active,
             type=(CodeableConcept(coding=(Coding(system=ORGANIZATION_TYPE, code="dept"),)),),
@@ -122,7 +127,7 @@ def organization(row: HospitalRow | DepartmentRow) -> Organization:
     return Organization(
         id=str(row.id),
         meta=_simple(row),
-        extension=_site_extensions(row),
+        extension=(*_site_extensions(row), *_description(row.description)),
         identifier=_code(row.code),
         active=row.active,
         type=(CodeableConcept(coding=(Coding(system=ORGANIZATION_TYPE, code="prov"),)),),

@@ -1,6 +1,12 @@
 from typing import Literal
 
-from drlibre.interfaces.fhir.schemas.common import ContactPoint, FhirModel, HumanName, Meta
+from drlibre.interfaces.fhir.schemas.common import (
+    ContactPoint,
+    Extension,
+    FhirModel,
+    HumanName,
+    Meta,
+)
 
 
 class Patient(FhirModel):
@@ -9,6 +15,7 @@ class Patient(FhirModel):
     resource_type: Literal["Patient"] = "Patient"
     id: str | None = None
     meta: Meta | None = None
+    extension: tuple[Extension, ...] | None = None
     active: bool | None = None
     name: tuple[HumanName, ...] | None = None
     telecom: tuple[ContactPoint, ...] | None = None
