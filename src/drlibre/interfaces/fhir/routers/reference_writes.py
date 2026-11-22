@@ -27,6 +27,7 @@ from drlibre.interfaces.fhir.routers.directory import (
     PRACTITIONER,
     PRACTITIONER_ROLE,
     SCHEDULE,
+    VALUE_SET,
     known_specialties,
     router,
 )
@@ -46,6 +47,7 @@ from drlibre.interfaces.fhir.schemas.directory import (
     Practitioner,
     PractitionerRole,
     Schedule,
+    ValueSet,
 )
 from drlibre.interfaces.fhir.version import etag, expected_version
 from drlibre.interop.application.ports.inbound import (
@@ -292,7 +294,7 @@ def delete_healthcare_service(request: HttpRequest, resource_id: str) -> HttpRes
     return _deleted()
 
 
-# CodeSystem: one specialty each; the `specialties` ValueSet follows them, read-only.
+# CodeSystem and ValueSet: one specialty each, under its id, written alike.
 def _code_system(record_id: Id, who: Reader) -> CodeSystem:
     return to.code_system(
         _one(_queries().specialties(SpecialtyFilter(ids=(record_id,)), who).items)
@@ -336,6 +338,51 @@ def delete_code_system(request: HttpRequest, resource_id: str) -> HttpResponse:
     identity = require_admin(request)
     record_id = parse_id(resource_id)
     _code_system(record_id, reader(request))
+    container().delete_specialty.execute(actor=identity.user_id, record_id=record_id)
+    return _deleted()
+
+
+def _value_set(record_id: Id, who: Reader) -> ValueSet:
+    return to.value_set(_one(_queries().specialties(SpecialtyFilter(ids=(record_id,)), who).items))
+
+
+@router.post("/ValueSet")
+def create_value_set(request: HttpRequest) -> HttpResponse:
+    identity = require_admin(request)
+    fields = writes.value_set_fields(read_body(request, ValueSet))
+    created = container().save_specialty.execute(
+        actor=identity.user_id, record_id=None, fields=fields
+    )
+    model = _value_set(created, reader(request))
+    return _created(VALUE_SET, model, created, version_of(model))
+
+
+@router.put("/ValueSet/{resource_id}")
+def update_value_set(request: HttpRequest, resource_id: str) -> HttpResponse:
+    identity = require_admin(request)
+    who = reader(request)
+    record_id = parse_id(resource_id)
+    _value_set(record_id, who)
+    incoming = read_body(request, ValueSet)
+    _same_id("ValueSet.id", incoming.id, resource_id)
+    fields = writes.value_set_fields(incoming)
+    _update(
+        request,
+        WriteTarget.record(Locked.SPECIALTY, record_id),
+        lambda: version_of(_value_set(record_id, who)),
+        lambda: container().save_specialty.execute(
+            actor=identity.user_id, record_id=record_id, fields=fields
+        ),
+    )
+    model = _value_set(record_id, who)
+    return resource_response(model, version_of(model))
+
+
+@router.delete("/ValueSet/{resource_id}")
+def delete_value_set(request: HttpRequest, resource_id: str) -> HttpResponse:
+    identity = require_admin(request)
+    record_id = parse_id(resource_id)
+    _value_set(record_id, reader(request))
     container().delete_specialty.execute(actor=identity.user_id, record_id=record_id)
     return _deleted()
 

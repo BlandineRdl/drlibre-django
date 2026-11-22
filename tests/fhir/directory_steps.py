@@ -149,10 +149,10 @@ def bundle_includes(
     assert included == {(first, exchange.path(first_id)), (second, exchange.path(second_id))}
 
 
-@then(parsers.parse('the value set gathers the code system of "{record}" only'))
+@then(parsers.parse('the value set includes the code system of "{record}" only'))
 def value_set(exchange: Exchange, record: str) -> None:
     body = exchange.body()
-    assert (body["resourceType"], body["id"]) == ("ValueSet", "specialties")
+    assert (body["resourceType"], body["id"]) == ("ValueSet", exchange.path(record))
     systems = [i["system"] for i in body["compose"]["include"]]
     assert systems == [code_system_url(Id.parse(exchange.path(record)))]
 

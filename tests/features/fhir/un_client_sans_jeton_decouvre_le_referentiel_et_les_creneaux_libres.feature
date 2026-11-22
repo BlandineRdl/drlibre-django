@@ -42,8 +42,10 @@ Feature: Un client sans jeton découvre le référentiel et les créneaux libres
   Scenario: Sans jeton, lecture et recherche sont ouvertes sur les enregistrements actifs : `Organization` (hôpital de type `prov`, département de type `dept` `partOf` l'hôpital), `Location` (site avec adresse, téléphone, position et fuseau ; salle `partOf` le site), `HealthcareService`, `CodeSystem` et `ValueSet` des spécialités, `Practitioner` et `PractitionerRole` limités aux champs publics, `Schedule`. (spécialités)
     When a client without a token searches "/fhir/CodeSystem?status=active"
     Then the bundle holds only "CodeSystem" "$specialty"
-    When a client without a token reads "/fhir/ValueSet/specialties"
-    Then the value set gathers the code system of "$specialty" only
+    When a client without a token searches "/fhir/ValueSet?status=active"
+    Then the bundle holds only "ValueSet" "$specialty"
+    When a client without a token reads "/fhir/ValueSet/$specialty"
+    Then the value set includes the code system of "$specialty" only
 
   Scenario: Un enregistrement inactif ou absent donne `not_found` ; l'email et le téléphone d'un praticien ne sont pas renvoyés.
     When a client without a token reads "/fhir/Organization/$roubaix"

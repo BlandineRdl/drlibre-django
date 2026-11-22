@@ -29,6 +29,7 @@ from drlibre.interfaces.fhir.schemas.directory import (
     Location,
     Organization,
     PractitionerRole,
+    ValueSet,
 )
 from drlibre.organisation.infrastructure.repositories import (
     DjangoAppointmentTypes,
@@ -182,6 +183,14 @@ def _sample(w: Writing, name: str) -> dict[str, Any]:
             "status": "active",
             "concept": [{"code": "NEURO", "display": "Neurologie"}],
         }
+    if name == "jeu de valeurs de spécialité":
+        return {
+            "resourceType": "ValueSet",
+            "name": "NEURO",
+            "title": "Neurologie",
+            "status": "active",
+            "compose": {"include": [{"concept": [{"code": "NEURO"}]}]},
+        }
     if name in ("praticien", "patient"):
         return {
             "resourceType": "Practitioner" if name == "praticien" else "Patient",
@@ -213,7 +222,7 @@ def _label(resource: dict[str, Any]) -> str:
     kind = resource["resourceType"]
     if kind in ("Practitioner", "Patient"):
         return resource["name"][0]["text"]
-    if kind == "CodeSystem":
+    if kind in ("CodeSystem", "ValueSet"):
         return resource["title"]
     if kind == "PractitionerRole":
         return next(e["valueString"] for e in resource["extension"] if e["url"].endswith("/bio"))
@@ -225,7 +234,7 @@ def _renamed(resource: dict[str, Any]) -> dict[str, Any]:
     kind = found["resourceType"]
     if kind in ("Practitioner", "Patient"):
         found["name"][0]["text"] += " bis"
-    elif kind == "CodeSystem":
+    elif kind in ("CodeSystem", "ValueSet"):
         found["title"] += " bis"
     elif kind == "PractitionerRole":
         for e in found["extension"]:
@@ -285,6 +294,9 @@ def _keeps_what_was_sent(sent: dict[str, Any], body: dict[str, Any]) -> None:
             assert all(e in body["extension"] for e in kept), (kept, body.get("extension"))
         elif key == "location":
             assert all(v in body[key] for v in value), body[key]
+        elif key == "compose":
+            concepts = [c for i in body[key]["include"] for c in i["concept"]]
+            assert [c for i in value["include"] for c in i["concept"]] == concepts
         elif key == "specialty":
             systems = [c["system"] for k in body[key] for c in k["coding"]]
             assert [c["system"] for k in value for c in k["coding"]] == systems
@@ -350,44 +362,23 @@ def nothing_written(writing: Writing) -> None:
     assert AuditEntryRecord.objects.count() == writing.audit_count
 
 
-def _in_value_set(writing: Writing) -> bool:
-    assert writing.written is not None
-    system = code_system_url(Id.parse(writing.written.rpartition("/")[2]))
-    body = Client().get("/fhir/ValueSet/specialties").json()
-    return system in [i["system"] for i in body["compose"]["include"]]
-
-
-@then("the specialties value set gathers the written code system")
-def value_set_gathers(writing: Writing) -> None:
-    assert _in_value_set(writing)
-
-
-@then("the specialties value set leaves out the written code system")
-def value_set_leaves_out(writing: Writing) -> None:
-    assert not _in_value_set(writing)
-
-
-@when(parsers.parse('"{who}" retires the written code system'))
-def retires(writing: Writing, who: str) -> None:
-    _put(writing, who, lambda r: r.update(status="retired"))
-    assert writing.exchange.response.status_code == 200
-
-
 @then(
     parsers.parse(
-        '"{who}" sending "POST", "PUT" or "DELETE" to the specialties value set is refused'
-        " with 405 as not supported"
+        'the written specialty reads as a "{first}" and a "{second}" of the same id and title'
     )
 )
-def value_set_not_written(writing: Writing, who: str) -> None:
-    for method, path in (
-        ("POST", "/fhir/ValueSet"),
-        ("PUT", "/fhir/ValueSet/specialties"),
-        ("DELETE", "/fhir/ValueSet/specialties"),
-    ):
-        response = writing.send(who, method, path, {"resourceType": "ValueSet"})
-        assert response.status_code == 405, (method, response.content)
-        assert response.json()["issue"][0]["code"] == "not-supported"
+def same_specialty(writing: Writing, first: str, second: str) -> None:
+    record = _written_id(writing)
+    bodies = [writing.read(f"/fhir/{kind}/{record}").json() for kind in (first, second)]
+    assert {(b["id"], b["title"]) for b in bodies} == {(str(record), "Neurologie")}
+    include = bodies[1]["compose"]["include"]
+    assert [i["system"] for i in include] == [code_system_url(record)]
+
+
+@then(parsers.parse('the written specialty is gone as a "{kind}" too'))
+def gone_too(writing: Writing, kind: str) -> None:
+    assert writing.exchange.response.status_code == 204, writing.exchange.response.content
+    assert writing.read(f"/fhir/{kind}/{_written_id(writing)}").status_code == 404
 
 
 @when(parsers.parse('"{who}" changes the birth date of the written "{resource}" under its version'))
@@ -497,6 +488,7 @@ _CONSOLE = {
     "salle": ("rooms", "room"),
     "type de RDV": ("appointment-types", "appointment_type"),
     "spécialité": ("specialties", "specialty"),
+    "jeu de valeurs de spécialité": ("specialties", "specialty"),
     "praticien": ("users", "user"),
     "patient": ("users", "user"),
     "profil praticien": ("clinicians", "clinician_profile"),
@@ -516,6 +508,8 @@ def _console_form(writing: Writing, sample: str) -> dict[str, str]:
         return writes.type_fields(HealthcareService.model_validate(resource))
     if sample == "spécialité":
         return writes.specialty_fields(CodeSystem.model_validate(resource))
+    if sample == "jeu de valeurs de spécialité":
+        return writes.value_set_fields(ValueSet.model_validate(resource))
     if sample == "profil praticien":
         assert writing.extra_user is not None
         role = PractitionerRole.model_validate(resource)

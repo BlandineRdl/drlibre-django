@@ -7,13 +7,11 @@ from ninja import Router
 
 from drlibre.bootstrap.container import container
 from drlibre.interfaces.fhir.access import reader
-from drlibre.interfaces.fhir.bundle import entry
 from drlibre.interfaces.fhir.mappers import directory as to
 from drlibre.interfaces.fhir.params import (
     Prefix,
     SearchQuery,
     date_bound,
-    refuse_undeclared,
     search_query,
 )
 from drlibre.interfaces.fhir.registry import (
@@ -28,8 +26,6 @@ from drlibre.interfaces.fhir.routing import (
     bundle_response,
     choice,
     entries_of,
-    json_of,
-    missing,
     paging_of,
     parse_id,
     read_one,
@@ -115,7 +111,14 @@ CODE_SYSTEM = declare(
         search=(SearchParam("name", _STRING), SearchParam("status", _TOKEN)),
     )
 )
-VALUE_SET = declare(ResourceRules(type="ValueSet", interactions=_READ_SEARCH))
+# A specialty is both its CodeSystem and its ValueSet, under the same id.
+VALUE_SET = declare(
+    ResourceRules(
+        type="ValueSet",
+        interactions=_MANAGED,
+        search=(SearchParam("name", _STRING), SearchParam("status", _TOKEN)),
+    )
+)
 PRACTITIONER = declare(
     ResourceRules(
         type="Practitioner",
@@ -291,27 +294,21 @@ def search_code_system(request: HttpRequest) -> HttpResponse:
     )
 
 
-def _active_specialties() -> Sequence[SpecialtyRow]:
-    return _queries().specialties(SpecialtyFilter(active=True), Reader.anonymous()).items
-
-
 @router.get("/ValueSet/{resource_id}")
 def read_value_set(request: HttpRequest, resource_id: str) -> HttpResponse:
-    refuse_undeclared(request.GET, frozenset())
-    rows = _active_specialties()
-    if resource_id != to.SPECIALTIES or not rows:
-        raise missing()
-    model = to.value_set(rows)
+    criteria = SpecialtyFilter(ids=(parse_id(resource_id),))
+    model = to.value_set(read_one(request, _queries().specialties(criteria, reader(request))))
     return resource_response(model, version_of(model))
 
 
 @router.get("/ValueSet")
 def search_value_set(request: HttpRequest) -> HttpResponse:
     query = search_query(request.GET, VALUE_SET)
-    rows = _active_specialties()
-    found = [to.value_set(rows)] if rows and query.page == 1 else []
-    entries = [entry(VALUE_SET.type, to.SPECIALTIES, json_of(m)) for m in found]
-    return bundle_response(VALUE_SET, query, 1 if rows else 0, entries)
+    criteria = SpecialtyFilter(name=query.first("name"), active=choice(query, "status", _STATUSES))
+    page = _queries().specialties(criteria, reader(request), paging_of(query))
+    return bundle_response(
+        VALUE_SET, query, page.total, entries_of(VALUE_SET, page.items, to.value_set)
+    )
 
 
 @router.get("/Practitioner/{resource_id}")

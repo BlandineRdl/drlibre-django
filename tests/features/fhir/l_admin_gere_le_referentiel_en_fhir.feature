@@ -21,6 +21,7 @@ Feature: L'admin gère le référentiel en FHIR
       | salle            | salle            | Location          |
       | type de RDV      | type de RDV      | HealthcareService |
       | spécialité       | spécialité       | CodeSystem        |
+      | jeu de valeurs de spécialité | jeu de valeurs de spécialité | ValueSet |
       | praticien        | praticien        | Practitioner      |
       | profil praticien | profil praticien | PractitionerRole  |
 
@@ -49,13 +50,15 @@ Feature: L'admin gère le référentiel en FHIR
       | un praticien supprime un praticien | clinician | DELETE | /fhir/Practitioner/$clinician | praticien |
       | un praticien crée un profil | clinician | POST | /fhir/PractitionerRole | profil praticien |
       | un patient modifie un profil | patient | PUT | /fhir/PractitionerRole/$profile | profil praticien |
+      | un patient crée un jeu de valeurs | patient | POST | /fhir/ValueSet | jeu de valeurs de spécialité |
+      | un praticien modifie un jeu de valeurs | clinician | PUT | /fhir/ValueSet/$specialty | jeu de valeurs de spécialité |
+      | un patient supprime un jeu de valeurs | patient | DELETE | /fhir/ValueSet/$specialty | jeu de valeurs de spécialité |
 
-  Scenario: L'admin seul crée, modifie et supprime `Organization`, `Location`, `HealthcareService`, `CodeSystem`, `ValueSet`, `Practitioner` et `PractitionerRole` ; tout autre utilisateur reçoit `forbidden`. (le `ValueSet` suit les `CodeSystem` et ne s'écrit pas)
-    When "admin" creates the "spécialité" in FHIR
-    Then the specialties value set gathers the written code system
-    When "admin" retires the written code system
-    Then the specialties value set leaves out the written code system
-    And "admin" sending "POST", "PUT" or "DELETE" to the specialties value set is refused with 405 as not supported
+  Scenario: L'admin seul crée, modifie et supprime `Organization`, `Location`, `HealthcareService`, `CodeSystem`, `ValueSet`, `Practitioner` et `PractitionerRole` ; tout autre utilisateur reçoit `forbidden`. (une spécialité est son `CodeSystem` et son `ValueSet`)
+    When "admin" creates the "jeu de valeurs de spécialité" in FHIR
+    Then the written specialty reads as a "CodeSystem" and a "ValueSet" of the same id and title
+    When "admin" deletes the written "ValueSet"
+    Then the written specialty is gone as a "CodeSystem" too
 
   Scenario: L'admin crée, modifie et supprime aussi `Patient`.
     When "admin" creates the "patient" in FHIR
@@ -129,6 +132,7 @@ Feature: L'admin gère le référentiel en FHIR
       | salle            | salle            | Location          |
       | type de RDV      | type de RDV      | HealthcareService |
       | spécialité       | spécialité       | CodeSystem        |
+      | jeu de valeurs de spécialité | jeu de valeurs de spécialité | ValueSet |
       | praticien        | praticien        | Practitioner      |
       | profil praticien | profil praticien | PractitionerRole  |
       | patient          | patient          | Patient           |
@@ -145,6 +149,7 @@ Feature: L'admin gère le référentiel en FHIR
       | salle            | salle            | room.created, room.updated, room.deleted                                 |
       | type de RDV      | type de RDV      | appointment_type.created, appointment_type.updated, appointment_type.deleted |
       | spécialité       | spécialité       | specialty.created, specialty.updated, specialty.deleted                  |
+      | jeu de valeurs de spécialité | jeu de valeurs de spécialité | specialty.created, specialty.updated, specialty.deleted |
       | praticien        | praticien        | user.created, user.updated, user.deleted                                 |
       | profil praticien | profil praticien | clinician_profile.created, clinician_profile.updated, clinician_profile.deleted |
       | patient          | patient          | user.created, user.updated, user.deleted                                 |

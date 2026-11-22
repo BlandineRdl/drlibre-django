@@ -80,8 +80,13 @@ class CodeSystem(FhirModel):
     concept: tuple[Concept, ...]
 
 
+class ValueSetConcept(FhirModel):
+    code: str
+
+
 class ValueSetInclude(FhirModel):
-    system: str
+    system: str | None = None
+    concept: tuple[ValueSetConcept, ...]
 
 
 class ValueSetCompose(FhirModel):
@@ -90,12 +95,13 @@ class ValueSetCompose(FhirModel):
 
 class ValueSet(FhirModel):
     resource_type: Literal["ValueSet"] = "ValueSet"
-    id: str
-    meta: Meta
-    url: str
+    id: str | None = None
+    meta: Meta | None = None
+    url: str | None = None
+    identifier: tuple[Identifier, ...] | None = None
     name: str
     title: str
-    status: Literal["active"] = "active"
+    status: Literal["active", "retired"]
     compose: ValueSetCompose
 
 

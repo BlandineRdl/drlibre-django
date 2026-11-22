@@ -27,6 +27,7 @@ from drlibre.interfaces.fhir.schemas.directory import (
     Schedule,
     ValueSet,
     ValueSetCompose,
+    ValueSetConcept,
     ValueSetInclude,
 )
 from drlibre.interfaces.fhir.version import meta, version_id
@@ -46,7 +47,6 @@ ORGANIZATION_TYPE = "http://terminology.hl7.org/CodeSystem/organization-type"
 PHYSICAL_TYPE = "http://terminology.hl7.org/CodeSystem/location-physical-type"
 PRODUCT_CODE = "urn:drlibre:code"
 ROLE_CODE = "urn:drlibre:role"
-SPECIALTIES = "specialties"
 # Weekday 0 is Sunday, as in availability rules.
 DAYS = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
 UNAVAILABLE = "Indisponible"
@@ -212,18 +212,20 @@ def code_system(row: SpecialtyRow) -> CodeSystem:
     )
 
 
-def value_set(rows: Sequence[SpecialtyRow]) -> ValueSet:
-    """Every active specialty's code system, gathered; versioned by all of them."""
-    version = version_id(*(f"{r.id}@{r.updated_at}" for r in rows))
+def value_set(row: SpecialtyRow) -> ValueSet:
+    """One specialty, as the value set of its code system's single concept; same id."""
+    include = ValueSetInclude(
+        system=code_system_url(row.id), concept=(ValueSetConcept(code=row.code),)
+    )
     return ValueSet(
-        id=SPECIALTIES,
-        meta=meta(version, max(r.updated_at for r in rows)),
-        url=f"{base_url()}/ValueSet/{SPECIALTIES}",
-        name="Specialties",
-        title="Spécialités",
-        compose=ValueSetCompose(
-            include=tuple(ValueSetInclude(system=code_system_url(r.id)) for r in rows)
-        ),
+        id=str(row.id),
+        meta=_simple(row),
+        url=f"{base_url()}/ValueSet/{row.id}",
+        identifier=_code(row.code),
+        name=row.code,
+        title=row.name,
+        status="active" if row.active else "retired",
+        compose=ValueSetCompose(include=(include,)),
     )
 
 

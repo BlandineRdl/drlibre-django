@@ -30,6 +30,7 @@ from drlibre.interfaces.fhir.schemas.directory import (
     Organization,
     Practitioner,
     PractitionerRole,
+    ValueSet,
 )
 from drlibre.interfaces.fhir.schemas.patient import Patient
 from drlibre.interop.application.ports.inbound import TimeOffRow
@@ -39,6 +40,7 @@ from drlibre.shared_kernel.validation import invalid_field
 type Fields = dict[str, str]
 TEMPORARY_PASSWORD = "temporary-password"  # noqa: S105  # nosec B105
 ROLE = "role"
+ONE_CONCEPT = "Une spécialité porte un seul concept."
 
 
 def _flag(value: bool | None) -> str:
@@ -161,10 +163,22 @@ def type_fields(resource: HealthcareService) -> Fields:
 def specialty_fields(resource: CodeSystem) -> Fields:
     """A specialty is one code system with a single concept: its code; the title names it."""
     if len(resource.concept) != 1:
-        raise invalid_field("CodeSystem.concept", "Une spécialité porte un seul concept.")
+        raise invalid_field("CodeSystem.concept", ONE_CONCEPT)
     return {
         "name": resource.title,
         "code": resource.concept[0].code,
+        "active": _flag(resource.status == "active"),
+    }
+
+
+def value_set_fields(resource: ValueSet) -> Fields:
+    """The same specialty as its code system: one included concept; the title names it."""
+    concepts = [c for i in resource.compose.include for c in i.concept]
+    if len(concepts) != 1:
+        raise invalid_field("ValueSet.compose.include", ONE_CONCEPT)
+    return {
+        "name": resource.title,
+        "code": concepts[0].code,
         "active": _flag(resource.status == "active"),
     }
 
