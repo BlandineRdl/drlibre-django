@@ -54,5 +54,12 @@ Under `/fhir`, fictitious and localhost only. Fixed bearer tokens: `demo-admin-t
 2. With the stack up: `uv run pytest`.
 3. `uv run pre-commit run --all-files` runs every gate.
 4. End-to-end: `uv run playwright install chromium` once, `docker compose up -d --build`, then `uv run pytest -m e2e`.
+   - The journeys write into the stack's database (test hospitals, patients, notifications): keep the demo stack clean by running them on a separate compose project, here on ports 28000:
+     ```bash
+     export COMPOSE_PROJECT_NAME=drlibre-e2e WEB_PORT=28000 POSTGRES_PORT=25432 REDIS_PORT=26379 MAILPIT_SMTP_PORT=21025 MAILPIT_PORT=28025 NETWORK_HOURLY_LIMIT=100000
+     docker compose up -d --build --wait
+     E2E_BASE_URL=http://localhost:28000 E2E_MAILPIT_URL=http://localhost:28025 E2E_REDIS_URL=redis://localhost:26379/0 uv run pytest -m e2e
+     docker compose down -v
+     ```
 
 Design and stack: `aidd_docs/INSTALL.md`.
