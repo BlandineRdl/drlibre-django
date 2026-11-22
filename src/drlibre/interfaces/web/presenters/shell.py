@@ -11,7 +11,7 @@ from drlibre.interfaces.web.presenters.portal import (
 from drlibre.interfaces.web.presenters.workspace import workspace_nav
 
 ROLE_LABELS = {Role.ADMIN: "Administration", Role.CLINICIAN: "Praticien", Role.PATIENT: "Patient"}
-PASSWORD_URL = "/account/password"  # noqa: S105  # nosec B105
+ACCOUNT_SECURITY_URL = "/account/password"
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +70,11 @@ def shell_view(
             if role is Role.PATIENT
             else ()
         ),
-        *((NavLink(PASSWORD_URL, "Mot de passe", path == PASSWORD_URL),) if has_password else ()),
+        *(
+            (NavLink(ACCOUNT_SECURITY_URL, "Mot de passe", path == ACCOUNT_SECURITY_URL),)
+            if has_password
+            else ()
+        ),
     )
     account = AccountView(
         full_name,
