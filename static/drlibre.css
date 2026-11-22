@@ -67,6 +67,7 @@ small, .muted { color: var(--dl-muted); }
 .main-nav a:hover, .section-nav a:hover { background: var(--dl-primary-soft); color: var(--dl-primary); }
 .main-nav [aria-current="page"], .section-nav [aria-current="page"] { color: var(--dl-primary); font-weight: 600; box-shadow: inset 0 -3px 0 var(--dl-primary); border-radius: 0; }
 .main-nav button { margin: 0; padding: 0.35rem 0.8rem; font-size: 0.875rem; }
+.main-nav > ul:last-child { gap: var(--dl-space-3); }
 .site-footer { margin-top: var(--dl-space-6); padding-block: var(--dl-space-4); border-top: 1px solid var(--dl-border); color: var(--dl-muted); }
 .section-nav { background: var(--dl-surface); border: 1px solid var(--dl-border); border-radius: var(--dl-radius); padding: 0 var(--dl-space-2); margin-bottom: var(--dl-space-5); }
 .section-nav ul { margin: 0; gap: 0; }
