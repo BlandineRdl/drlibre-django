@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: CapabilityStatement, preuve de l'Epic, seed, documentation, gates

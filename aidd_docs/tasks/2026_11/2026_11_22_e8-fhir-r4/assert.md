@@ -204,3 +204,28 @@
 - All or nothing: `ConditionalWrites.run(all_or_nothing=True)` opens the outer transaction with or without `If-Match`, locks the target and lets a refusal roll back every use case already run; the default keeps the waitlist's commit-then-raise; the fake only runs the write, so the rollback is proven on PostgreSQL (`test_an_all_or_nothing_refusal_keeps_none_of_the_writes_before_it`) and by the scenario.
 - Deviations: `Schedule` actors are matched to the token holder at the door (`_named_self`: a schedule naming another practitioner, created or updated, is `forbidden` before any diff), `DeleteAvailabilityRule` judges deletes; `Schedule.id`, `meta`, `active` and `planningHorizon` are optional on write, `active` is computed and ignored, a horizon sent on create or changed on update is `invalid_input` (`Schedule.planningHorizon`); `valueTime` `HH:MM:00` maps to the screen's `HH:MM`; `notAvailable` periods match one for one on start, end (instants, any offset) and description, removals run before additions, a description « Indisponible » means no reason, an instant without offset is `invalid_input`; local times are read in the role's hospital zone; a clinician's `PUT PractitionerRole` changing anything but `notAvailable` is `forbidden`, another clinician's role or a patient is `forbidden`.
 - To record in `architecture.md` (phase 11): `Schedule` and `notAvailable` writes go through the workspace's use cases, `If-Match` locking the profile then the rule; `ConditionalWrites` `all_or_nothing` makes a multi-call write atomic.
+
+## Round 11
+- Head: `ad7dc3a`
+- Uncommitted changes: no (plan docs only)
+- Verdict: PASS for phase 11 and the plan
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 |  |
+| `uv run ruff format --check .` | 0 |  |
+| `uv run lint-imports` | 0 | 12 kept, 0 broken |
+| `uv run pyrefly check` | 0 |  |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | no migration |
+| `uv run pre-commit run --all-files` | 0 | Python Doctor 90 after `# nosec B311` on the new Locust task |
+| `docker compose up -d --build` then `uv run pytest` | 0 | 2108 passed, 11 deselected |
+| `uv run pytest -m e2e` | 0 | 11 passed |
+| `curl -i localhost:8000/fhir/metadata` | 0 | 200, `application/fhir+json; charset=utf-8`, `x-correlation-id` |
+| `./scripts/load-run.sh` | 0 | FHIR `Slot` search p95 88 ms, 0 failures (`load-results.md`) |
+| mutant: Communication search ignores `category` | 1 | « paramètres, `_include` et `_sort` déclarés » fails, reverted |
+| mutant: Slot search ignores `_sort=-start` | 1 | same scenario fails, reverted |
+
+- Every bullet of « Un client découvre les capacités du serveur dans le CapabilityStatement » names a scenario; « déclaré = servi » is proven four ways: Ninja routes equal the registry's, each undeclared interaction answers 405 with `Allow` the declared methods, each search reads every declared parameter, `_include` and `_sort` (watched `SearchQuery.values` and `_listed`), each search refuses an undeclared parameter, `_include` or `_sort`.
+- Epic Success Evidence (`tests/fhir/test_parcours_fhir_de_l_epic.py`, demo seed in the test database, fixed tokens): a visitor's free `Slot` booked with `demo-patient-token` (`booked`, practitioner and room) then cancelled leaves the same audit entries (action, type, metadata, actor) and notifications as the booking screen and portal cancel; that token gets 403 on another patient's appointments and `Patient`, and searches leave them out; each of the 28 declared writes maps to a scenario refusing it as the screen or API does; « Sans jeton, toute écriture renvoie `unauthenticated` (401). (chaque écriture déclarée) » sends all 28.
+- Added refusal rows: 12 reference writes and `PUT Patient` refused `forbidden` to non-admins, as the console's `require_role`.
+- Deviations: `metadata.py` needed no change (already read from the registry); `tests/fhir/test_metadata.py` folded into the Story's test; the Epic journey runs in-process on the seed rather than over HTTP against compose, so audit and notifications are read from the same database.
