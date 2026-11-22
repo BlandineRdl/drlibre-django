@@ -71,3 +71,23 @@
 - `tests/test_acceptance_names.py` is green: the token story's four bullets and « Sans jeton, toute écriture renvoie `unauthenticated` (401). » (on `PUT Patient`, re-proven for every write in phase 11).
 - To record in `architecture.md` (phase 11): `interop/infrastructure/conditional_writes.py` is a second lock adapter locking other contexts' rows by their ORM models (clinician profile, user, appointment, availability rule), the accepted exception beside booking's `schedule_locks`.
 - Deviations: the read port is `PatientQueries` (rule 0-ports: several reads make a `*Queries` port), not `PatientReads`; the token scenarios stay in `tests/features/identity/…` run by `tests/use_cases/identity/test_api_tokens.py`; field errors raised by `UpdateProfile` keep their product names (`phone`, `birth_date`) in `expression`, only diff refusals carry FHIR paths; `phase-3.md` still says `status: pending` although round 3 closed it.
+
+## Round 5
+- Head: `4e1a432`
+- Uncommitted changes: no (plan docs only)
+- Verdict: PASS for phase 5 scope
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 | |
+| `uv run ruff format --check .` | 0 | |
+| `uv run lint-imports` | 0 | |
+| `uv run pyrefly check` | 0 | |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | |
+| `uv run pytest tests/fhir tests/contracts tests/use_cases tests/api tests/presenters tests/test_acceptance_names.py -q` | 0 | 1655 passed |
+| pre-commit hooks of `4e1a432` (Python Doctor included) | 0 | |
+| `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+- Every bullet of « Un client réserve et consulte des RDV en FHIR » names a scenario; each refusal is replayed on `POST /api/v1/appointments` with the same token and answers the same status, code and (but for `invalid_input` field paths) details.
+- Deviations: the read port is `InteropAppointmentQueries` (booking already owns an `AppointmentQueries`, rule 0-ports: two reads make a `*Queries` port), not `AppointmentReads`; `comment` is refused on create beside `reasonCode` (no screen writes notes while booking); an inactive patient booked by the admin answers 403 `forbidden`, as `refuse_non_patient` does; a clinician sees no waitlist entry (§15.4, plan decision); a hold carries no patient participant, its visitor has no account.
+- To record in `architecture.md` (phase 11): `SqlInteropAppointmentQueries` takes the `Clock` so an expired hold is absent, as in the slot query.
