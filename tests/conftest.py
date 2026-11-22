@@ -25,6 +25,7 @@ pytest_plugins = [
     "tests.fhir.waitlist_steps",
     "tests.fhir.notification_audit_steps",
     "tests.fhir.reference_write_steps",
+    "tests.fhir.availability_steps",
     "tests.use_cases.booking.steps_scene",
     "tests.use_cases.booking.steps_holds",
     "tests.use_cases.booking.steps_changes",

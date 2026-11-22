@@ -269,6 +269,7 @@ class ConditionalWrites(Protocol):
         expected: str | None,
         current: Callable[[], str],
         write: Callable[[], T],
+        all_or_nothing: bool = False,
     ) -> T:
-        """Lock the target, refuse a stale `expected` with StaleVersionError, then write."""
+        """Lock, refuse a stale `expected`, write; `all_or_nothing` rolls back a refused write."""
         ...

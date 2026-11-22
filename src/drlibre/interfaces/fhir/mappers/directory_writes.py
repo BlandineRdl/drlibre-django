@@ -2,12 +2,15 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from drlibre.interfaces.fhir.bundle import base_url
 from drlibre.interfaces.fhir.mappers.directory import (
     ORGANIZATION_TYPE,
     PHYSICAL_TYPE,
     PRODUCT_CODE,
+    UNAVAILABLE,
     extension_url,
 )
 from drlibre.interfaces.fhir.schemas.common import (
@@ -23,11 +26,14 @@ from drlibre.interfaces.fhir.schemas.directory import (
     CodeSystem,
     HealthcareService,
     Location,
+    NotAvailable,
     Organization,
     Practitioner,
     PractitionerRole,
 )
 from drlibre.interfaces.fhir.schemas.patient import Patient
+from drlibre.interop.application.ports.inbound import TimeOffRow
+from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.validation import invalid_field
 
 type Fields = dict[str, str]
@@ -192,6 +198,55 @@ def role_paths(resource: PractitionerRole) -> dict[str, object]:
             n.model_dump() for n in resource.not_available or ()
         ),
     }
+
+
+def own_role_paths(resource: PractitionerRole) -> dict[str, object]:
+    """Every element but `notAvailable`, the only one its clinician changes."""
+    dumped = resource.model_dump(
+        by_alias=True, exclude_none=True, exclude={"id", "meta", "not_available"}
+    )
+    return {f"PractitionerRole.{name}": value for name, value in dumped.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class TimeOffChanges:
+    """A `notAvailable` update: the time offs it drops, then the periods it adds."""
+
+    removed: tuple[Id, ...]
+    added: tuple[Fields, ...]
+
+
+def _instant(raw: str | None, path: str) -> datetime:
+    try:
+        found = datetime.fromisoformat(raw or "")
+    except ValueError:
+        found = None
+    if found is None or found.tzinfo is None:
+        raise invalid_field(path, "Saisissez une date et une heure avec fuseau.")
+    return found
+
+
+def _local(at: datetime, zone: ZoneInfo) -> str:
+    return at.astimezone(zone).replace(tzinfo=None).isoformat()
+
+
+def time_off_changes(
+    current: Sequence[TimeOffRow], incoming: Sequence[NotAvailable], zone: ZoneInfo
+) -> TimeOffChanges:
+    """Periods matched one for one on start, end and description; the rest is dropped or added."""
+    kept = list(current)
+    added: list[Fields] = []
+    for period in incoming:
+        start = _instant(period.during.start, "PractitionerRole.notAvailable.during.start")
+        end = _instant(period.during.end, "PractitionerRole.notAvailable.during.end")
+        key = (start, end, period.description)
+        same = next((o for o in kept if (o.start, o.end, o.reason or UNAVAILABLE) == key), None)
+        if same is not None:
+            kept.remove(same)
+            continue
+        reason = "" if period.description == UNAVAILABLE else period.description
+        added.append({"start": _local(start, zone), "end": _local(end, zone), "reason": reason})
+    return TimeOffChanges(tuple(o.id for o in kept), tuple(added))
 
 
 @dataclass(frozen=True, slots=True)

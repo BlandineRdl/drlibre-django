@@ -1,16 +1,22 @@
-"""The admin's reference writes, on the directory router, through the console's use cases."""
+"""Reference writes on the directory router: the admin's console, the clinician's availability."""
 
 from collections.abc import Callable, Sequence
+from zoneinfo import ZoneInfo
 
 from django.http import HttpRequest, HttpResponse
 
 from drlibre.bootstrap.container import container
-from drlibre.identity.application.ports.inbound import Identity
-from drlibre.interfaces.fhir.access import reader, require_admin
+from drlibre.identity.application.ports.inbound import Identity, Role
+from drlibre.interfaces.fhir.access import caller, reader, require_admin
 from drlibre.interfaces.fhir.bundle import base_url
 from drlibre.interfaces.fhir.diff import changes
 from drlibre.interfaces.fhir.mappers import directory as to
 from drlibre.interfaces.fhir.mappers import directory_writes as writes
+from drlibre.interfaces.fhir.mappers.schedule import (
+    practitioner_of,
+    schedule_fields,
+    schedule_paths,
+)
 from drlibre.interfaces.fhir.outcome import fhir_response
 from drlibre.interfaces.fhir.registry import ResourceRules
 from drlibre.interfaces.fhir.routers.directory import (
@@ -20,6 +26,7 @@ from drlibre.interfaces.fhir.routers.directory import (
     ORGANIZATION,
     PRACTITIONER,
     PRACTITIONER_ROLE,
+    SCHEDULE,
     known_specialties,
     router,
 )
@@ -38,6 +45,7 @@ from drlibre.interfaces.fhir.schemas.directory import (
     Organization,
     Practitioner,
     PractitionerRole,
+    Schedule,
 )
 from drlibre.interfaces.fhir.version import etag, expected_version
 from drlibre.interop.application.ports.inbound import (
@@ -54,16 +62,21 @@ from drlibre.interop.application.ports.inbound import (
     RoleFilter,
     RoleRow,
     RoomRow,
+    ScheduleFilter,
+    ScheduleRow,
     ServiceFilter,
     SpecialtyFilter,
     WriteTarget,
 )
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.validation import invalid_field
 from drlibre.shared_kernel.validation import parse_id as parse_id_or_none
 
 SITE_IS_AN_ORGANIZATION = "Le site s'écrit par son Organization `prov`."
 ADMIN_ROLE_IS_A_USER = "Le rôle admin suit l'utilisateur : écrivez le Practitioner."
+OWN_AVAILABILITY = "Seul le praticien gère ses plages et ses absences."
+HORIZON_IS_COMPUTED = "L'horizon suit la période de validité de la plage."
 
 
 def _queries() -> DirectoryQueries:
@@ -87,13 +100,19 @@ def _same_id(path: str, incoming: str | None, resource_id: str) -> None:
 
 
 def _update[T](
-    request: HttpRequest, target: WriteTarget, current: Callable[[], str], write: Callable[[], T]
+    request: HttpRequest,
+    target: WriteTarget,
+    current: Callable[[], str],
+    write: Callable[[], T],
+    *,
+    all_or_nothing: bool = False,
 ) -> T:
     return container().conditional_writes.run(
         target=target,
         expected=expected_version(request.headers.get("If-Match")),
         current=current,
         write=write,
+        all_or_nothing=all_or_nothing,
     )
 
 
@@ -452,7 +471,9 @@ def create_practitioner_role(request: HttpRequest) -> HttpResponse:
 
 @router.put("/PractitionerRole/{resource_id}")
 def update_practitioner_role(request: HttpRequest, resource_id: str) -> HttpResponse:
-    identity = require_admin(request)
+    identity = caller(request)
+    if identity.role is not Role.ADMIN:
+        return _update_own_time_off(request, identity, resource_id)
     who = reader(request)
     record_id = parse_id(resource_id)
     _role(record_id, who)
@@ -485,10 +506,114 @@ def update_practitioner_role(request: HttpRequest, resource_id: str) -> HttpResp
     return resource_response(model, version_of(model))
 
 
+def _zone(row: RoleRow, who: Reader) -> ZoneInfo:
+    """The hospital zone the time off screen reads its local dates in."""
+    site = _organization(row.hospital_id, who) if row.hospital_id else None
+    if not isinstance(site, HospitalRow):
+        raise missing()
+    return ZoneInfo(site.time_zone)
+
+
+def _update_own_time_off(
+    request: HttpRequest, identity: Identity, resource_id: str
+) -> HttpResponse:
+    """A clinician's own role: `notAvailable` alone changes, every period or none."""
+    who = reader(request)
+    record_id = parse_id(resource_id)
+    if who.profile_id != record_id:
+        raise DomainError(ErrorCode.FORBIDDEN, OWN_AVAILABILITY)
+    incoming = read_body(request, PractitionerRole)
+    _same_id("PractitionerRole.id", incoming.id, resource_id)
+
+    def write() -> None:
+        row = _role(record_id, who)
+        current = to.role(row, known_specialties(who))
+        paths = writes.own_role_paths(current)
+        asked = writes.own_role_paths(incoming)
+        changes(paths, asked, writable=frozenset(), reserved=frozenset(paths | asked))
+        found = writes.time_off_changes(
+            row.time_offs, incoming.not_available or (), _zone(row, who)
+        )
+        for time_off_id in found.removed:
+            container().delete_time_off.execute(actor=identity.user_id, time_off_id=time_off_id)
+        for fields in found.added:
+            container().record_time_off.execute(actor=identity.user_id, fields=fields)
+
+    _update(
+        request,
+        WriteTarget.clinician(clinician_id=record_id),
+        lambda: version_of(_role_model(record_id, who)),
+        write,
+        all_or_nothing=True,
+    )
+    model = _role_model(record_id, who)
+    return resource_response(model, version_of(model))
+
+
 @router.delete("/PractitionerRole/{resource_id}")
 def delete_practitioner_role(request: HttpRequest, resource_id: str) -> HttpResponse:
     identity = require_admin(request)
     record_id = parse_id(resource_id)
     _role(record_id, reader(request))
     container().delete_clinician_profile.execute(actor=identity.user_id, profile_id=record_id)
+    return _deleted()
+
+
+# Schedule: one availability rule, written by its clinician as on the workspace screen.
+def _schedule(record_id: Id, who: Reader) -> ScheduleRow:
+    return _one(_queries().schedules(ScheduleFilter(ids=(record_id,)), who).items)
+
+
+def _named_self(practitioner_id: str, identity: Identity) -> None:
+    """A schedule names its practitioner: only the token holder themselves."""
+    if practitioner_id != str(identity.user_id):
+        raise DomainError(ErrorCode.FORBIDDEN, OWN_AVAILABILITY)
+
+
+@router.post("/Schedule")
+def create_schedule(request: HttpRequest) -> HttpResponse:
+    identity = caller(request)
+    incoming = read_body(request, Schedule)
+    _named_self(practitioner_of(incoming), identity)
+    if incoming.planning_horizon is not None:
+        raise invalid_field("Schedule.planningHorizon", HORIZON_IS_COMPUTED)
+    created = container().save_availability_rule.execute(
+        actor=identity.user_id, rule_id=None, fields=schedule_fields(incoming)
+    )
+    model = to.schedule(_schedule(created, reader(request)))
+    return _created(SCHEDULE, model, created, version_of(model))
+
+
+@router.put("/Schedule/{resource_id}")
+def update_schedule(request: HttpRequest, resource_id: str) -> HttpResponse:
+    identity = caller(request)
+    who = reader(request)
+    record_id = parse_id(resource_id)
+    row = _schedule(record_id, who)
+    _named_self(str(row.practitioner_id), identity)
+    incoming = read_body(request, Schedule)
+    _same_id("Schedule.id", incoming.id, resource_id)
+
+    def write() -> None:
+        current = to.schedule(_schedule(record_id, who))
+        changes(schedule_paths(current), schedule_paths(incoming), writable=frozenset())
+        container().save_availability_rule.execute(
+            actor=identity.user_id, rule_id=record_id, fields=schedule_fields(incoming)
+        )
+
+    _update(
+        request,
+        WriteTarget.clinician(clinician_id=row.role_id, row=(Locked.AVAILABILITY_RULE, record_id)),
+        lambda: version_of(to.schedule(_schedule(record_id, who))),
+        write,
+    )
+    model = to.schedule(_schedule(record_id, who))
+    return resource_response(model, version_of(model))
+
+
+@router.delete("/Schedule/{resource_id}")
+def delete_schedule(request: HttpRequest, resource_id: str) -> HttpResponse:
+    identity = caller(request)
+    record_id = parse_id(resource_id)
+    container().delete_availability_rule.execute(actor=identity.user_id, rule_id=record_id)
     return _deleted()

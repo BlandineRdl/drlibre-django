@@ -45,16 +45,19 @@ class DjangoConditionalWrites(ConditionalWrites):
         expected: str | None,
         current: Callable[[], str],
         write: Callable[[], T],
+        all_or_nothing: bool = False,
     ) -> T:
-        if expected is None:
+        if expected is None and not all_or_nothing:
             return write()
         refused: DomainError | None = None
         with transaction.atomic():
             for kind, row_id in target.rows:
                 rows = _MODELS[kind].objects.select_for_update().filter(pk=row_id.value)
                 list(rows.values_list("pk", flat=True))
-            if current() != expected:
+            if expected is not None and current() != expected:
                 raise StaleVersionError
+            if all_or_nothing:
+                return write()
             try:
                 return write()
             except DomainError as error:

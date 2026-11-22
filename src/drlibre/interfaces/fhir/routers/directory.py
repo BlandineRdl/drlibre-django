@@ -61,7 +61,7 @@ from drlibre.shared_kernel.validation import invalid_field
 router = Router(tags=["directory"])
 
 _READ_SEARCH = (Interaction.READ, Interaction.SEARCH)
-# The admin writes these as on the console; `routers/reference_writes.py` serves the writes.
+# Written as on the console or workspace; `routers/reference_writes.py` serves the writes.
 _MANAGED = (*_READ_SEARCH, Interaction.CREATE, Interaction.UPDATE, Interaction.DELETE)
 _STRING, _TOKEN, _REFERENCE = ParamType.STRING, ParamType.TOKEN, ParamType.REFERENCE
 _DATE = ParamType.DATE
@@ -142,7 +142,7 @@ PRACTITIONER_ROLE = declare(
 SCHEDULE = declare(
     ResourceRules(
         type="Schedule",
-        interactions=_READ_SEARCH,
+        interactions=_MANAGED,
         search=(
             SearchParam("actor", _REFERENCE),
             SearchParam("date", _DATE),

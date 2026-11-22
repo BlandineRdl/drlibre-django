@@ -137,10 +137,12 @@ class PractitionerRole(FhirModel):
 
 
 class Schedule(FhirModel):
+    """A client writes it without id, meta, `active` or the horizon, all computed."""
+
     resource_type: Literal["Schedule"] = "Schedule"
-    id: str
-    meta: Meta
+    id: str | None = None
+    meta: Meta | None = None
     extension: tuple[Extension, ...] | None = None
-    active: bool
+    active: bool | None = None
     actor: tuple[Reference, ...]
-    planning_horizon: Period
+    planning_horizon: Period | None = None

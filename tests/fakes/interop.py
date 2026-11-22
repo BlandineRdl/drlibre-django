@@ -96,6 +96,7 @@ class InMemoryConditionalWrites(ConditionalWrites):
         expected: str | None,
         current: Callable[[], str],
         write: Callable[[], T],
+        all_or_nothing: bool = False,
     ) -> T:
         if expected is not None and current() != expected:
             raise StaleVersionError
