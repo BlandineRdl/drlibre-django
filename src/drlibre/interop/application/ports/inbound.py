@@ -141,7 +141,7 @@ class DirectoryQueries(Protocol):
     def roles(
         self, criteria: RoleFilter, reader: Reader, paging: Paging | None = None
     ) -> Page[RoleRow]:
-        """Like practitioners; weight, time-off reasons and offline types for staff only."""
+        """Like practitioners; weight, offline types for staff; reasons for admin and owner."""
         ...
 
     def schedules(

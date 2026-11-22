@@ -180,6 +180,22 @@ def test_a_visitor_reads_a_role_without_its_weight_reasons_or_offline_types(
     assert set(staff.service_ids) == {scene.online.id, scene.offline.id}
 
 
+def test_only_the_admin_and_the_owning_clinician_read_a_time_off_reason(
+    directory: tuple[DirectoryQueries, Directory],
+) -> None:
+    """Plan E8 « Champs publics »: a reason may be health data, as on the availability screen."""
+    port, scene = directory
+    colleague = Reader(ReaderKind.CLINICIAN, scene.former.id, scene.former_profile.id)
+    patient = Reader(ReaderKind.PATIENT, scene.former.id)
+
+    def reason(reader: Reader) -> str | None:
+        (row,) = port.roles(RoleFilter(practitioner=scene.clinician.id), reader).items
+        return row.time_offs[0].reason
+
+    assert [reason(r) for r in (clinician(scene), admin(scene))] == ["Congés", "Congés"]
+    assert [reason(r) for r in (colleague, patient, VISITOR)] == [None, None, None]
+
+
 def test_roles_match_by_department_hospital_site_room_specialty_and_type(
     directory: tuple[DirectoryQueries, Directory],
 ) -> None:

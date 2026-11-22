@@ -349,7 +349,13 @@ class InMemoryDirectoryQueries(DirectoryQueries):
                 AvailabilityRow(r.id, r.weekday, r.start, r.end, self._stamp) for r in rules
             ),
             time_offs=tuple(
-                TimeOffRow(o.id, o.start, o.end, o.reason if reader.is_staff else None, self._stamp)
+                TimeOffRow(
+                    o.id,
+                    o.start,
+                    o.end,
+                    o.reason if reader.reads_reasons_of(p.id) else None,
+                    self._stamp,
+                )
                 for o in offs
             ),
             updated_at=max(p.updated_at, u.updated_at),

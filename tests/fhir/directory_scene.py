@@ -188,3 +188,11 @@ def a_directory(repos: Repos) -> Directory:
         lille, paris, roubaix, cardiology, room, online, offline, specialty, retired,
         clinician, profile, former, former_profile, admin, rule, time_off,
     )  # fmt: skip
+
+
+def a_colleague(repos: Repos, scene: Directory) -> User:
+    """An active clinician of the same department, who owns none of the scene's time off."""
+    colleague = _user(Role.CLINICIAN, "Chloé Durand")
+    repos.users.save(colleague)
+    repos.profiles.save(_profile(colleague, scene.cardiology, scene.specialty))
+    return colleague

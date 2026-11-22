@@ -15,7 +15,7 @@ from drlibre.interfaces.fhir.mappers.directory import code_system_url, extension
 from drlibre.interfaces.fhir.registry import declared
 from drlibre.shared_kernel.ids import Id
 from tests.fhir.conftest import token_for
-from tests.fhir.directory_scene import Directory, a_directory, django_repos
+from tests.fhir.directory_scene import Directory, a_colleague, a_directory, django_repos
 
 
 @dataclass
@@ -64,6 +64,12 @@ def reads_without_token(exchange: Exchange, path: str) -> None:
 def reads_with_token(exchange: Exchange, who: str, path: str) -> None:
     assert exchange.directory is not None
     _send(exchange, path, getattr(exchange.directory, who))
+
+
+@when(parsers.parse('the client with a colleague clinician\'s token reads "{path}"'))
+def reads_as_colleague(exchange: Exchange, path: str) -> None:
+    assert exchange.directory is not None
+    _send(exchange, path, a_colleague(django_repos(), exchange.directory))
 
 
 @when(parsers.parse('the client follows the "{relation}" link'))
@@ -191,6 +197,13 @@ def staff_role(exchange: Exchange, weight: int, reason: str) -> None:
     assert {"url": extension_url("round-robin-weight"), "valueInteger": weight} in body["extension"]
     assert [n["description"] for n in body["notAvailable"]] == [reason]
     assert len(body["healthcareService"]) == 2
+
+
+@then(parsers.parse("the role shows the round robin weight {weight:d} without the reason"))
+def colleague_role(exchange: Exchange, weight: int) -> None:
+    body = exchange.body()
+    assert {"url": extension_url("round-robin-weight"), "valueInteger": weight} in body["extension"]
+    assert [n["description"] for n in body["notAvailable"]] == ["Indisponible"]
 
 
 @then("the role hides the round robin weight, the reason and the types booked offline")

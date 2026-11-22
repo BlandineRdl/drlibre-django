@@ -32,6 +32,10 @@ class Reader:
     def is_staff(self) -> bool:
         return self.kind is ReaderKind.CLINICIAN or self.kind is ReaderKind.ADMIN
 
+    def reads_reasons_of(self, profile_id: Id) -> bool:
+        """A time-off reason may be health data: only the admin and its own clinician read it."""
+        return self.is_admin or self.profile_id == profile_id
+
 
 def admin_only(reader: Reader) -> None:
     """Only the admin reads the audit journal, as on screen; anyone else is forbidden."""

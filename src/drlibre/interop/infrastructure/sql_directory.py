@@ -255,7 +255,7 @@ def _role(row: Row, reader: Reader) -> RoleRow:
                 id=_id(o["id"]),
                 start=datetime.fromisoformat(o["start"]),
                 end=datetime.fromisoformat(o["end"]),
-                reason=o["reason"] if reader.is_staff else None,
+                reason=o["reason"] if reader.reads_reasons_of(Id(row["id"])) else None,
                 updated_at=datetime.fromisoformat(o["updated_at"]),
             )
             for o in loaded(row["time_offs"])
