@@ -56,23 +56,19 @@ def test_a_refusal_of_the_write_reaches_the_caller(writes: ConditionalWrites) ->
     assert raised.value.code is ErrorCode.RULE_VIOLATION
 
 
-def test_an_all_or_nothing_refusal_reaches_the_caller_without_if_match(
-    writes: ConditionalWrites,
-) -> None:
+def test_a_refusal_reaches_the_caller_without_if_match(writes: ConditionalWrites) -> None:
     def refuse() -> None:
         raise DomainError(ErrorCode.INVALID_INPUT, "Refusé.")
 
     with pytest.raises(DomainError) as raised:
-        writes.run(
-            target=TARGET, expected=None, current=lambda: "v1", write=refuse, all_or_nothing=True
-        )
+        writes.run(target=TARGET, expected=None, current=lambda: "v1", write=refuse)
 
     assert raised.value.code is ErrorCode.INVALID_INPUT
 
 
 @pytest.mark.integration
 @pytest.mark.django_db
-def test_an_all_or_nothing_refusal_keeps_none_of_the_writes_before_it() -> None:
+def test_a_refusal_keeps_none_of_the_writes_before_it() -> None:
     """Story disponibilités en FHIR: a refused time off period leaves none of the others written."""
     saved: list[User] = []
 
@@ -86,7 +82,6 @@ def test_an_all_or_nothing_refusal_keeps_none_of_the_writes_before_it() -> None:
             expected=None,
             current=lambda: "v1",
             write=save_then_refuse,
-            all_or_nothing=True,
         )
 
     assert DjangoUsers().get(saved[0].id) is None

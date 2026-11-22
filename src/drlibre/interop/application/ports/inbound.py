@@ -260,7 +260,7 @@ class StaleVersionError(DomainError):
 
 
 class ConditionalWrites(Protocol):
-    """If-Match under the write's own locks; none writes as is; a refusal keeps its commits."""
+    """If-Match under the write's own locks, in one transaction a refusal rolls back."""
 
     def run[T](
         self,
@@ -269,7 +269,6 @@ class ConditionalWrites(Protocol):
         expected: str | None,
         current: Callable[[], str],
         write: Callable[[], T],
-        all_or_nothing: bool = False,
     ) -> T:
-        """Lock, refuse a stale `expected`, write; `all_or_nothing` rolls back a refused write."""
+        """Lock, refuse a stale `expected`, write; any refusal rolls back every write."""
         ...

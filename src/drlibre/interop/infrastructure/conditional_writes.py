@@ -19,7 +19,6 @@ from drlibre.organisation.infrastructure.django.models import (
     SpecialtyRecord,
 )
 from drlibre.scheduling.infrastructure.django.models import AvailabilityRuleModel
-from drlibre.shared_kernel.errors import DomainError
 
 # A lock adapter, like booking's schedule locks, may lock other contexts' rows by their models.
 _MODELS: dict[Locked, type[models.Model]] = {
@@ -45,22 +44,11 @@ class DjangoConditionalWrites(ConditionalWrites):
         expected: str | None,
         current: Callable[[], str],
         write: Callable[[], T],
-        all_or_nothing: bool = False,
     ) -> T:
-        if expected is None and not all_or_nothing:
-            return write()
-        refused: DomainError | None = None
         with transaction.atomic():
             for kind, row_id in target.rows:
-                rows = _MODELS[kind].objects.select_for_update().filter(pk=row_id.value)
+                rows = _MODELS[kind].objects.select_for_update(no_key=True).filter(pk=row_id.value)
                 list(rows.values_list("pk", flat=True))
             if expected is not None and current() != expected:
                 raise StaleVersionError
-            if all_or_nothing:
-                return write()
-            try:
-                return write()
-            except DomainError as error:
-                # A refusal after its own commit, such as a lapsed offer put back, keeps it.
-                refused = error
-        raise refused
+            return write()

@@ -106,15 +106,12 @@ def _update[T](
     target: WriteTarget,
     current: Callable[[], str],
     write: Callable[[], T],
-    *,
-    all_or_nothing: bool = False,
 ) -> T:
     return container().conditional_writes.run(
         target=target,
         expected=expected_version(request.headers.get("If-Match")),
         current=current,
         write=write,
-        all_or_nothing=all_or_nothing,
     )
 
 
@@ -591,7 +588,6 @@ def _update_own_time_off(
         WriteTarget.clinician(clinician_id=record_id),
         lambda: version_of(_role_model(record_id, who)),
         write,
-        all_or_nothing=True,
     )
     model = _role_model(record_id, who)
     return resource_response(model, version_of(model))
