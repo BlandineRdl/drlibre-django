@@ -127,7 +127,6 @@ def test_the_load_seed_never_double_books_a_room_a_clinician_or_a_patient(
 def test_the_load_seed_signs_in_its_clinicians_and_fills_the_journal_and_notifications_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Issue #23: load clinicians sign in, the journal and notifications hold load volumes."""
     monkeypatch.setattr(seed, "LOAD_CLINICIANS", 4)
     monkeypatch.setattr(seed, "LOAD_PATIENTS", 40)
     monkeypatch.setattr(seed, "LOAD_APPOINTMENTS_PER_CLINICIAN", 30)
@@ -145,9 +144,8 @@ def test_the_load_seed_signs_in_its_clinicians_and_fills_the_journal_and_notific
     ids = set(load.values_list("id", flat=True))
     journal = AuditEntryRecord.objects.filter(entity_id__in=ids)
     assert journal.count() == len(ids) == 4 * 30
-    assert not any(
-        "email" in str(m) or "name" in str(m) for m in journal.values_list("metadata", flat=True)
-    )
+    kept = {"clinician_id", "appointment_type_id", "room_id", "source"}
+    assert all(set(m) <= kept for m in journal.values_list("metadata", flat=True))
     upcoming = load.filter(status="BOOKED", start__gt=datetime.now(UTC))
     notices = NotificationRecord.objects.filter(appointment_id__in=ids)
     assert notices.count() == upcoming.count() > 0

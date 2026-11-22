@@ -1,6 +1,6 @@
 ---
 objective: "Every signed-in screen and API list named in #23 has a p95 measured by Locust on the load seed, recorded in load-results.md, each p95 >= 200 ms backed by a fix issue."
-status: pending
+status: done
 ---
 
 # Plan: p95 des écrans connectés et du tableau de bord

@@ -1,9 +1,9 @@
 # Load results #23
 ## Setup
 - Machine: Apple M4, 10 cores, 24 GB, macOS 26.6.2, Docker 29.8.2 (compose project `drlibre-load` on the same machine, Locust 2.47.0 on the host).
-- Data: fresh volume, `python -m scripts.seed --size load`: 10 hospitals (8 load + 2 demo), 200 load clinicians signing in with the demo password, 5 000 patients, 50 108 appointments, 50 430 audit entries (one per load appointment), 25 055 notifications (one per future BOOKED load appointment).
+- Data: fresh volume, `python -m scripts.seed --size load`: 10 hospitals (8 load + 2 demo), 200 load clinicians signing in with the demo password, 5 000 patients, 50 108 appointments (50 000 load + 108 demo), 50 430 audit entries (50 000 load, one per load appointment, + 430 demo), 25 055 notifications (one per future BOOKED load appointment, plus the demo seed's).
 - Users: `-u 20` shared by weight: 8 `Visitor`, 4 `Patient` (sign-in link from Mailpit), 4 `Clinician` (random load clinician), 4 `Admin` (`admin@drlibre.localhost`).
-- Command: `./scripts/load-run.sh --keep -t 3m --only-summary --csv <dir>/run` (`-u 20 -r 5`; `-t` raised from 2 min because a 30 s probe gave admin endpoints ~0.4 req/s, under 50 successes in 2 min).
+- Command: `./scripts/load-run.sh --keep --only-summary --csv <dir>/run` (`-u 20 -r 5 -t 3m`; the default went from 2 to 3 min because a 30 s probe gave admin endpoints ~0.4 req/s, under 50 successes in 2 min).
 - A request counts as a success only on HTTP 200 without redirect (`allow_redirects=False`); anything else is reported apart under `<endpoint> refused`.
 
 ## p95 of successful requests per endpoint (ms)
