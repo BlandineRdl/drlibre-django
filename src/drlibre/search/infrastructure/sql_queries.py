@@ -110,18 +110,19 @@ class SqlSearchQueries(SearchQueries):
 
     def providers(self, criteria: SearchCriteria, horizon: Horizon) -> Found[ProviderResult]:
         base, params = _base(criteria, horizon)
+        # Rank on the first slot alone, page, then read the next slots of the kept rows only.
         sql = (  # nosec B608
             f"""
 WITH prov AS ({base}),
-ranked AS (
-    SELECT p.*, n.starts, {_DISTANCE if criteria.location else "NULL::float8"} AS distance_km
-    FROM prov p
-    LEFT JOIN LATERAL ({_slots(criteria, limit=3)}) n ON true
-    {"WHERE cardinality(n.starts) > 0" if criteria.has_time_filter else ""}
+firsts AS ({_firsts(criteria)}),
+page AS (
+    SELECT r.*, COUNT(*) OVER () AS total FROM firsts r
+    ORDER BY {_order(criteria, "r.first_start", "r.full_name", "r.clinician_id", "r.distance_km")}
+    LIMIT %(limit)s OFFSET %(offset)s
 )
-SELECT r.*, COUNT(*) OVER () AS total FROM ranked r
-ORDER BY {_order(criteria, "r.starts[1]", "r.full_name", "r.clinician_id", "r.distance_km")}
-LIMIT %(limit)s OFFSET %(offset)s
+SELECT p.*, n.starts FROM page p
+LEFT JOIN LATERAL ({_slots(criteria, limit=3)}) n ON true
+ORDER BY {_order(criteria, "p.first_start", "p.full_name", "p.clinician_id", "p.distance_km")}
 """
         )
         rows = _rows(sql, params | _paging(criteria))

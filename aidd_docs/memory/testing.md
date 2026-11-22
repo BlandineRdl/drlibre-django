@@ -12,7 +12,7 @@
 | FHIR R4 conformance of the answers | `./scripts/fhir-validate.sh` on the running stack: HL7 validator, also in CI; only local code system warnings remain |
 | A concurrent write guarded by a lock | PostgreSQL test with `django_db(transaction=True)`, one thread per writer closing its connections; the first writer waits until `pg_stat_activity` shows a `Lock` waiter; it must fail with the lock removed |
 | A user journey | A few Playwright end-to-end tests |
-| Search or booking performance | Locust on the load seed: `./scripts/load-run.sh` (own compose project `drlibre-load`, ports 18000/15432/16379/18025, `NETWORK_HOURLY_LIMIT=100000`, volume removed at exit; `--keep` leaves it up, extra args go to Locust); the demo stack and `.env` stay untouched; results in the plan's `load-results.md` |
+| Search, booking or signed-in screen performance | Locust on the load seed (visitor, patient, clinician and admin users; `LOAD_PASSWORD` read from `scripts.seed`): `./scripts/load-run.sh` (own compose project `drlibre-load`, ports 18000/15432/16379/18025, `NETWORK_HOURLY_LIMIT=100000`, volume removed at exit; `--keep` leaves it up, extra args go to Locust); the demo stack and `.env` stay untouched; results in the plan's `load-results.md` |
 
 ## Conventions
 - Test behaviour, not functions: a refactoring that keeps behaviour breaks no test.

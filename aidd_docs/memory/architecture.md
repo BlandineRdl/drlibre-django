@@ -80,9 +80,11 @@
 - Actor scope: `actor_scope` maps a profile to clinician, `Staff.is_admin` to admin, else patient; `scoped_appointment` lets an admin read any appointment (`not_found` if absent), others keep their guards; admins follow staff rules (no 24 h, `for_patient=False`), clinical notes stay `forbidden` to them.
 - Admin `BookForPatient` requires a clinician; the named room must be active in the type's department (`not_found`), then free (`conflict`); source `STAFF`.
 - `reporting` is a read-only context: `ActivityQueries` in SQL plus pure `available_minutes`, minutes in each clinician's hospital zone; utilisation counts active clinicians' appointments only, RDV counts every clinician's; ratios with a zero denominator show « n/a »; bar widths are `.bar-N` classes, the CSP forbids inline styles.
+- `ActivityQueries.activity` reads tally, days and busiest clinicians in one statement; each clinician's zone and today come from a materialised CTE, so each appointment converts its zone once (#25).
 - The audit journal is read through audit's `ViewAuditJournal` (admin only); its `JournalActors` port (`IdentityJournalActors`) resolves the actor filter's email and the page's actor emails through identity; an unknown email matches no entry.
 - `ExportAppointments` (admin only) writes one `booking.appointments_exported` audit entry `{count}`; `csv_cell` prefixes `'` before `= + - @ \t \r`.
 - The audit log is read through `AuditQueries.page` (newest first, total) and `entity_types()`, called by `ViewAuditJournal`, whose `AuditJournal` carries the zone (`settings.TIME_ZONE`) its dates are read and shown in, named.
+- `entity_types()` is a loose index scan (recursive CTE, one probe per type) on `audit_entry_target_at`, never a scan of the append-only journal (#26).
 - Index `appointment_start` on `start` (`booking.0005`) serves the admin list, export and dashboard across hospitals.
 - API admin `GET /appointments` takes the list filters, `from`/`to` keep the date of the aware datetime; `POST /jobs/reminders` runs `RunReminders` synchronously and returns `{count}`.
 - The admin file history shows clinician actions as « Personnel ».

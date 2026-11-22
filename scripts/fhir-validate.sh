@@ -13,7 +13,7 @@ trap 'rm -rf "$SAMPLES"' EXIT
 command -v java >/dev/null || { echo "java 11+ is required" >&2; exit 1; }
 if ! { [ -f "$JAR" ] && echo "$SHA256  $JAR" | shasum -a 256 -c - >/dev/null 2>&1; }; then
   mkdir -p "$(dirname "$JAR")"
-  curl -fsSL -o "$JAR" "https://github.com/hapifhir/org.hl7.fhir.core/releases/download/$VERSION/validator_cli.jar"
+  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o "$JAR" "https://github.com/hapifhir/org.hl7.fhir.core/releases/download/$VERSION/validator_cli.jar"
   echo "$SHA256  $JAR" | shasum -a 256 -c -
 fi
 

@@ -51,7 +51,7 @@ class Ratio:
 
 @dataclass(frozen=True, slots=True)
 class Tally:
-    """Appointments starting in the range."""
+    """Appointments starting in the range; active minutes count active clinicians only."""
 
     appointments: int
     cancellations: int
@@ -71,6 +71,15 @@ class BusyClinician:
     clinician_id: Id
     name: str
     count: int
+
+
+@dataclass(frozen=True, slots=True)
+class Activity:
+    """Appointment figures of a range, read together."""
+
+    tally: Tally
+    per_day: tuple[DayCount, ...]
+    busiest: tuple[BusyClinician, ...]
 
 
 @dataclass(frozen=True, slots=True)

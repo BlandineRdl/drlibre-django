@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from drlibre.identity.domain.user import Role
 from drlibre.reporting.application.ports.outbound import ActivityQueries, Admins
 from drlibre.reporting.domain.available_minutes import Absence, ClinicianSchedule, RuleHours
-from drlibre.reporting.domain.dashboard import BusyClinician, DayCount, Range, Tally
+from drlibre.reporting.domain.dashboard import Activity, BusyClinician, DayCount, Range, Tally
 from drlibre.shared_kernel.ids import Id
 from tests.fakes.users import InMemoryUsers
 
@@ -44,8 +44,11 @@ class InMemoryActivityQueries(ActivityQueries):
 
         return [a for a in self.appointments if inside(a)]
 
-    def tally(self, now: datetime, period: Range) -> Tally:
+    def activity(self, now: datetime, period: Range, limit: int) -> Activity:
         rows = self._in_range(now, period)
+        return Activity(self._tally(rows), self._per_day(rows), self._busiest(rows, limit))
+
+    def _tally(self, rows: list[ActivityAppointment]) -> Tally:
         kept = [a for a in rows if a.status != "CANCELLED"]
         working = {i for i, c in self.clinicians.items() if c.active}
         active = [a for a in kept if a.status != "NO_SHOW" and a.clinician_id in working]
@@ -57,17 +60,17 @@ class InMemoryActivityQueries(ActivityQueries):
             active_minutes=int(sum((a.end - a.start).total_seconds() for a in active) // 60),
         )
 
-    def per_day(self, now: datetime, period: Range) -> tuple[DayCount, ...]:
+    def _per_day(self, rows: list[ActivityAppointment]) -> tuple[DayCount, ...]:
         counts: dict[date, int] = {}
-        for a in self._in_range(now, period):
+        for a in rows:
             if a.status != "CANCELLED":
                 day = a.start.astimezone(ZoneInfo(a.time_zone)).date()
                 counts[day] = counts.get(day, 0) + 1
         return tuple(DayCount(day, counts[day]) for day in sorted(counts))
 
-    def busiest(self, now: datetime, period: Range, limit: int) -> tuple[BusyClinician, ...]:
+    def _busiest(self, rows: list[ActivityAppointment], limit: int) -> tuple[BusyClinician, ...]:
         counts: dict[tuple[Id, str], int] = {}
-        for a in self._in_range(now, period):
+        for a in rows:
             if a.status != "CANCELLED":
                 key = (a.clinician_id, a.clinician_name)
                 counts[key] = counts.get(key, 0) + 1

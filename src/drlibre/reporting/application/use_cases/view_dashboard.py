@@ -27,12 +27,13 @@ class ViewDashboardUseCase(ViewDashboard):
             zone = ZoneInfo(schedule.time_zone)
             days = period.days(now.astimezone(zone).date())
             available += available_minutes(schedule.rules, schedule.absences, days, zone)
+        activity = self._queries.activity(now, period, BUSIEST_COUNT)
         return Dashboard.from_figures(
             period=period,
-            tally=self._queries.tally(now, period),
+            tally=activity.tally,
             available_minutes=available,
             waitlist_size=self._queries.waitlist_size(),
             days=period.days(now.astimezone(self._zone).date()),
-            counted=self._queries.per_day(now, period),
-            busiest=self._queries.busiest(now, period, BUSIEST_COUNT),
+            counted=activity.per_day,
+            busiest=activity.busiest,
         )

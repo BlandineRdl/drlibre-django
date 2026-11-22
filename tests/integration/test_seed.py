@@ -9,6 +9,7 @@ from drlibre.audit.infrastructure.django.models import AuditEntryRecord
 from drlibre.booking.infrastructure.django.models import AppointmentRecord, WaitlistEntryRecord
 from drlibre.bootstrap.container import container
 from drlibre.identity.infrastructure.django.models import UserRecord
+from drlibre.notifications.infrastructure.django.models import NotificationRecord
 from drlibre.organisation.infrastructure.django.models import (
     AppointmentTypeRecord,
     ClinicianProfileRecord,
@@ -121,6 +122,33 @@ def test_the_load_seed_never_double_books_a_room_a_clinician_or_a_patient(
     for key in ("patient_id", "clinician_id", "room_id"):
         slots = [(row[key], row["start"]) for row in rows]
         assert len(set(slots)) == len(slots), key
+
+
+def test_the_load_seed_signs_in_its_clinicians_and_fills_the_journal_and_notifications_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(seed, "LOAD_CLINICIANS", 4)
+    monkeypatch.setattr(seed, "LOAD_PATIENTS", 40)
+    monkeypatch.setattr(seed, "LOAD_APPOINTMENTS_PER_CLINICIAN", 30)
+
+    seed.main(size="load")
+    seed.main(size="load")
+
+    signed = container().sign_in.execute(
+        email="load-clinician-000@drlibre.localhost",
+        password=seed.DEMO_PASSWORD,
+        user_agent="pytest",
+    )
+    assert signed.token
+    load = AppointmentRecord.objects.filter(clinician__department__code__startswith="LOAD-")
+    ids = set(load.values_list("id", flat=True))
+    journal = AuditEntryRecord.objects.filter(entity_id__in=ids)
+    assert journal.count() == len(ids) == 4 * 30
+    kept = {"clinician_id", "appointment_type_id", "room_id", "source"}
+    assert all(set(m) <= kept for m in journal.values_list("metadata", flat=True))
+    upcoming = load.filter(status="BOOKED", start__gt=datetime.now(UTC))
+    notices = NotificationRecord.objects.filter(appointment_id__in=ids)
+    assert notices.count() == upcoming.count() > 0
 
 
 def test_the_demo_clinician_is_named_once_with_an_honorific_title_even_after_a_reseed() -> None:
