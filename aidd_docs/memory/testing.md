@@ -9,7 +9,7 @@
 | A port or adapter | Contract suite run against the fake and the real adapter |
 | An ORM, SQL, mail or Redis adapter | Integration test on PostgreSQL, Mailpit or Redis |
 | The FHIR API | FHIR R4 contract test in `tests/fhir/` on PostgreSQL, one `tests/features/fhir/` feature per Story; `metadata` proven against the Ninja routes and each search's reads |
-| FHIR R4 conformance of the answers | `./scripts/fhir-validate.sh` on the running stack: HL7 validator, warnings (narrative, local code systems) accepted |
+| FHIR R4 conformance of the answers | `./scripts/fhir-validate.sh` on the running stack: HL7 validator, also in CI; only local code system warnings remain |
 | A concurrent write guarded by a lock | PostgreSQL test with `django_db(transaction=True)`, one thread per writer closing its connections; the first writer waits until `pg_stat_activity` shows a `Lock` waiter; it must fail with the lock removed |
 | A user journey | A few Playwright end-to-end tests |
 | Search or booking performance | Locust on the load seed: `./scripts/load-run.sh` (own compose project `drlibre-load`, ports 18000/15432/16379/18025, `NETWORK_HOURLY_LIMIT=100000`, volume removed at exit; `--keep` leaves it up, extra args go to Locust); the demo stack and `.env` stay untouched; results in the plan's `load-results.md` |
