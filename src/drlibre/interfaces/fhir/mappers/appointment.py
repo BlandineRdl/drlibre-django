@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from drlibre.interfaces.fhir.bundle import base_url
 from drlibre.interfaces.fhir.mappers.directory import extension_url
@@ -176,3 +177,92 @@ def booking_request(resource: Appointment) -> BookingRequest:
         patient_id=_one(resource, "Patient"),
         room_id=_one(resource, "Location"),
     )
+
+
+class Intent(StrEnum):
+    """The one use case an `Appointment` update calls."""
+
+    RESCHEDULE = "reschedule"
+    CANCEL = "cancel"
+    CHECK_IN = "check_in"
+    COMPLETE = "complete"
+    NO_SHOW = "no_show"
+    NOTES = "notes"
+
+
+_STATUS, _START, _COMMENT = "Appointment.status", "Appointment.start", "Appointment.comment"
+_REASON = "Appointment.cancelationReason"
+WRITABLE = frozenset({_STATUS, _START, _COMMENT, _REASON})
+_TRANSITIONS = {
+    "cancelled": Intent.CANCEL,
+    "checked-in": Intent.CHECK_IN,
+    "fulfilled": Intent.COMPLETE,
+    "noshow": Intent.NO_SHOW,
+}
+
+
+def _actors(resource: Appointment) -> tuple[str, ...]:
+    """Participant references as `<type>/<id>`, an absolute base left out, in order."""
+    found = (p.actor.reference for p in resource.participant or () if p.actor)
+    return tuple(sorted("/".join(r.split("/")[-2:]) for r in found if r))
+
+
+def fields(resource: Appointment) -> dict[str, object]:
+    """The elements an update is compared on, by FHIR path; `end`, `meta` and the source are not."""
+    return {
+        _STATUS: resource.status,
+        _START: _start_of(resource),
+        _COMMENT: resource.comment,
+        _REASON: resource.cancelation_reason.text if resource.cancelation_reason else None,
+        "Appointment.participant": _actors(resource),
+        "Appointment.serviceType": _type_of(resource),
+        "Appointment.reasonCode": tuple(c.text for c in resource.reason_code or ()),
+        "Appointment.requestedPeriod": tuple(
+            (p.start, p.end) for p in resource.requested_period or ()
+        ),
+        "Appointment.slot": tuple(r.reference for r in resource.slot or ()),
+    }
+
+
+def refused_transition(row: AppointmentRow) -> DomainError:
+    return DomainError(
+        ErrorCode.INVALID_TRANSITION,
+        "Ce rendez-vous ne permet pas ce changement.",
+        {"status": row.status},
+    )
+
+
+def intent(row: AppointmentRow, changed: frozenset[str], incoming: Appointment) -> Intent | None:
+    """The use case the changed paths ask; several at once invalid_input, no use case 409."""
+    asked = {_START: Intent.RESCHEDULE, _COMMENT: Intent.NOTES, _STATUS: None, _REASON: None}
+    groups = {asked[p] for p in changed}
+    if len(groups) > 1:
+        raise DomainError(
+            ErrorCode.INVALID_INPUT,
+            "Une seule modification par mise à jour.",
+            {
+                "fields": [
+                    {"field": p, "message": "Une seule modification."} for p in sorted(changed)
+                ]
+            },
+        )
+    if not changed:
+        return None
+    if groups != {None}:
+        return groups.pop()
+    if _STATUS not in changed:
+        raise invalid_field(_REASON, "Le motif accompagne l'annulation.")
+    if (found := _TRANSITIONS.get(incoming.status)) is None:
+        raise refused_transition(row)
+    return found
+
+
+def start_of(resource: Appointment) -> datetime:
+    start = _start_of(resource)
+    if start is None:
+        raise invalid_field(_START, "Précisez le nouveau début.")
+    return start
+
+
+def cancellation_reason(resource: Appointment) -> str:
+    return (resource.cancelation_reason.text if resource.cancelation_reason else None) or ""

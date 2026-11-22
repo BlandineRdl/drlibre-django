@@ -9,6 +9,7 @@ from ninja import Router
 from drlibre.bootstrap.container import container
 from drlibre.interfaces.fhir.access import caller, reader
 from drlibre.interfaces.fhir.bundle import base_url
+from drlibre.interfaces.fhir.diff import changes
 from drlibre.interfaces.fhir.mappers import appointment as to
 from drlibre.interfaces.fhir.mappers import directory
 from drlibre.interfaces.fhir.mappers import patient as patients
@@ -42,9 +43,10 @@ from drlibre.interfaces.fhir.routing import (
 )
 from drlibre.interfaces.fhir.schemas.appointment import Appointment
 from drlibre.interfaces.fhir.schemas.bundle import BundleEntry
-from drlibre.interfaces.fhir.version import etag
+from drlibre.interfaces.fhir.version import etag, expected_version
 from drlibre.interop.application.ports.inbound import (
     AppointmentFilter,
+    AppointmentKind,
     AppointmentRow,
     LocationFilter,
     Paging,
@@ -52,6 +54,7 @@ from drlibre.interop.application.ports.inbound import (
     PractitionerFilter,
     Reader,
     RoleFilter,
+    WriteTarget,
 )
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -62,7 +65,12 @@ router = Router(tags=["appointments"])
 APPOINTMENT = declare(
     ResourceRules(
         type="Appointment",
-        interactions=(Interaction.READ, Interaction.SEARCH, Interaction.CREATE),
+        interactions=(
+            Interaction.READ,
+            Interaction.SEARCH,
+            Interaction.CREATE,
+            Interaction.UPDATE,
+        ),
         search=(
             SearchParam("patient", ParamType.REFERENCE),
             SearchParam("practitioner", ParamType.REFERENCE),
@@ -223,3 +231,55 @@ def create_appointment(request: HttpRequest) -> HttpResponse:
     response["Location"] = f"{base_url()}/Appointment/{booked.id}"
     response["ETag"] = etag(to.version_of(row))
     return response
+
+
+def _apply(intent: to.Intent, actor_id: Id, appointment_id: Id, incoming: Appointment) -> None:
+    """The use case `POST /api/v1/appointments/{id}/…` calls for the same intent."""
+    c, ids = container(), {"actor_id": actor_id, "appointment_id": appointment_id}
+    match intent:
+        case to.Intent.RESCHEDULE:
+            c.reschedule_appointment.execute(start=to.start_of(incoming), **ids)
+        case to.Intent.CANCEL:
+            c.cancel_appointment.execute(reason=to.cancellation_reason(incoming), **ids)
+        case to.Intent.CHECK_IN:
+            c.check_in_appointment.execute(**ids)
+        case to.Intent.COMPLETE:
+            c.complete_appointment.execute(**ids)
+        case to.Intent.NO_SHOW:
+            c.mark_no_show.execute(**ids)
+        case to.Intent.NOTES:
+            c.write_clinical_notes.execute(text=incoming.comment or "", **ids)
+
+
+@router.put("/Appointment/{resource_id}")
+def update_appointment(request: HttpRequest, resource_id: str) -> HttpResponse:
+    identity = caller(request)
+    who = reader(request)
+    appointment_id = parse_id(resource_id)
+    row = _visible(appointment_id, who)
+    incoming = read_body(request, Appointment)
+    if incoming.id not in (None, resource_id):
+        raise invalid_field("Appointment.id", "L'id doit être celui de l'adresse.")
+    clinician_id, patient_id = row.clinician_id, row.patient_id
+    # Waitlist entries and holds change through their own interactions, if any.
+    if row.kind is not AppointmentKind.APPOINTMENT or clinician_id is None or patient_id is None:
+        raise to.refused_transition(row)
+
+    def write() -> None:
+        current = _visible(appointment_id, who)
+        changed = changes(
+            to.fields(to.appointment(current)), to.fields(incoming), writable=to.WRITABLE
+        )
+        if (intent := to.intent(current, changed, incoming)) is not None:
+            _apply(intent, identity.user_id, appointment_id, incoming)
+
+    container().conditional_writes.run(
+        target=WriteTarget.appointment(
+            clinician_id=clinician_id, patient_id=patient_id, appointment_id=row.id
+        ),
+        expected=expected_version(request.headers.get("If-Match")),
+        current=lambda: to.version_of(_visible(appointment_id, who)),
+        write=write,
+    )
+    row = _visible(appointment_id, who)
+    return resource_response(to.appointment(row), to.version_of(row))
