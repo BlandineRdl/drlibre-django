@@ -156,3 +156,27 @@
 - Phase 7 leftover (`0ad0256`): a clinician naming a practitioner they cannot resolve gets 403 `forbidden`, not 404; an unseen practitioner reaches `JoinWaitlist` as is, which refuses the caller first, then answers `not_found`.
 - Deviations: Communication `If-Match` locks the recipient's user row (`WriteTarget.user`), already raced in `test_concurrent_conditional_writes_postgres.py`, instead of a new notification lock; `received` takes the server's clock, as the portal does, and once filled is no longer writable (`invalid_input`); the admin guard is interop's `admin_only(reader)`, called by both `AuditEventQueries` adapters, so a search is `forbidden`, not empty; `AuditEvent.type` is the action's prefix, `subtype` the action, `source.observer` the display « DrLibre », a visitor or job agent is named « système » with `requestor` false, an unserved entity type (`session`, `time_off`, `api_token`) or a deleted user is an `identifier`; `entity` search takes any served `<Type>/<id>`, `entity-type` the product type; the `date` bounds helper moved from the Appointment router to `routing.instants`, shared with `sent`.
 - To record in `architecture.md` (phase 11): `Communication` and `AuditEvent` are read by interop SQL; only the admin reads `AuditEvent`.
+
+## Round 9
+- Head: `a0fa036`
+- Uncommitted changes: no (plan docs only)
+- Verdict: PASS for phase 9 scope
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 |  |
+| `uv run ruff format --check .` | 0 |  |
+| `uv run lint-imports` | 0 |  |
+| `uv run pyrefly check` | 0 |  |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | no migration: writes reuse the console's tables |
+| `uv run pytest tests/fhir tests/contracts tests/use_cases tests/api tests/presenters tests/integration/test_concurrent_conditional_writes_postgres.py tests/test_acceptance_names.py -q` | 0 | 1803 passed |
+| race test per reference target (hospital, department, room, appointment type, specialty) with the row lock removed | 1 | 5 tests fail, reverted |
+| mutant: `require_admin` lets anyone write | 1 | 7 scenarios fail, reverted |
+| mutant: the hospital description is dropped on write | 1 | 2 scenarios fail, reverted |
+| pre-commit hooks of `a0fa036` (Python Doctor 90 after removing a literal empty password) | 0 |  |
+| `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+- Every bullet of « L'admin gère le référentiel en FHIR » names a scenario; each write's audit trail (create, rename, delete) is compared entry by entry with the console doing the same, actor and metadata included, ids blanked; every element a client sends is read back, so an update from the read loses nothing.
+- Lock order: no organisation use case nor `SaveUser` takes a row lock (`records.py`, `save_user.py`; `RefreshSlots` takes none), so `If-Match` locks the record's own row (`WriteTarget.record`, new `Locked` members); `PractitionerRole` locks the profile as `lock_profile`, `Practitioner` and `Patient` the user row.
+- Deviations: the `ValueSet` stays read-only (POST, PUT, DELETE answer 405) and follows the `CodeSystem` writes, against the bullet « l'admin … `ValueSet` », to record in the PR and `open-questions.md`; writes are served by `routers/reference_writes.py` on the directory router (Ninja needs one router per path); `Organization` gains a `description` extension so a hospital or department round-trips; the profile's title is the write-only `title` extension of `PractitionerRole`, kept when absent, read on `Practitioner.name.prefix`; a staff user's role is the write-only `role` extension of `Practitioner` (`clinician` by default on create, kept when absent), so an admin is also created and their own role change refused there; an admin's `PractitionerRole` (id = user) is not writable (`invalid_input`, write the `Practitioner`); a site `Location` write is `invalid_input` « Le site s'écrit par son Organization `prov` »; admin updates refuse a changed phone or title (`invalid_input`), a patient's phone or birth date and a role's `availableTime` or `notAvailable` (`forbidden`, other role); computed elements (site `partOf`, type specialties, role services, department `active`) are ignored; deletes answer 204 without `If-Match`.
+- To record in `architecture.md` (phase 11): reference writes go through the console's use cases with `require_admin` at the FHIR door; `If-Match` on a reference record locks its own row.
