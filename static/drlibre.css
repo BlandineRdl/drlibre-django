@@ -216,3 +216,10 @@ td.nowrap { white-space: nowrap; }
 .week-nav h2 { flex: 1 1 100%; order: -1; margin: 0; font-size: 1.125rem; }
 @media (min-width: 768px) { .week-nav { flex-wrap: nowrap; } .week-nav h2 { flex: 1; order: 0; text-align: center; } }
 .week-nav a { white-space: nowrap; }
+.resend { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--dl-space-1); margin-top: var(--dl-space-4); color: var(--dl-muted); font-size: 0.9375rem; }
+button.link-button { width: auto; margin: 0; padding: 0; border: 0; background: none; color: var(--dl-primary); font-size: inherit; text-decoration: underline; text-underline-offset: 0.15em; }
+button.link-button:hover, button.link-button:focus-visible { background: none; color: var(--dl-text); }
+.explainer { background: var(--dl-surface); border: 1px solid var(--dl-border); border-radius: var(--dl-radius); padding: var(--dl-space-4); margin-bottom: var(--dl-space-5); }
+.explainer p { margin-bottom: var(--dl-space-2); font-weight: 600; }
+.explainer ol { margin: 0; padding-left: 1.25rem; }
+.explainer li { margin-bottom: var(--dl-space-1); }
