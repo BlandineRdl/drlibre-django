@@ -42,6 +42,8 @@ from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
 from tests.fakes.interop import (
     InMemoryAppointmentResponseQueries,
+    InMemoryAuditEventQueries,
+    InMemoryCommunicationQueries,
     InMemoryConditionalWrites,
     InMemoryInteropAppointmentQueries,
     InMemoryPatientQueries,
@@ -289,6 +291,10 @@ class FakeWorld:
             appointment_responses=InMemoryAppointmentResponseQueries(
                 waitlist=self.waitlist, clock=self.clock
             ),
+            communications=InMemoryCommunicationQueries(
+                notifications=self.notifications, users=self.users
+            ),
+            audit_events=InMemoryAuditEventQueries(log=self.audit, users=self.users),
             conditional_writes=InMemoryConditionalWrites(),
             admins=InMemoryAdmins(self.users),
             journal_actors=InMemoryJournalActors(self.users),

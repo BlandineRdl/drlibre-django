@@ -1,8 +1,5 @@
 from collections.abc import Iterable
-from datetime import date, datetime, time, timedelta
-from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from ninja import Router
 
@@ -15,10 +12,7 @@ from drlibre.interfaces.fhir.mappers import directory
 from drlibre.interfaces.fhir.mappers import patient as patients
 from drlibre.interfaces.fhir.outcome import fhir_response
 from drlibre.interfaces.fhir.params import (
-    DateBound,
-    Prefix,
     SearchQuery,
-    date_bound,
     refuse_undeclared,
     search_query,
 )
@@ -34,6 +28,7 @@ from drlibre.interfaces.fhir.routers.patients import PATIENT
 from drlibre.interfaces.fhir.routing import (
     bundle_response,
     entries_of,
+    instants,
     missing,
     parse_id,
     read_body,
@@ -83,7 +78,6 @@ APPOINTMENT = declare(
         sorts=("date",),
     )
 )
-_AFTER = timedelta(microseconds=1)
 
 
 def _visible(appointment_id: Id, who: Reader) -> AppointmentRow:
@@ -103,33 +97,6 @@ def read_appointment(request: HttpRequest, resource_id: str) -> HttpResponse:
     refuse_undeclared(request.GET, frozenset())
     row = _visible(parse_id(resource_id), reader(request))
     return resource_response(to.appointment(row), to.version_of(row))
-
-
-def _interval(bound: DateBound) -> tuple[datetime, datetime]:
-    """The instants a day, read in the hospital zone, or an instant stands for."""
-    if isinstance(bound.value, datetime):
-        return bound.value, bound.value + _AFTER
-    day: date = bound.value
-    zone = ZoneInfo(settings.TIME_ZONE)
-    first = datetime.combine(day, time(), tzinfo=zone)
-    return first, datetime.combine(day + timedelta(days=1), time(), tzinfo=zone)
-
-
-def _dates(query: SearchQuery) -> tuple[datetime | None, datetime | None]:
-    """The `date` bounds as a start from (included) and before (excluded)."""
-    start_from = start_before = None
-    for raw in query.values("date"):
-        bound = date_bound("date", raw)
-        first, after = _interval(bound)
-        if bound.prefix in (Prefix.EQ, Prefix.GE):
-            start_from = first
-        if bound.prefix is Prefix.GT:
-            start_from = after
-        if bound.prefix in (Prefix.EQ, Prefix.LE):
-            start_before = after
-        if bound.prefix is Prefix.LT:
-            start_before = first
-    return start_from, start_before
 
 
 def _statuses(query: SearchQuery) -> tuple[tuple[str, str], ...]:
@@ -180,7 +147,7 @@ def search_appointment(request: HttpRequest) -> HttpResponse:
     caller(request)
     query = search_query(request.GET, APPOINTMENT)
     who = reader(request)
-    start_from, start_before = _dates(query)
+    start_from, start_before = instants(query, "date")
     criteria = AppointmentFilter(
         patient=reference(query, "patient", "Patient"),
         practitioner=reference(query, "practitioner", "Practitioner"),

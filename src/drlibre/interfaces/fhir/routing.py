@@ -1,14 +1,24 @@
 """Helpers every FHIR router shares: rendering, reading ids and search tokens, parsing bodies."""
 
 from collections.abc import Callable, Sequence
+from datetime import date, datetime, time, timedelta
 from typing import Any, Protocol
+from zoneinfo import ZoneInfo
 
 import pydantic
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
 from drlibre.interfaces.fhir.bundle import entry, searchset
 from drlibre.interfaces.fhir.outcome import fhir_response
-from drlibre.interfaces.fhir.params import SearchQuery, reference_id, refuse_undeclared
+from drlibre.interfaces.fhir.params import (
+    DateBound,
+    Prefix,
+    SearchQuery,
+    date_bound,
+    reference_id,
+    refuse_undeclared,
+)
 from drlibre.interfaces.fhir.registry import ResourceRules
 from drlibre.interfaces.fhir.schemas.bundle import BundleEntry
 from drlibre.interfaces.fhir.schemas.common import FhirModel
@@ -21,6 +31,7 @@ from drlibre.shared_kernel.validation import invalid_field
 
 ACCEPTED_BODIES = frozenset({"application/fhir+json", "application/json"})
 _BOOLEANS = {"true": True, "false": False}
+_AFTER = timedelta(microseconds=1)
 
 
 def json_of(model: FhirModel) -> dict[str, Any]:
@@ -95,6 +106,33 @@ def reference(query: SearchQuery, name: str, *types: str) -> Id | None:
         return Id.parse(found)
     except ValueError as error:
         raise invalid_field(name, f"Saisissez une référence {types[0]}/<id>.") from error
+
+
+def _interval(bound: DateBound) -> tuple[datetime, datetime]:
+    """The instants a day, read in the hospital zone, or an instant stands for."""
+    if isinstance(bound.value, datetime):
+        return bound.value, bound.value + _AFTER
+    day: date = bound.value
+    zone = ZoneInfo(settings.TIME_ZONE)
+    first = datetime.combine(day, time(), tzinfo=zone)
+    return first, datetime.combine(day + timedelta(days=1), time(), tzinfo=zone)
+
+
+def instants(query: SearchQuery, name: str) -> tuple[datetime | None, datetime | None]:
+    """A date parameter's bounds as an instant from (included) and before (excluded)."""
+    start_from = start_before = None
+    for raw in query.values(name):
+        bound = date_bound(name, raw)
+        first, after = _interval(bound)
+        if bound.prefix in (Prefix.EQ, Prefix.GE):
+            start_from = first
+        if bound.prefix is Prefix.GT:
+            start_from = after
+        if bound.prefix in (Prefix.EQ, Prefix.LE):
+            start_before = after
+        if bound.prefix is Prefix.LT:
+            start_before = first
+    return start_from, start_before
 
 
 class _Identified(Protocol):

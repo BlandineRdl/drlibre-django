@@ -21,8 +21,14 @@ class CodeableConcept(FhirModel):
     text: str | None = None
 
 
+class Identifier(FhirModel):
+    system: str | None = None
+    value: str
+
+
 class Reference(FhirModel):
     reference: str | None = None
+    identifier: Identifier | None = None
     display: str | None = None
 
 
@@ -40,11 +46,6 @@ class Extension(FhirModel):
 class Meta(FhirModel):
     version_id: str | None = None
     last_updated: datetime | None = None
-
-
-class Identifier(FhirModel):
-    system: str | None = None
-    value: str
 
 
 class Period(FhirModel):

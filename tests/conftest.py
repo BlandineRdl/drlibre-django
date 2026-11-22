@@ -23,6 +23,7 @@ pytest_plugins = [
     "tests.fhir.appointment_steps",
     "tests.fhir.appointment_update_steps",
     "tests.fhir.waitlist_steps",
+    "tests.fhir.notification_audit_steps",
     "tests.use_cases.booking.steps_scene",
     "tests.use_cases.booking.steps_holds",
     "tests.use_cases.booking.steps_changes",

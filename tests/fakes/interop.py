@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Callable, Iterable, Iterator
 
 from drlibre.booking.domain.appointment import Appointment
@@ -11,6 +12,13 @@ from drlibre.interop.application.ports.inbound import (
     AppointmentResponseQueries,
     AppointmentResponseRow,
     AppointmentRow,
+    AuditAction,
+    AuditEventFilter,
+    AuditEventQueries,
+    AuditEventRow,
+    CommunicationFilter,
+    CommunicationQueries,
+    CommunicationRow,
     ConditionalWrites,
     InteropAppointmentQueries,
     Paging,
@@ -22,10 +30,13 @@ from drlibre.interop.application.ports.inbound import (
     StaleVersionError,
     WriteTarget,
 )
+from drlibre.interop.domain.reader import admin_only
 from drlibre.shared_kernel.clock import Clock
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page
+from tests.fakes.audit_log import InMemoryAuditLog
 from tests.fakes.booking import InMemoryAppointments, InMemoryHolds, InMemoryWaitlist
+from tests.fakes.notifications import InMemoryNotifications
 from tests.fakes.organisation import InMemoryClinicianProfiles
 from tests.fakes.users import InMemoryUsers
 
@@ -222,3 +233,92 @@ class InMemoryAppointmentResponseQueries(AppointmentResponseQueries):
 
     def exists(self, response_id: Id) -> bool:
         return any(r.id == response_id for r in self._rows())
+
+
+def _page[T](found: list[T], paging: Paging | None) -> Page[T]:
+    if paging is None:
+        return Page(tuple(found), len(found), 1)
+    return Page(tuple(found[paging.offset : paging.offset + paging.count]), len(found), paging.page)
+
+
+class InMemoryCommunicationQueries(CommunicationQueries):
+    """Notifications of the fake store, stamped when last read or sent."""
+
+    def __init__(self, *, notifications: InMemoryNotifications, users: InMemoryUsers) -> None:
+        self._notifications = notifications
+        self._users = users
+
+    def _rows(self) -> Iterator[CommunicationRow]:
+        for n in self._notifications.rows:
+            user = self._users.get(n.recipient_id)
+            yield CommunicationRow(
+                n.id, n.recipient_id, user.role.value if user else None, n.kind.value, n.title,
+                n.body, n.appointment_id, n.created_at, n.read_at, n.read_at or n.created_at,
+            )  # fmt: skip
+
+    def communications(
+        self, criteria: CommunicationFilter, reader: Reader, paging: Paging | None = None
+    ) -> Page[CommunicationRow]:
+        c = criteria
+        found = sorted(
+            (
+                r
+                for r in self._rows()
+                if reader.user_id is not None
+                and r.recipient_id == reader.user_id
+                and (not c.ids or r.id in c.ids)
+                and c.recipient in (None, r.recipient_id)
+                and c.category in (None, r.kind)
+                and (c.sent_from is None or r.sent >= c.sent_from)
+                and (c.sent_before is None or r.sent < c.sent_before)
+            ),
+            key=lambda r: (r.sent, str(r.id)),
+            reverse=bool(paging and paging.descending),
+        )
+        return _page(found, paging)
+
+    def exists(self, communication_id: Id) -> bool:
+        return any(r.id == communication_id for r in self._rows())
+
+
+class InMemoryAuditEventQueries(AuditEventQueries):
+    """Entries of the fake audit log, each given an id from its position."""
+
+    def __init__(self, *, log: InMemoryAuditLog, users: InMemoryUsers) -> None:
+        self._log = log
+        self._users = users
+
+    def _role(self, user_id: Id | None) -> str | None:
+        user = self._users.get(user_id) if user_id else None
+        return user.role.value if user else None
+
+    def _rows(self) -> Iterator[AuditEventRow]:
+        entries = zip(self._log.entries, self._log.correlation_ids, strict=True)
+        for index, (e, correlation) in enumerate(entries):
+            target = self._role(e.entity_id) if e.entity_type == "user" else None
+            yield AuditEventRow(
+                Id(uuid.UUID(int=index + 1)), e.actor, self._role(e.actor), e.action,
+                e.entity_type, e.entity_id, target, tuple(sorted(e.metadata)), e.at, correlation,
+            )  # fmt: skip
+
+    def events(
+        self, criteria: AuditEventFilter, reader: Reader, paging: Paging | None = None
+    ) -> Page[AuditEventRow]:
+        admin_only(reader)
+        c = criteria
+        found = sorted(
+            (
+                r
+                for r in self._rows()
+                if (not c.ids or r.id in c.ids)
+                and c.agent in (None, r.actor_id)
+                and c.entity in (None, r.entity_id)
+                and c.entity_type in (None, r.entity_type)
+                and (not c.actions or AuditAction.of(r.action) in c.actions)
+                and (c.at_from is None or r.at >= c.at_from)
+                and (c.at_before is None or r.at < c.at_before)
+            ),
+            key=lambda r: (r.at, str(r.id)),
+            reverse=bool(paging and paging.descending),
+        )
+        return _page(found, paging)

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
+from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 
 
@@ -30,3 +31,9 @@ class Reader:
     @property
     def is_staff(self) -> bool:
         return self.kind is ReaderKind.CLINICIAN or self.kind is ReaderKind.ADMIN
+
+
+def admin_only(reader: Reader) -> None:
+    """Only the admin reads the audit journal, as on screen; anyone else is forbidden."""
+    if not reader.is_admin:
+        raise DomainError(ErrorCode.FORBIDDEN, "Seul l'admin consulte le journal d'audit.")

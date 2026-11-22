@@ -172,7 +172,7 @@ def _number(paging: Paging | None) -> int:
     return paging.page if paging else 1
 
 
-def _loaded(value: Any) -> Any:
+def loaded(value: Any) -> Any:
     """Django leaves json and jsonb columns as text."""
     return json.loads(value) if isinstance(value, str) else value
 
@@ -221,7 +221,7 @@ def _room(row: Row) -> RoomRow:
         code=row["code"],
         floor=row["floor"],
         capacity=row["capacity"],
-        equipment=tuple(_loaded(row["equipment"])),
+        equipment=tuple(loaded(row["equipment"])),
         active=row["active"],
         updated_at=row["updated_at"],
     )
@@ -248,7 +248,7 @@ def _role(row: Row, reader: Reader) -> RoleRow:
                 end=time.fromisoformat(a["end"]),
                 updated_at=datetime.fromisoformat(a["updated_at"]),
             )
-            for a in _loaded(row["availability"])
+            for a in loaded(row["availability"])
         ),
         time_offs=tuple(
             TimeOffRow(
@@ -258,7 +258,7 @@ def _role(row: Row, reader: Reader) -> RoleRow:
                 reason=o["reason"] if reader.is_staff else None,
                 updated_at=datetime.fromisoformat(o["updated_at"]),
             )
-            for o in _loaded(row["time_offs"])
+            for o in loaded(row["time_offs"])
         ),
         updated_at=row["updated_at"],
     )

@@ -6,6 +6,9 @@ from typing import Protocol
 from drlibre.interop.domain.filters import (
     AppointmentFilter,
     AppointmentResponseFilter,
+    AuditAction,
+    AuditEventFilter,
+    CommunicationFilter,
     LocationFilter,
     LocationKind,
     Near,
@@ -25,7 +28,10 @@ from drlibre.interop.domain.rows import (
     AppointmentKind,
     AppointmentResponseRow,
     AppointmentRow,
+    AuditDetail,
+    AuditEventRow,
     AvailabilityRow,
+    CommunicationRow,
     DepartmentRow,
     HospitalRow,
     PatientRow,
@@ -49,7 +55,15 @@ __all__ = [
     "AppointmentResponseQueries",
     "AppointmentResponseRow",
     "AppointmentRow",
+    "AuditAction",
+    "AuditDetail",
+    "AuditEventFilter",
+    "AuditEventQueries",
+    "AuditEventRow",
     "AvailabilityRow",
+    "CommunicationFilter",
+    "CommunicationQueries",
+    "CommunicationRow",
     "ConditionalWrites",
     "DepartmentRow",
     "DirectoryQueries",
@@ -170,6 +184,26 @@ class AppointmentResponseQueries(Protocol):
 
     def exists(self, response_id: Id) -> bool:
         """Whether a booked entry has that id, whoever reads."""
+        ...
+
+
+class CommunicationQueries(Protocol):
+    def communications(
+        self, criteria: CommunicationFilter, reader: Reader, paging: Paging | None = None
+    ) -> Page[CommunicationRow]:
+        """The reader's own notifications by sending; none for a visitor."""
+        ...
+
+    def exists(self, communication_id: Id) -> bool:
+        """Whether a notification has that id, whoever reads."""
+        ...
+
+
+class AuditEventQueries(Protocol):
+    def events(
+        self, criteria: AuditEventFilter, reader: Reader, paging: Paging | None = None
+    ) -> Page[AuditEventRow]:
+        """Audit entries by time, for the admin only; anyone else is forbidden."""
         ...
 
 

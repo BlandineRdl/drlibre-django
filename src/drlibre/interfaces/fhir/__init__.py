@@ -15,6 +15,8 @@ from drlibre.interfaces.fhir.routers.appointment_responses import (
     router as appointment_responses_router,
 )
 from drlibre.interfaces.fhir.routers.appointments import router as appointments_router
+from drlibre.interfaces.fhir.routers.audit_events import router as audit_events_router
+from drlibre.interfaces.fhir.routers.communications import router as communications_router
 from drlibre.interfaces.fhir.routers.directory import router as directory_router
 from drlibre.interfaces.fhir.routers.patients import router as patients_router
 from drlibre.interfaces.fhir.routers.slots import router as slots_router
@@ -48,6 +50,8 @@ fhir.add_router("/", slots_router)
 fhir.add_router("/", patients_router)
 fhir.add_router("/", appointments_router)
 fhir.add_router("/", appointment_responses_router)
+fhir.add_router("/", communications_router)
+fhir.add_router("/", audit_events_router)
 
 
 @fhir.exception_handler(DomainError)

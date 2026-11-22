@@ -216,6 +216,8 @@ from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
 from drlibre.interop.application.ports.inbound import (
     AppointmentResponseQueries,
+    AuditEventQueries,
+    CommunicationQueries,
     ConditionalWrites,
     DirectoryQueries,
     InteropAppointmentQueries,
@@ -227,6 +229,8 @@ from drlibre.interop.infrastructure.sql_appointment_responses import (
     SqlAppointmentResponseQueries,
 )
 from drlibre.interop.infrastructure.sql_appointments import SqlInteropAppointmentQueries
+from drlibre.interop.infrastructure.sql_audit_events import SqlAuditEventQueries
+from drlibre.interop.infrastructure.sql_communications import SqlCommunicationQueries
 from drlibre.interop.infrastructure.sql_directory import SqlDirectoryQueries
 from drlibre.interop.infrastructure.sql_patients import SqlPatientQueries
 from drlibre.interop.infrastructure.sql_readers import SqlReaders
@@ -482,6 +486,8 @@ class Adapters:
     patient_queries: PatientQueries
     interop_appointments: InteropAppointmentQueries
     appointment_responses: AppointmentResponseQueries
+    communications: CommunicationQueries
+    audit_events: AuditEventQueries
     conditional_writes: ConditionalWrites
     admins: Admins
     journal_actors: JournalActors
@@ -510,6 +516,8 @@ class Container:
     patient_queries: PatientQueries
     interop_appointments: InteropAppointmentQueries
     appointment_responses: AppointmentResponseQueries
+    communications: CommunicationQueries
+    audit_events: AuditEventQueries
     conditional_writes: ConditionalWrites
     change_password: ChangePassword
     update_profile: UpdateProfile
@@ -681,6 +689,8 @@ def wire(a: Adapters) -> Container:
         patient_queries=a.patient_queries,
         interop_appointments=a.interop_appointments,
         appointment_responses=a.appointment_responses,
+        communications=a.communications,
+        audit_events=a.audit_events,
         conditional_writes=a.conditional_writes,
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
@@ -1312,6 +1322,8 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         patient_queries=SqlPatientQueries(),
         interop_appointments=SqlInteropAppointmentQueries(clock=clock),
         appointment_responses=SqlAppointmentResponseQueries(),
+        communications=SqlCommunicationQueries(),
+        audit_events=SqlAuditEventQueries(),
         conditional_writes=DjangoConditionalWrites(),
         admins=IdentityAdmins(user_queries),
         journal_actors=IdentityJournalActors(users=user_queries, staff=user_queries),

@@ -138,3 +138,49 @@ class AppointmentResponseFilter:
 
     ids: tuple[Id, ...] = ()
     patient: Id | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CommunicationFilter:
+    """`category` is a notification kind; `sent` lies from `sent_from` to `sent_before` excluded."""
+
+    ids: tuple[Id, ...] = ()
+    recipient: Id | None = None
+    category: str | None = None
+    sent_from: datetime | None = None
+    sent_before: datetime | None = None
+
+
+class AuditAction(StrEnum):
+    """FHIR `AuditEvent.action`, read from the product action's suffix; E for any other."""
+
+    CREATE = "C"
+    READ = "R"
+    UPDATE = "U"
+    DELETE = "D"
+    EXECUTE = "E"
+
+    @classmethod
+    def of(cls, action: str) -> "AuditAction":
+        suffix = action.rpartition(".")[2]
+        return _SUFFIXES.get(suffix, cls.EXECUTE)
+
+
+_SUFFIXES = {
+    "created": AuditAction.CREATE,
+    "updated": AuditAction.UPDATE,
+    "deleted": AuditAction.DELETE,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class AuditEventFilter:
+    """`agent` is the actor's user; `at` lies from `at_from` to `at_before` excluded."""
+
+    ids: tuple[Id, ...] = ()
+    agent: Id | None = None
+    entity: Id | None = None
+    entity_type: str | None = None
+    actions: tuple[AuditAction, ...] = ()
+    at_from: datetime | None = None
+    at_before: datetime | None = None

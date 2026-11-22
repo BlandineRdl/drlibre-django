@@ -206,3 +206,38 @@ class AppointmentResponseRow:
     id: Id
     patient_id: Id
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class CommunicationRow:
+    """A notification, as its recipient reads it; `recipient_role` is their identity role."""
+
+    id: Id
+    recipient_id: Id
+    recipient_role: str | None
+    kind: str
+    title: str
+    body: str
+    appointment_id: Id | None
+    sent: datetime
+    received: datetime | None
+    updated_at: datetime
+
+
+type AuditDetail = str | int | bool | tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AuditEventRow:
+    """An audit entry; the roles name the actor's and a user entity's, None when unknown."""
+
+    id: Id
+    actor_id: Id | None
+    actor_role: str | None
+    action: str
+    entity_type: str
+    entity_id: Id | None
+    entity_role: str | None
+    metadata: tuple[tuple[str, AuditDetail], ...]
+    at: datetime
+    correlation_id: str
