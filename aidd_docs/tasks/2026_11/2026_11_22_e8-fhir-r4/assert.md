@@ -133,3 +133,26 @@
 - Every bullet of « Un patient rejoint la liste d'attente et accepte une offre en FHIR » names a scenario; join and accept refusals are replayed on `POST /api/v1/waitlist` and `/waitlist/{id}/accept` with the same token (same status, code and, but for `invalid_input`, details); audit, notification and emails of a FHIR acceptance are compared with an API one, ids left out.
 - Deviations: `JoinWaitlist` gains `patient_id` (FHIR names a `Patient/<id>`), unknown or inactive → `not_found` as by email; the port is `AppointmentResponseQueries` (rule 0-ports), not `AppointmentResponseReads`; `AppointmentResponse.actor` is the server's, ignored on create like `Appointment.end`; only `participantStatus` `accepted` is created; a clinician reads no `AppointmentResponse` (`forbidden`), as the Story names the patient and the admin; search declares `patient` and `appointment`; `requestedPeriod` is written as dates and read back as instants (midnights of the type's zone, the end exclusive); a `conflict` is not replayed on the API, since the entry is back to `WAITING` and would answer `invalid_transition`.
 - To record in `architecture.md` (phase 11): an accepted entry and its appointment share one id; `SqlAppointmentResponseQueries` serves `BOOKED` entries.
+
+## Round 8
+- Head: `4c0ca45`
+- Uncommitted changes: no (plan docs only)
+- Verdict: PASS for phase 8 scope
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 |  |
+| `uv run ruff format --check .` | 0 |  |
+| `uv run lint-imports` | 0 |  |
+| `uv run pyrefly check` | 0 |  |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | no migration: both resources read existing tables |
+| `uv run pytest tests/fhir tests/contracts tests/use_cases tests/api tests/presenters tests/integration/test_concurrent_conditional_writes_postgres.py tests/test_acceptance_names.py -q` | 0 | 1757 passed |
+| mutant: `received` writable once read | 1 | 1 scenario fails, reverted |
+| mutant: `admin_only` lets anyone read | 1 | 8 tests fail, reverted |
+| pre-commit hooks of `4c0ca45` and `0ad0256` (Python Doctor included) | 0 |  |
+| `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+- Every bullet of « Un client lit les notifications de son utilisateur en FHIR » and « L'admin consulte le journal d'audit en FHIR » names a scenario; a reading filled in FHIR shows read on `/portal/notifications` and is audited `notification.read` as there; audit events are compared field by field with `audit_auditentryrecord`, and no person's email or name appears in them.
+- Phase 7 leftover (`0ad0256`): a clinician naming a practitioner they cannot resolve gets 403 `forbidden`, not 404; an unseen practitioner reaches `JoinWaitlist` as is, which refuses the caller first, then answers `not_found`.
+- Deviations: Communication `If-Match` locks the recipient's user row (`WriteTarget.user`), already raced in `test_concurrent_conditional_writes_postgres.py`, instead of a new notification lock; `received` takes the server's clock, as the portal does, and once filled is no longer writable (`invalid_input`); the admin guard is interop's `admin_only(reader)`, called by both `AuditEventQueries` adapters, so a search is `forbidden`, not empty; `AuditEvent.type` is the action's prefix, `subtype` the action, `source.observer` the display « DrLibre », a visitor or job agent is named « système » with `requestor` false, an unserved entity type (`session`, `time_off`, `api_token`) or a deleted user is an `identifier`; `entity` search takes any served `<Type>/<id>`, `entity-type` the product type; the `date` bounds helper moved from the Appointment router to `routing.instants`, shared with `sent`.
+- To record in `architecture.md` (phase 11): `Communication` and `AuditEvent` are read by interop SQL; only the admin reads `AuditEvent`.
