@@ -33,3 +33,20 @@
 | `uv run pytest tests/test_acceptance_names.py -q` | 1 | `bullets without a scenario`: token story (4 bullets, phases 4 to 8); « sans jeton » story: `Slot` (phase 3) and « toute écriture renvoie `unauthenticated` » (no write declared before phase 4: an undeclared write answers 405 first) |
 | pre-commit hooks of `5f4ddfd` (Python Doctor 90 after fixes) | 0 | |
 | `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+## Round 3
+- Head: `290bc45`
+- Uncommitted changes: yes
+- Verdict: FAIL
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 | |
+| `uv run ruff format --check .` | 0 | |
+| `uv run lint-imports` | 0 | |
+| `uv run pyrefly check` | 0 | |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | |
+| `uv run pytest tests/fhir tests/use_cases tests/properties tests/contracts tests/api tests/presenters -q` | 0 | |
+| `uv run pytest tests/test_acceptance_names.py -q` | 1 | `bullets without a scenario`: token story (4 bullets, phases 4 to 8); « sans jeton » story: « toute écriture renvoie `unauthenticated` » (no write declared before phase 4); the `Slot` bullets are covered |
+| pre-commit hooks of `290bc45` (Python Doctor included) | 0 | |
+| `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
