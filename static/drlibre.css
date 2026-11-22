@@ -204,3 +204,5 @@ td.nowrap { white-space: nowrap; }
   .facts, .profile-identity { display: grid; grid-template-columns: minmax(9rem, max-content) 1fr; gap: var(--dl-space-2) var(--dl-space-5); align-items: baseline; background: var(--dl-surface); border: 1px solid var(--dl-border); border-radius: var(--dl-radius); padding: var(--dl-space-4); max-width: 48rem; }
   .facts dd, .profile-identity dd { margin: 0; }
 }
+.active-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dl-space-2); }
+.active-filter .badge { white-space: normal; color: var(--dl-primary); background: #e8f1f7; border-color: #b9d3e3; }

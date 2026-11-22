@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from urllib.parse import urlencode
 
@@ -130,6 +130,8 @@ class SearchView:
     zone_note: str
     heading: str
     has_filters: bool
+    distance_note: str = ""
+    clear_distance_url: str = ""
 
 
 def search_url(criteria: SearchCriteria, kind: Kind, *, page: int | None = None) -> str:
@@ -170,8 +172,8 @@ def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
-def _distance(km: float | None) -> str:
-    return f"à {km:.0f} km" if km is not None else ""
+def _near(text: str, km: float | None) -> str:
+    return f"{text} · à {km:.0f} km" if km is not None else text
 
 
 def _first_slot_view(
@@ -202,8 +204,7 @@ def provider_result(item: ProviderResult) -> ResultView:
     place = f"{item.hospital_name} · {item.department_name} · {item.city}"
     lines = (
         f"{item.title} · {item.specialty_name}",
-        place,
-        *((_distance(item.distance_km),) if item.distance_km is not None else ()),
+        _near(place, item.distance_km),
         f"Heures de {item.time_zone}",
     )
     return ResultView(
@@ -223,10 +224,9 @@ def provider_result(item: ProviderResult) -> ResultView:
 def hospital_result(item: HospitalResult) -> ResultView:
     heading, slots = _first_slot_view(item.first_slot, item.time_zone)
     lines = (
-        f"{item.street}, {item.postal_code} {item.city}",
+        _near(f"{item.street}, {item.postal_code} {item.city}", item.distance_km),
         f"Spécialités : {', '.join(item.specialties)}",
         _plural(item.providers, "praticien réservable", "praticiens réservables"),
-        *((_distance(item.distance_km),) if item.distance_km is not None else ()),
         f"Heures de {item.time_zone}",
     )
     if slots:
@@ -254,7 +254,7 @@ def specialty_result(item: SpecialtyResult) -> ResultView:
     heading, slots = _first_slot_view(item.first_slot, zone) if item.time_zone else ("", ())
     lines = (
         _plural(item.providers, "praticien", "praticiens"),
-        _plural(item.hospitals, "hôpital", "hôpitaux"),
+        _near(_plural(item.hospitals, "hôpital", "hôpitaux"), item.distance_km),
         *((f"Heures de {zone}",) if slots else ()),
     )
     return ResultView(
@@ -371,7 +371,24 @@ def search_view(
             or criteria.appointment_type
             or criteria.has_time_filter
         ),
+        distance_note=_distance_note(criteria),
+        clear_distance_url=search_url(_without_location(criteria), kind)
+        if criteria.location
+        else "",
     )
+
+
+def _distance_note(criteria: SearchCriteria) -> str:
+    if not criteria.location:
+        return ""
+    if criteria.sort is Sort.DISTANCE:
+        return "Triés du plus proche au plus loin de votre position"
+    return "Distances depuis votre position"
+
+
+def _without_location(criteria: SearchCriteria) -> SearchCriteria:
+    sort = Sort.SOONEST if criteria.sort is Sort.DISTANCE else criteria.sort
+    return replace(criteria, location=None, sort=sort, page=1)
 
 
 def _id(value: object) -> str:

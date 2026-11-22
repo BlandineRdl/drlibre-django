@@ -54,6 +54,7 @@
     <button type="button" id="geo-button" class="secondary outline" hidden>Trier par distance</button>
   </div>
   <p id="geo-status" role="status"></p>
+  {% if view.distance_note %}<p class="active-filter"><span class="badge">{{ view.distance_note }}</span> <a href="{{ view.clear_distance_url }}">Retirer ma position</a></p>{% endif %}
 </form>
 </search>
 <nav aria-label="Type de résultat">

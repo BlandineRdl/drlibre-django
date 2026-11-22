@@ -97,6 +97,10 @@ Feature: Le visiteur filtre et trie les résultats
     When the visitor opens "/?sort=distance&lat=50.63&lon=3.06"
     Then the page says "Distance la plus courte"
     And the page says "à 0 km"
+    And the page says "Lille · à 0 km"
+    And the page says "Triés du plus proche au plus loin de votre position"
+    When the visitor opens "/?q=nord&sort=distance&lat=50.63&lon=3.06"
+    Then the page links to "/?q=nord"
 
   Scenario: Filtres et tri vivent dans l'adresse de la page, et les trois `GET /search/providers`, `/search/hospitals`, `/search/specialties` les acceptent.
     When the visitor opens "/?q=dr&window=7d&moment=afternoon&sort=name-desc&size=10"
