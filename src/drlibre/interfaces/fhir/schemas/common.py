@@ -28,13 +28,42 @@ class Reference(FhirModel):
 
 class Extension(FhirModel):
     url: str
+    extension: tuple["Extension", ...] | None = None
     value_string: str | None = None
     value_boolean: bool | None = None
     value_integer: int | None = None
     value_decimal: float | None = None
     value_code: str | None = None
+    value_time: str | None = None
 
 
 class Meta(FhirModel):
     version_id: str | None = None
     last_updated: datetime | None = None
+
+
+class Identifier(FhirModel):
+    system: str | None = None
+    value: str
+
+
+class Period(FhirModel):
+    start: str | None = None
+    end: str | None = None
+
+
+class HumanName(FhirModel):
+    text: str
+    prefix: tuple[str, ...] | None = None
+
+
+class ContactPoint(FhirModel):
+    system: str
+    value: str
+
+
+class Address(FhirModel):
+    line: tuple[str, ...] | None = None
+    city: str | None = None
+    postal_code: str | None = None
+    country: str | None = None

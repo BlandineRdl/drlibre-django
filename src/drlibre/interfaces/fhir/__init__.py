@@ -2,7 +2,7 @@ from functools import wraps
 from typing import Any
 
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBase
-from django.urls import URLPattern
+from django.urls import URLPattern, re_path
 from ninja import NinjaAPI
 from ninja.errors import ValidationError
 from ninja.parser import Parser
@@ -11,6 +11,7 @@ from ninja.renderers import JSONRenderer
 from drlibre.interfaces.fhir.access import gate
 from drlibre.interfaces.fhir.metadata import router as metadata_router
 from drlibre.interfaces.fhir.outcome import error_outcome, not_supported
+from drlibre.interfaces.fhir.routers.directory import router as directory_router
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 _ACCEPTED = frozenset({"application/fhir+json", "application/json"})
@@ -39,6 +40,7 @@ fhir = NinjaAPI(
     openapi_url=None,
 )
 fhir.add_router("/", metadata_router)
+fhir.add_router("/", directory_router)
 
 
 @fhir.exception_handler(DomainError)
@@ -71,8 +73,12 @@ def _outcome_when_not_allowed(view: Any) -> Any:
     return guarded
 
 
+def unknown_path(request: HttpRequest, path: str) -> HttpResponse:
+    return error_outcome(DomainError(ErrorCode.NOT_FOUND, "Ressource introuvable."))
+
+
 def urls() -> tuple[list[URLPattern], str, str]:
-    """Ninja's routes, its bare 405 on an undeclared interaction made an OperationOutcome."""
+    """Ninja's routes, a bare 405 or an unknown path made an OperationOutcome."""
     patterns, app_name, namespace = fhir.urls
     wrapped = []
     for p in patterns:
@@ -81,4 +87,5 @@ def urls() -> tuple[list[URLPattern], str, str]:
         wrapped.append(
             URLPattern(p.pattern, _outcome_when_not_allowed(p.callback), p.default_args, p.name)
         )
+    wrapped.append(re_path(r"^(?P<path>.*)$", unknown_path))
     return wrapped, app_name, namespace

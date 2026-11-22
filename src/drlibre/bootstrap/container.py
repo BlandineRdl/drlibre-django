@@ -214,7 +214,8 @@ from drlibre.identity.infrastructure.repositories import (
 from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
-from drlibre.interop.application.ports.inbound import Readers
+from drlibre.interop.application.ports.inbound import DirectoryQueries, Readers
+from drlibre.interop.infrastructure.sql_directory import SqlDirectoryQueries
 from drlibre.interop.infrastructure.sql_readers import SqlReaders
 from drlibre.notifications.application.ports.inbound import (
     CountUnread,
@@ -457,6 +458,7 @@ class Adapters:
     search_queries: SearchQueries
     activity_queries: ActivityQueries
     readers: Readers
+    directory_queries: DirectoryQueries
     admins: Admins
     journal_actors: JournalActors
     notifications: Notifications
@@ -480,6 +482,7 @@ class Container:
     revoke_api_tokens: RevokeApiTokens
     authenticate_token: AuthenticateToken
     readers: Readers
+    directory_queries: DirectoryQueries
     change_password: ChangePassword
     update_profile: UpdateProfile
     save_hospital: SaveHospital
@@ -628,6 +631,7 @@ def wire(a: Adapters) -> Container:
             clock=clock, users=a.users, api_tokens=a.api_tokens
         ),
         readers=a.readers,
+        directory_queries=a.directory_queries,
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
         ),
@@ -1250,6 +1254,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         search_queries=SqlSearchQueries(),
         activity_queries=SqlActivityQueries(),
         readers=SqlReaders(),
+        directory_queries=SqlDirectoryQueries(),
         admins=IdentityAdmins(user_queries),
         journal_actors=IdentityJournalActors(users=user_queries, staff=user_queries),
         notifications=notifications,

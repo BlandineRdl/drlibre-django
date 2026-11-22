@@ -36,6 +36,7 @@ from tests.fakes.booking_options import InMemoryBookingOptionQueries
 from tests.fakes.clinician_agenda import InMemoryClinicianAgenda
 from tests.fakes.clock import FixedClock
 from tests.fakes.database_probe import InMemoryDatabaseProbe
+from tests.fakes.directory import InMemoryDirectoryQueries
 from tests.fakes.email_outbox import RecordingEmailOutbox
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 from tests.fakes.in_memory_mailer import InMemoryMailer
@@ -142,6 +143,18 @@ class FakeWorld:
             holds=self.holds,
         )
         self.notifications = InMemoryNotifications()
+        self.directory_queries = InMemoryDirectoryQueries(
+            hospitals=self.hospitals,
+            departments=self.departments,
+            rooms=self.rooms,
+            appointment_types=self.appointment_types,
+            specialties=self.specialties,
+            profiles=self.profiles,
+            users=self.users,
+            rules=self.availability_rules,
+            time_offs=self.time_offs,
+            stamp=self.clock.at,
+        )
         self.notify = NotifyUseCase(clock=self.clock, notifications=self.notifications)
         self.notices = OutboxBookingNotices(
             outbox=self.outbox,
@@ -256,6 +269,7 @@ class FakeWorld:
             search_queries=SqlSearchQueries(),
             activity_queries=self.activity,
             readers=InMemoryReaders(self.users, self.profiles),
+            directory_queries=self.directory_queries,
             admins=InMemoryAdmins(self.users),
             journal_actors=InMemoryJournalActors(self.users),
             notifications=self.notifications,

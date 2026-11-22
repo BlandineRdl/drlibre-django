@@ -16,6 +16,7 @@ class ParamType(StrEnum):
     DATE = "date"
     REFERENCE = "reference"
     NUMBER = "number"
+    SPECIAL = "special"
 
 
 # Method and path, relative to /fhir, that serve each interaction.

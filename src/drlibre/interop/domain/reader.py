@@ -24,5 +24,9 @@ class Reader:
         return cls(ReaderKind.ANONYMOUS)
 
     @property
+    def is_admin(self) -> bool:
+        return self.kind is ReaderKind.ADMIN
+
+    @property
     def is_staff(self) -> bool:
         return self.kind is ReaderKind.CLINICIAN or self.kind is ReaderKind.ADMIN

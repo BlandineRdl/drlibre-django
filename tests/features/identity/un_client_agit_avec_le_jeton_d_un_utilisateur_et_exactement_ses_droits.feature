@@ -44,3 +44,25 @@ Feature: Un client agit avec le jeton d'un utilisateur et exactement ses droits
     And "dr@example.org" must change their password
     When the client calls "GET" "/fhir/metadata" with that token
     Then the answer is 403 with an OperationOutcome "forbidden" and the code "forbidden"
+
+  @integration @django_db
+  Scenario: Avec un jeton du personnel, `Practitioner` et `PractitionerRole` renvoient tous les champs, y compris email et téléphone, et `Slot` accepte les statuts `busy`, `busy-tentative` et `busy-unavailable` ; seul l'admin voit les `Practitioner` admins. (Practitioner et PractitionerRole)
+    Given a reference directory of active and closed hospitals, their departments, rooms, types, specialties and clinicians
+    When a client without a token reads "/fhir/PractitionerRole/$profile"
+    Then the role hides the round robin weight, the reason and the types booked offline
+    When the client with the "clinician" token reads "/fhir/Practitioner/$clinician"
+    Then the practitioner shows the email and phone of "clinician"
+    When the client with the "clinician" token reads "/fhir/PractitionerRole/$profile"
+    Then the role shows the round robin weight 3 and the reason "Congés"
+    When the client with the "clinician" token reads "/fhir/Practitioner/$former"
+    Then the answer is a FHIR "Practitioner" with the id of "former"
+
+  @integration @django_db
+  Scenario: Avec un jeton du personnel, `Practitioner` et `PractitionerRole` renvoient tous les champs, y compris email et téléphone, et `Slot` accepte les statuts `busy`, `busy-tentative` et `busy-unavailable` ; seul l'admin voit les `Practitioner` admins. (Practitioner admins)
+    Given a reference directory of active and closed hospitals, their departments, rooms, types, specialties and clinicians
+    When the client with the "clinician" token reads "/fhir/Practitioner/$admin"
+    Then the client is refused with 404 and the code "not_found"
+    When the client with the "admin" token reads "/fhir/Practitioner/$admin"
+    Then the answer is a FHIR "Practitioner" with the id of "admin"
+    When the client with the "admin" token reads "/fhir/PractitionerRole/$admin"
+    Then the role is coded "admin" for "Practitioner/$admin"

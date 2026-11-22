@@ -108,9 +108,9 @@ def date_bound(name: str, raw: str) -> DateBound:
     return DateBound(Prefix(prefix), value)
 
 
-def reference_id(name: str, raw: str, resource_type: str) -> str:
-    """The id a reference parameter names, as `Type/id` or a bare id."""
+def reference_id(name: str, raw: str, *resource_types: str) -> str:
+    """The id a reference parameter names, as `Type/id` of one of the types or a bare id."""
     kind, _, rest = raw.strip().rpartition("/")
-    if (kind and kind != resource_type) or not rest:
-        raise invalid_field(name, f"Saisissez une référence {resource_type}/<id>.")
+    if (kind and kind not in resource_types) or not rest:
+        raise invalid_field(name, f"Saisissez une référence {resource_types[0]}/<id>.")
     return rest

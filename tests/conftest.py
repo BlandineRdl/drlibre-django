@@ -17,6 +17,7 @@ from tests.fakes.world import FakeWorld
 
 # Booking's steps, one module per area; pytest only reads plugins from the top conftest.
 pytest_plugins = [
+    "tests.fhir.directory_steps",
     "tests.use_cases.booking.steps_scene",
     "tests.use_cases.booking.steps_holds",
     "tests.use_cases.booking.steps_changes",
