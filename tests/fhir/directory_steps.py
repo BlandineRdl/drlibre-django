@@ -1,6 +1,7 @@
 """Steps of the FHIR reference directory scenarios, on PostgreSQL, shared by their feature files."""
 
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from string import Template
 from typing import Any
 from urllib.parse import urlsplit
@@ -11,6 +12,7 @@ from pytest_bdd import given, parsers, then, when
 
 from drlibre.identity.domain.user import User
 from drlibre.interfaces.fhir.mappers.directory import code_system_url, extension_url
+from drlibre.interfaces.fhir.registry import declared
 from drlibre.shared_kernel.ids import Id
 from tests.fhir.conftest import token_for
 from tests.fhir.directory_scene import Directory, a_directory, django_repos
@@ -23,6 +25,7 @@ class Exchange:
     directory: Directory | None = None
     response: Any = None
     previous: Any = None
+    answers: list[tuple[str, str, Any]] = field(default_factory=list)
 
     def path(self, raw: str) -> str:
         assert self.directory is not None
@@ -222,3 +225,26 @@ def outcome(exchange: Exchange, status: int, issue: str, code: str) -> None:
 def refused(exchange: Exchange, status: int, code: str) -> None:
     assert exchange.response.status_code == status
     assert exchange.body()["issue"][0]["details"]["coding"][0]["code"] == code
+
+
+@when("a client without a token sends every write the server declares")
+def sends_every_write(exchange: Exchange) -> None:
+    for rules in declared():
+        for method, path in sorted(rules.routes()):
+            if method != "GET":
+                sent = "/fhir" + path.replace("{id}", str(uuid.uuid4()))
+                response = Client().generic(method, sent, "{}", "application/fhir+json")
+                exchange.answers.append((method, path, response))
+
+
+@then(
+    parsers.parse(
+        'each write answers {status:d} with an OperationOutcome "{issue}" and the code "{code}"'
+    )
+)
+def every_write_refused(exchange: Exchange, status: int, issue: str, code: str) -> None:
+    assert exchange.answers
+    for method, path, response in exchange.answers:
+        (found,) = response.json()["issue"]
+        assert response.status_code == status, (method, path)
+        assert (found["code"], found["details"]["coding"][0]["code"]) == (issue, code), path

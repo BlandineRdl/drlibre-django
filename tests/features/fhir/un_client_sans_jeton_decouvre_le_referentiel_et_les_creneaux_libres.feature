@@ -150,3 +150,7 @@ Feature: Un client sans jeton découvre le référentiel et les créneaux libres
     When a client without a token updates the patient "first"
     Then the answer is 401 with an OperationOutcome "login" and the code "unauthenticated"
     And the patient "first" has phone "0611111111" and birth date "1980-03-04"
+
+  Scenario: Sans jeton, toute écriture renvoie `unauthenticated` (401). (chaque écriture déclarée)
+    When a client without a token sends every write the server declares
+    Then each write answers 401 with an OperationOutcome "login" and the code "unauthenticated"

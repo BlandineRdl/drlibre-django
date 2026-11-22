@@ -37,6 +37,18 @@ Feature: L'admin gère le référentiel en FHIR
       | un patient crée une spécialité        | patient   | POST   | /fhir/CodeSystem           | spécialité       |
       | un praticien modifie un praticien     | clinician | PUT    | /fhir/Practitioner/$clinician | praticien     |
       | un patient supprime un profil         | patient   | DELETE | /fhir/PractitionerRole/$profile | profil praticien |
+      | un praticien modifie un hôpital | clinician | PUT | /fhir/Organization/$lille | hôpital |
+      | un patient supprime un département | patient | DELETE | /fhir/Organization/$cardiology | département |
+      | un praticien crée une salle | clinician | POST | /fhir/Location | salle |
+      | un patient supprime une salle | patient | DELETE | /fhir/Location/$room | salle |
+      | un patient crée un type de RDV | patient | POST | /fhir/HealthcareService | type de RDV |
+      | un praticien modifie un type de RDV | clinician | PUT | /fhir/HealthcareService/$online | type de RDV |
+      | un praticien modifie une spécialité | clinician | PUT | /fhir/CodeSystem/$specialty | spécialité |
+      | un patient supprime une spécialité | patient | DELETE | /fhir/CodeSystem/$specialty | spécialité |
+      | un patient crée un praticien | patient | POST | /fhir/Practitioner | praticien |
+      | un praticien supprime un praticien | clinician | DELETE | /fhir/Practitioner/$clinician | praticien |
+      | un praticien crée un profil | clinician | POST | /fhir/PractitionerRole | profil praticien |
+      | un patient modifie un profil | patient | PUT | /fhir/PractitionerRole/$profile | profil praticien |
 
   Scenario: L'admin seul crée, modifie et supprime `Organization`, `Location`, `HealthcareService`, `CodeSystem`, `ValueSet`, `Practitioner` et `PractitionerRole` ; tout autre utilisateur reçoit `forbidden`. (le `ValueSet` suit les `CodeSystem` et ne s'écrit pas)
     When "admin" creates the "spécialité" in FHIR
@@ -63,6 +75,7 @@ Feature: L'admin gère le référentiel en FHIR
       | case                                  | who       | method | path                  |
       | un praticien ne crée pas de patient   | clinician | POST   | /fhir/Patient         |
       | un patient ne supprime pas sa fiche   | patient   | DELETE | /fhir/Patient/$patient |
+      | un praticien ne modifie pas un patient | clinician | PUT | /fhir/Patient/$patient |
 
   Scenario: L'admin crée, modifie et supprime aussi `Patient`. (le téléphone et la naissance restent au patient)
     When "admin" creates the "patient" in FHIR
