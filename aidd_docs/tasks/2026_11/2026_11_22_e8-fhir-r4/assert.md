@@ -229,3 +229,22 @@
 - Epic Success Evidence (`tests/fhir/test_parcours_fhir_de_l_epic.py`, demo seed in the test database, fixed tokens): a visitor's free `Slot` booked with `demo-patient-token` (`booked`, practitioner and room) then cancelled leaves the same audit entries (action, type, metadata, actor) and notifications as the booking screen and portal cancel; that token gets 403 on another patient's appointments and `Patient`, and searches leave them out; each of the 28 declared writes maps to a scenario refusing it as the screen or API does; « Sans jeton, toute écriture renvoie `unauthenticated` (401). (chaque écriture déclarée) » sends all 28.
 - Added refusal rows: 12 reference writes and `PUT Patient` refused `forbidden` to non-admins, as the console's `require_role`.
 - Deviations: `metadata.py` needed no change (already read from the registry); `tests/fhir/test_metadata.py` folded into the Story's test; the Epic journey runs in-process on the seed rather than over HTTP against compose, so audit and notifications are read from the same database.
+
+## Round 12
+- Head: `51330fd` plus the `ValueSet` fix
+- Uncommitted changes: yes (the fix, before its commit)
+- Verdict: PASS; closes the validation's failed bullet « L'admin seul crée, modifie et supprime … `ValueSet` … »
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run pytest tests/fhir tests/contracts tests/test_acceptance_names.py` | 0 | 754 passed |
+| `uv run ruff check .` | 0 |  |
+| `uv run ruff format --check .` | 0 |  |
+| `uv run lint-imports` | 0 | 12 kept, 0 broken |
+| `uv run pyrefly check` | 0 | 0 errors |
+| `uv run pre-commit run --all-files` | 0 |  |
+| `uv run pytest` | 0 | 2114 passed, 11 deselected |
+
+- A specialty is a `CodeSystem` and a `ValueSet` sharing its product id; the admin creates, renames, deletes `ValueSet` through `SaveSpecialty`/`DeleteSpecialty`, `If-Match` on `Locked.SPECIALTY`, others get `forbidden`; read and search (`name`, `status`) for anyone, active only unless admin.
+- The aggregate `ValueSet/specialties` is gone (§15.1 product ids); the deviation scenario is replaced by Examples rows (create, rename, delete, three refusals, stale `If-Match`, audit equal to the console's) and a scenario reading one specialty as both resources.
+- Declared writes go from 28 to 31; `SAME_REFUSAL`, the 401 scenario and the CapabilityStatement test derive from the registry and pass.

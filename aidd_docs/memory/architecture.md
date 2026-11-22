@@ -24,6 +24,7 @@
 - One registry (`interfaces/fhir/registry.py`) declares each resource's interactions, search parameters, `_include` and `_sort`; it serves `/fhir/metadata`, refuses undeclared parameters (`invalid_input`) and answers 405 `not-supported` on undeclared interactions.
 - `interop` is a read context: SQL reads of organisation, identity, scheduling, booking, notifications and audit tables, scoped in the SQL by `Reader` (anonymous, patient, clinician, admin), each row with its version; plus `ConditionalWrites` for `If-Match`.
 - FHIR writes call the screens' use cases; reference writes check `require_admin` at the FHIR door, as the console's `require_role`.
+- A specialty is both a `CodeSystem` and a `ValueSet` (one included concept) sharing its id, as a hospital is an `Organization` and a `Location`; both write through `SaveSpecialty`/`DeleteSpecialty`.
 
 ## Constraints
 - p95 under 200 ms, search included, proven by load tests.
