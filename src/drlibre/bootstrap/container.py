@@ -149,12 +149,15 @@ from drlibre.health.application.use_cases.check_health import CheckHealthUseCase
 from drlibre.health.infrastructure.database_probe import DjangoDatabaseProbe
 from drlibre.identity.application.ports.inbound import (
     AuthenticateSession,
+    AuthenticateToken,
     ChangePassword,
     DeleteUser,
+    IssueApiToken,
     OpenPatientSession,
     PatientLookup,
     ProvidePatientAccount,
     RequestSignInLink,
+    RevokeApiTokens,
     SaveUser,
     SignIn,
     SignOut,
@@ -164,6 +167,7 @@ from drlibre.identity.application.ports.inbound import (
     UseSignInLink,
 )
 from drlibre.identity.application.ports.outbound import (
+    ApiTokens,
     AuditActors,
     FailedSignIns,
     LinkNotices,
@@ -174,6 +178,11 @@ from drlibre.identity.application.ports.outbound import (
     TokenGenerator,
     UpcomingAppointments,
     Users,
+)
+from drlibre.identity.application.use_cases.api_tokens import (
+    AuthenticateTokenUseCase,
+    IssueApiTokenUseCase,
+    RevokeApiTokensUseCase,
 )
 from drlibre.identity.application.use_cases.authenticate_session import (
     AuthenticateSessionUseCase,
@@ -197,6 +206,7 @@ from drlibre.identity.infrastructure.password_hasher import DjangoPasswordHasher
 from drlibre.identity.infrastructure.queries import DjangoUserQueries
 from drlibre.identity.infrastructure.rate_limiter import RedisRateLimiter
 from drlibre.identity.infrastructure.repositories import (
+    DjangoApiTokens,
     DjangoSessions,
     DjangoSignInLinks,
     DjangoUsers,
@@ -204,6 +214,26 @@ from drlibre.identity.infrastructure.repositories import (
 from drlibre.identity.infrastructure.staff_profiles import OrganisationStaffProfiles
 from drlibre.identity.infrastructure.tokens import SecretsTokenGenerator
 from drlibre.identity.infrastructure.upcoming_appointments import BookingUpcomingAppointments
+from drlibre.interop.application.ports.inbound import (
+    AppointmentResponseQueries,
+    AuditEventQueries,
+    CommunicationQueries,
+    ConditionalWrites,
+    DirectoryQueries,
+    InteropAppointmentQueries,
+    PatientQueries,
+    Readers,
+)
+from drlibre.interop.infrastructure.conditional_writes import DjangoConditionalWrites
+from drlibre.interop.infrastructure.sql_appointment_responses import (
+    SqlAppointmentResponseQueries,
+)
+from drlibre.interop.infrastructure.sql_appointments import SqlInteropAppointmentQueries
+from drlibre.interop.infrastructure.sql_audit_events import SqlAuditEventQueries
+from drlibre.interop.infrastructure.sql_communications import SqlCommunicationQueries
+from drlibre.interop.infrastructure.sql_directory import SqlDirectoryQueries
+from drlibre.interop.infrastructure.sql_patients import SqlPatientQueries
+from drlibre.interop.infrastructure.sql_readers import SqlReaders
 from drlibre.notifications.application.ports.inbound import (
     CountUnread,
     ListNotifications,
@@ -304,7 +334,9 @@ from drlibre.scheduling.application.ports.inbound import (
     ExtendSlotHorizon,
     FindFreeSlots,
     FindFreeWeek,
+    FindSlotStates,
     NextBookableSlots,
+    ReadSlotState,
     RecordTimeOff,
     SaveAvailabilityRule,
 )
@@ -324,11 +356,16 @@ from drlibre.scheduling.application.use_cases.delete_availability_rule import (
 )
 from drlibre.scheduling.application.use_cases.delete_time_off import DeleteTimeOffUseCase
 from drlibre.scheduling.application.use_cases.extend_slot_horizon import ExtendSlotHorizonUseCase
-from drlibre.scheduling.application.use_cases.find_free_slots import FindFreeSlotsUseCase
+from drlibre.scheduling.application.use_cases.find_free_slots import (
+    FindFreeSlotsUseCase,
+    FreeSlotRead,
+)
 from drlibre.scheduling.application.use_cases.find_free_week import FindFreeWeekUseCase
+from drlibre.scheduling.application.use_cases.find_slot_states import FindSlotStatesUseCase
 from drlibre.scheduling.application.use_cases.free_clinicians_at import FreeCliniciansAtUseCase
 from drlibre.scheduling.application.use_cases.is_slot_free import IsSlotFreeUseCase
 from drlibre.scheduling.application.use_cases.next_bookable_slots import NextBookableSlotsUseCase
+from drlibre.scheduling.application.use_cases.read_slot_state import ReadSlotStateUseCase
 from drlibre.scheduling.application.use_cases.record_time_off import RecordTimeOffUseCase
 from drlibre.scheduling.application.use_cases.refresh_slots import RefreshSlotsUseCase
 from drlibre.scheduling.application.use_cases.save_availability_rule import (
@@ -410,6 +447,7 @@ class Adapters:
     audit: AuditLog
     users: Users
     sessions: Sessions
+    api_tokens: ApiTokens
     hasher: PasswordHasher
     failures: FailedSignIns
     tokens: TokenGenerator
@@ -443,6 +481,14 @@ class Adapters:
     link_notices: LinkNotices
     search_queries: SearchQueries
     activity_queries: ActivityQueries
+    readers: Readers
+    directory_queries: DirectoryQueries
+    patient_queries: PatientQueries
+    interop_appointments: InteropAppointmentQueries
+    appointment_responses: AppointmentResponseQueries
+    communications: CommunicationQueries
+    audit_events: AuditEventQueries
+    conditional_writes: ConditionalWrites
     admins: Admins
     journal_actors: JournalActors
     notifications: Notifications
@@ -462,6 +508,17 @@ class Container:
     sign_in: SignIn
     sign_out: SignOut
     authenticate_session: AuthenticateSession
+    issue_api_token: IssueApiToken
+    revoke_api_tokens: RevokeApiTokens
+    authenticate_token: AuthenticateToken
+    readers: Readers
+    directory_queries: DirectoryQueries
+    patient_queries: PatientQueries
+    interop_appointments: InteropAppointmentQueries
+    appointment_responses: AppointmentResponseQueries
+    communications: CommunicationQueries
+    audit_events: AuditEventQueries
+    conditional_writes: ConditionalWrites
     change_password: ChangePassword
     update_profile: UpdateProfile
     save_hospital: SaveHospital
@@ -492,6 +549,8 @@ class Container:
     extend_slot_horizon: ExtendSlotHorizon
     find_free_slots: FindFreeSlots
     find_free_week: FindFreeWeek
+    find_slot_states: FindSlotStates
+    read_slot_state: ReadSlotState
     next_bookable_slots: NextBookableSlots
     book_appointment: BookAppointment
     require_patient: RequirePatient
@@ -548,18 +607,34 @@ class Container:
 def wire(a: Adapters) -> Container:
     clock, uow, audit = a.clock, a.uow, a.audit
     directory = a.scheduling_directory
+    computation = SlotComputation(
+        directory=directory,
+        rules=a.availability_rules,
+        time_offs=a.time_offs,
+        appointments=a.clinician_appointments,
+    )
     find_free_slots = FindFreeSlotsUseCase(
         clock=clock,
         directory=directory,
         queries=a.slot_queries,
         holds=a.slot_holds,
         rooms=a.room_bookings,
-        computation=SlotComputation(
+        computation=computation,
+    )
+    find_slot_states = FindSlotStatesUseCase(
+        read=FreeSlotRead(
+            clock=clock,
             directory=directory,
-            rules=a.availability_rules,
-            time_offs=a.time_offs,
-            appointments=a.clinician_appointments,
+            queries=a.slot_queries,
+            holds=a.slot_holds,
+            rooms=a.room_bookings,
+            computation=computation,
         ),
+        directory=directory,
+        rules=a.availability_rules,
+        time_offs=a.time_offs,
+        appointments=a.clinician_appointments,
+        holds=a.slot_holds,
     )
     refresh = RefreshSlotsUseCase(
         clock=clock,
@@ -595,6 +670,28 @@ def wire(a: Adapters) -> Container:
         authenticate_session=AuthenticateSessionUseCase(
             clock=clock, users=a.users, sessions=a.sessions
         ),
+        issue_api_token=IssueApiTokenUseCase(
+            clock=clock,
+            uow=uow,
+            audit=audit,
+            users=a.users,
+            api_tokens=a.api_tokens,
+            tokens=a.tokens,
+        ),
+        revoke_api_tokens=RevokeApiTokensUseCase(
+            clock=clock, uow=uow, audit=audit, users=a.users, api_tokens=a.api_tokens
+        ),
+        authenticate_token=AuthenticateTokenUseCase(
+            clock=clock, users=a.users, api_tokens=a.api_tokens
+        ),
+        readers=a.readers,
+        directory_queries=a.directory_queries,
+        patient_queries=a.patient_queries,
+        interop_appointments=a.interop_appointments,
+        appointment_responses=a.appointment_responses,
+        communications=a.communications,
+        audit_events=a.audit_events,
+        conditional_writes=a.conditional_writes,
         change_password=ChangePasswordUseCase(
             clock=clock, uow=uow, audit=audit, users=a.users, hasher=a.hasher
         ),
@@ -762,6 +859,10 @@ def wire(a: Adapters) -> Container:
         find_free_slots=find_free_slots,
         find_free_week=FindFreeWeekUseCase(
             clock=clock, directory=directory, find_free_slots=find_free_slots
+        ),
+        find_slot_states=find_slot_states,
+        read_slot_state=ReadSlotStateUseCase(
+            directory=directory, find_slot_states=find_slot_states
         ),
         next_bookable_slots=NextBookableSlotsUseCase(clock=clock, find_free_slots=find_free_slots),
         book_appointment=booking.book_appointment,
@@ -1145,6 +1246,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         audit=DjangoAuditLog(),
         users=DjangoUsers(),
         sessions=DjangoSessions(),
+        api_tokens=DjangoApiTokens(),
         hasher=DjangoPasswordHasher(),
         failures=RedisFailedSignIns(),
         tokens=SecretsTokenGenerator(),
@@ -1215,6 +1317,14 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         ),
         search_queries=SqlSearchQueries(),
         activity_queries=SqlActivityQueries(),
+        readers=SqlReaders(),
+        directory_queries=SqlDirectoryQueries(),
+        patient_queries=SqlPatientQueries(),
+        interop_appointments=SqlInteropAppointmentQueries(clock=clock),
+        appointment_responses=SqlAppointmentResponseQueries(),
+        communications=SqlCommunicationQueries(),
+        audit_events=SqlAuditEventQueries(),
+        conditional_writes=DjangoConditionalWrites(),
         admins=IdentityAdmins(user_queries),
         journal_actors=IdentityJournalActors(users=user_queries, staff=user_queries),
         notifications=notifications,

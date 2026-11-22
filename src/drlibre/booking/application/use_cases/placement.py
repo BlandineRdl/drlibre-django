@@ -119,6 +119,7 @@ class Placement:
         reason: str | None = None,
         room_id: Id | None = None,
         announce: bool = True,
+        appointment_id: Id | None = None,
     ) -> Appointment:
         """Book for the patient on the actor's behalf; staff skip patient rules, may name a room."""
         with self._uow:
@@ -150,6 +151,7 @@ class Placement:
                 duration=duration,
                 source=source,
                 reason=reason,
+                id=appointment_id,
             )
             self._appointments.add(appointment)
             if announce:

@@ -79,6 +79,12 @@ Feature: Le patient accepte un créneau proposé
     When the patient accepts the offer of "patient@example.org"
     Then the audit holds "booking.waitlist_accepted" by the signed-in patient, with ids and the source only
 
+  Scenario: Règle §15.3 : le RDV accepté garde l'id de l'entrée
+    Given "patient@example.org" is offered the cancelled appointment with "A" at "2026-11-23 09:00"
+    And "A" is free at "2026-11-23 09:00"
+    When the patient accepts the offer of "patient@example.org"
+    Then the appointment keeps the id of the entry of "patient@example.org"
+
   Scenario: Règle §5.8 : seule une entrée proposée s'accepte
     Given "patient@example.org" waits from "2026-11-22 00:00" to "2026-11-24 00:00" since "2026-11-01 08:00"
     When the patient accepts the offer of "patient@example.org"

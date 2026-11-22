@@ -77,12 +77,15 @@ Tranchées au plan E7 (`aidd_docs/tasks/2026_11/2026_11_21_e7-supervision-admin/
 - Le bouton de rappel affiche-t-il le nombre de rappels créés ? → Oui, « N rappels envoyés » ; `POST /jobs/reminders` renvoie `{count}`.
 
 ## E8 FHIR R4
-- Quels champs de `PractitionerRole` sont publics sans jeton ?
-- Quels codes pour nommer un autre patient ou praticien, une salle par un patient, un déplacement qui change de praticien ou de type, une écriture sur un champ non autorisé, une interaction non supportée ?
-- Un `_count` au-delà de 100 est-il ramené à 100 ou refusé ?
-- Le jeton d'un utilisateur désactivé cesse-t-il aussitôt, expire-t-il, se révoque-t-il ?
-- L'offre manuelle de l'admin passe-t-elle par FHIR ?
-- Un praticien voit-il les entrées qui le désignent comme praticien préféré ?
-- Le praticien écrit-il ses notes (`Appointment.comment`) par FHIR ?
-- Créer un hôpital (`Organization` + `Location`) se fait-il en une ou deux requêtes, et un `Practitioner` ou `Patient` FHIR exige-t-il un mot de passe temporaire ?
-- Un client peut-il fixer le `planningHorizon` d'un `Schedule` ?
+Tranchées au plan E8 (`aidd_docs/tasks/2026_11/2026_11_22_e8-fhir-r4/plan.md`, Decisions).
+- Quels champs de `PractitionerRole` sont publics sans jeton ? → Ceux de la page publique : praticien, département, spécialité, site et salle par défaut, types actifs réservables en ligne, `availableTime`, `notAvailable` sans motif, bio en extension ; le personnel voit aussi email, téléphone, poids round robin, motifs, types hors ligne et praticiens inactifs.
+- Quels codes pour nommer un autre patient ou praticien, une salle par un patient, un déplacement qui change de praticien ou de type, une écriture sur un champ non autorisé, une interaction non supportée ? → Autre patient ou salle en tant que patient : `forbidden` ; déplacement qui change de praticien ou de type : `invalid_input` sur `participant` / `serviceType` ; champ non modifiable : `invalid_input` avec le chemin FHIR, champ d'un autre rôle : `forbidden` ; interaction non déclarée : 405 `not-supported`, avant l'authentification.
+- Un `_count` au-delà de 100 est-il ramené à 100 ou refusé ? → Ramené à 100 ; sous 1 ou non entier : `invalid_input`.
+- Le jeton d'un utilisateur désactivé cesse-t-il aussitôt, expire-t-il, se révoque-t-il ? → Les trois : refusé dès la désactivation, expiré après 90 jours par défaut (`--days`), révoqué par `manage.py api_token <email> --revoke` ; un `must_change_password` reçoit 403.
+- L'offre manuelle de l'admin passe-t-elle par FHIR ? → Non, console seulement (aucune interaction §15.4).
+- Un praticien voit-il les entrées qui le désignent comme praticien préféré ? → Non, son agenda seulement (§15.4).
+- Le praticien écrit-il ses notes (`Appointment.comment`) par FHIR ? → Oui, le praticien du RDV seul, par `WriteClinicalNotes` ; jamais lues par un autre.
+- Créer un hôpital (`Organization` + `Location`) se fait-il en une ou deux requêtes, et un `Practitioner` ou `Patient` FHIR exige-t-il un mot de passe temporaire ? → Une : l'`Organization` `prov` s'écrit, la `Location` du site garde son id et se lit seulement ; le mot de passe temporaire arrive dans l'extension write-only `temporary-password`, jamais renvoyée.
+- Un client peut-il fixer le `planningHorizon` d'un `Schedule` ? → Non, lecture seule comme à l'écran : fixé à la création ou changé, `invalid_input`.
+- Une spécialité est-elle un `CodeSystem` ou un `ValueSet` ? → Les deux, sous son id produit (comme l'hôpital `Organization` + `Location`) : `ValueSet/<id>` inclut le concept de son `CodeSystem` ; l'admin écrit l'un ou l'autre par `SaveSpecialty`/`DeleteSpecialty`.
+- Absences en `notAvailable` : une période correspond une pour une sur début, fin et `description` ; « Indisponible » veut dire sans motif ; un instant sans décalage est `invalid_input` ; les heures locales se lisent dans le fuseau de l'hôpital du rôle.

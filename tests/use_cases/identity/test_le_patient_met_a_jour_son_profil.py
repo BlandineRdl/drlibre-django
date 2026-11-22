@@ -23,6 +23,7 @@ scenarios("../../features/identity/le_patient_met_a_jour_son_profil.feature")
 class Profile:
     def __init__(self) -> None:
         self.user_id = Id()
+        self.actor_id: Id | None = None
         self.error: DomainError | None = None
         self.values: tuple[str, ...] = ()
         self.page: Any = None
@@ -77,10 +78,29 @@ def saves(world: FakeWorld, profile: Profile, phone: str, birth_date: str) -> No
     profile.values += (phone, birth_date)
     try:
         world.app.update_profile.execute(
-            user_id=profile.user_id, phone=typed(phone), birth_date=typed(birth_date)
+            actor_id=profile.actor_id or profile.user_id,
+            user_id=profile.user_id,
+            phone=typed(phone),
+            birth_date=typed(birth_date),
         )
     except DomainError as error:
         profile.error = error
+
+
+@when(
+    parsers.parse(
+        'another user saves the phone "{phone}" and the birth date "{birth_date}" on the patient'
+    )
+)
+def other_saves(world: FakeWorld, profile: Profile, phone: str, birth_date: str) -> None:
+    profile.actor_id = Id()
+    saves(world, profile, phone, birth_date)
+
+
+@then("the change is refused as forbidden")
+def refused_forbidden(profile: Profile) -> None:
+    assert profile.error is not None
+    assert profile.error.code is ErrorCode.FORBIDDEN
 
 
 @then(parsers.parse('the patient is still named "{name}" with email "{email}"'))
@@ -92,7 +112,7 @@ def same_identity(world: FakeWorld, profile: Profile, name: str, email: str) -> 
 @then("the profile offers no way to change the name or the email")
 def no_identity_fields() -> None:
     names = set(inspect.signature(FakeWorld().app.update_profile.execute).parameters)
-    assert names == {"user_id", "phone", "birth_date"}
+    assert names == {"actor_id", "user_id", "phone", "birth_date"}
 
 
 @then(parsers.parse('the patient has the phone "{phone}" and the birth date "{birth_date}"'))

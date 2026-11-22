@@ -140,6 +140,20 @@ class Visitor(HttpUser):
     def free_slots(self) -> None:
         self._slot()
 
+    @task(2)
+    def fhir_slot_search(self) -> None:
+        """A FHIR client's free Slot search of a type over a week, without a token."""
+        if not Visitor.providers:
+            return
+        slots = random.choice(Visitor.providers)["next_slots"]  # noqa: S311  # nosec B311
+        first = datetime.fromisoformat(slots["starts"][0])
+        params = [
+            ("service-type", slots["type_id"]),
+            ("start", f"ge{first.isoformat()}"),
+            ("start", f"lt{(first + timedelta(days=7)).isoformat()}"),
+        ]
+        self.client.get("/fhir/Slot", params=params, name="fhir slot search")
+
     @task(1)
     def book(self) -> None:
         if not (picked := self._slot()):

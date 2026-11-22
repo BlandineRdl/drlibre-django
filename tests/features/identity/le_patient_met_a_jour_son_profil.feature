@@ -51,6 +51,12 @@ Feature: Le patient met à jour son profil
     When the patient saves the phone "0601020304" and the birth date "1990-05-17"
     Then nothing is audited
 
+  Scenario: Règle §15.4 : seul le patient modifie son propre téléphone et sa date de naissance
+    When another user saves the phone "0611111111" and the birth date "1980-01-01" on the patient
+    Then the change is refused as forbidden
+    And the patient has the phone "0601020304" and the birth date "1990-05-17"
+    And nothing is audited
+
   Scenario Outline: Un patient qui a un mot de passe accède au changement de mot de passe ; un patient sans mot de passe ne le voit pas. (<case>)
     Given the patient <password>
     When the patient opens their profile page

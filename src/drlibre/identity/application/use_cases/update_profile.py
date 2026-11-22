@@ -21,7 +21,10 @@ class UpdateProfileUseCase(UpdateProfile):
         self._audit = audit
         self._users = users
 
-    def execute(self, *, user_id: Id, phone: str, birth_date: str) -> None:
+    def execute(self, *, actor_id: Id, user_id: Id, phone: str, birth_date: str) -> None:
+        # Spec §15.4: only the patient edits these; an admin goes through SaveUser.
+        if actor_id != user_id:
+            raise DomainError(ErrorCode.FORBIDDEN, "Seul le patient met à jour sa fiche.")
         at = self._clock.now()
         profile = ProfileDetails.parse(
             phone=phone, birth_date=birth_date, today=at.astimezone(self._zone).date()
