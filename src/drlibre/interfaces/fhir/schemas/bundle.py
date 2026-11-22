@@ -23,4 +23,4 @@ class Bundle(FhirModel):
     type: Literal["searchset"] = "searchset"
     total: int
     link: tuple[BundleLink, ...]
-    entry: tuple[BundleEntry, ...] = ()
+    entry: tuple[BundleEntry, ...] | None = None  # FHIR forbids an empty array

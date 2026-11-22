@@ -149,7 +149,7 @@ def bundle_includes(
 ) -> None:
     included = {
         (e["resource"]["resourceType"], e["resource"]["id"])
-        for e in exchange.body()["entry"]
+        for e in exchange.body().get("entry", [])
         if e["search"]["mode"] == "include"
     }
     assert included == {(first, exchange.path(first_id)), (second, exchange.path(second_id))}
@@ -172,7 +172,7 @@ def searchset(exchange: Exchange, total: int, links: str, names: str) -> None:
     body = exchange.body()
     assert body["total"] == total
     assert [link["relation"] for link in body["link"]] == links.split(", ")
-    assert [e["resource"]["name"] for e in body["entry"]] == names.split(", ")
+    assert [e["resource"]["name"] for e in body.get("entry", [])] == names.split(", ")
 
 
 @then(parsers.parse('the practitioner shows "{name}" titled "{title}" without email or phone'))

@@ -115,7 +115,7 @@ def slots_are(exchange: Exchange, slots: str) -> None:
 def slot_fields(exchange: Exchange, service: str, schedule: str) -> None:
     assert exchange.directory is not None
     scene = exchange.directory
-    for found in (e["resource"] for e in exchange.body()["entry"]):
+    for found in (e["resource"] for e in exchange.body().get("entry", [])):
         start = datetime.fromisoformat(found["start"]).astimezone(UTC)
         assert found["id"] == slot_id(SlotKey(scene.profile.id, scene.online.id, start))
         assert found["serviceType"][0]["coding"][0]["code"] == exchange.path(service)
@@ -126,7 +126,7 @@ def slot_fields(exchange: Exchange, service: str, schedule: str) -> None:
 @then("the ids are the same as before")
 def same_ids(exchange: Exchange) -> None:
     def ids(response: Any) -> list[str]:
-        return [e["resource"]["id"] for e in response.json()["entry"]]
+        return [e["resource"]["id"] for e in response.json().get("entry", [])]
 
     assert ids(exchange.response) == ids(exchange.previous)
 
@@ -143,7 +143,7 @@ def is_slot(exchange: Exchange, status: str) -> None:
 def includes_only(exchange: Exchange, resource: str, record: str) -> None:
     included = [
         (e["resource"]["resourceType"], e["resource"]["id"])
-        for e in exchange.body()["entry"]
+        for e in exchange.body().get("entry", [])
         if e["search"]["mode"] == "include"
     ]
     assert included == [(resource, exchange.path(record))]

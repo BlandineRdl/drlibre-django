@@ -257,7 +257,7 @@ def one_resource(booking: Booking, patient: str) -> None:
     response = Client().get(
         f"/fhir/Appointment?patient=Patient/{user.id}", headers=booking.headers(patient)
     )
-    found = [e["resource"] for e in response.json()["entry"]]
+    found = [e["resource"] for e in response.json().get("entry", [])]
     assert [(r["id"], r["status"]) for r in found] == [(str(_entry(booking, patient).id), "booked")]
 
 

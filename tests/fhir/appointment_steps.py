@@ -335,7 +335,7 @@ def appointments_found(booking: Booking, exchange: Exchange, labels: str) -> Non
 def bundle_includes(booking: Booking, exchange: Exchange, resource: str, who: str) -> None:
     included = [
         (e["resource"]["resourceType"], e["resource"]["id"])
-        for e in exchange.body()["entry"]
+        for e in exchange.body().get("entry", [])
         if e["search"]["mode"] == "include"
     ]
     assert included == [(resource, booking.values()[who])]

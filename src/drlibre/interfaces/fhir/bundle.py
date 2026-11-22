@@ -49,4 +49,4 @@ def searchset(
         links.append(
             BundleLink(relation="previous", url=_link(resource_type, query, query.page - 1))
         )
-    return Bundle(total=total, link=tuple(links), entry=tuple(entries))
+    return Bundle(total=total, link=tuple(links), entry=tuple(entries) or None)

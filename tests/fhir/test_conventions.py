@@ -160,6 +160,15 @@ def test_the_last_page_has_no_next_link() -> None:
     assert {link.relation for link in bundle.link} == {"self", "previous"}
 
 
+def test_a_search_without_result_answers_a_bundle_without_entry() -> None:
+    """Spec §15.1 : un Bundle FHIR R4 n'a jamais de tableau vide."""
+    query = search_query(QueryDict(""), SAMPLE)
+
+    bundle = searchset(resource_type="Sample", query=query, total=0, entries=())
+
+    assert "entry" not in bundle.model_dump(by_alias=True, exclude_none=True)
+
+
 def test_a_date_parameter_takes_its_prefix_and_a_day_or_an_aware_instant() -> None:
     assert date_bound("date", "ge2026-11-23") == DateBound(Prefix.GE, date(2026, 11, 23))
     assert date_bound("date", "2026-11-23T09:00:00+00:00") == DateBound(

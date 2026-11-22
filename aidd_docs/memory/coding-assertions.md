@@ -11,6 +11,7 @@
 - `curl -i localhost:8000/api/v1/health`: 200 with an `x-correlation-id` header.
 - `curl -i localhost:8000/fhir/metadata`: 200 `CapabilityStatement` in `application/fhir+json` with an `x-correlation-id` header.
 - `docker compose up -d --build`, `uv run playwright install chromium` once, then `uv run pytest -m e2e`: the Playwright journey against `localhost:8000`, axe-core at 375 and 1440 px; excluded from the default run and CI.
+- `docker compose up -d --build` then `./scripts/fhir-validate.sh`: every `/fhir` answer on the demo seed (`scripts/fhir_samples.py`, each reader) passes the pinned HL7 validator 7.0.6 for R4 4.0.1 with zero error; needs Java 11+, the jar is cached in `.cache/`.
 - `./scripts/load-run.sh`: Locust search and booking p95 on the load seed, in its own compose project removed at exit.
 - pre-commit `--all-files` only lints tracked files: run `uv run ruff check .` and `uv run ruff format --check .` before new files are staged.
 - Commit the whole index: `git commit -- <paths>` makes pre-commit stash the other staged work and check a mixed tree; never skip a failing hook, fix its cause.
