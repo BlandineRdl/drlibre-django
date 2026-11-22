@@ -1,3 +1,5 @@
+from django.db import connection
+
 from drlibre.audit.application.ports.inbound import (
     AuditFilter,
     AuditQueries,
@@ -7,6 +9,20 @@ from drlibre.audit.application.ports.inbound import (
 from drlibre.audit.infrastructure.django.models import AuditEntryRecord
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import PAGE_SIZE, Page, PageRequest
+
+# Loose index scan on `audit_entry_target_at`: one index probe per distinct type.
+_ENTITY_TYPES = """
+WITH RECURSIVE kinds AS (
+    (SELECT entity_type FROM audit_auditentryrecord ORDER BY entity_type LIMIT 1)
+    UNION ALL
+    SELECT (
+        SELECT a.entity_type FROM audit_auditentryrecord a
+        WHERE a.entity_type > k.entity_type ORDER BY a.entity_type LIMIT 1
+    )
+    FROM kinds k WHERE k.entity_type IS NOT NULL
+)
+SELECT entity_type FROM kinds WHERE entity_type IS NOT NULL
+"""
 
 
 def _audit_row(row: AuditEntryRecord) -> AuditRow:
@@ -50,5 +66,6 @@ class DjangoAuditQueries(AuditQueries):
         return Page(tuple(_audit_row(r) for r in window), rows.count(), request.number)
 
     def entity_types(self) -> tuple[str, ...]:
-        found = AuditEntryRecord.objects.values_list("entity_type", flat=True).distinct()
-        return tuple(sorted(found))
+        with connection.cursor() as cursor:
+            cursor.execute(_ENTITY_TYPES)
+            return tuple(sorted(row[0] for row in cursor.fetchall()))

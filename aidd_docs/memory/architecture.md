@@ -78,6 +78,7 @@
 - The audit journal is read through audit's `ViewAuditJournal` (admin only); its `JournalActors` port (`IdentityJournalActors`) resolves the actor filter's email and the page's actor emails through identity; an unknown email matches no entry.
 - `ExportAppointments` (admin only) writes one `booking.appointments_exported` audit entry `{count}`; `csv_cell` prefixes `'` before `= + - @ \t \r`.
 - The audit log is read through `AuditQueries.page` (newest first, total) and `entity_types()`, called by `ViewAuditJournal`, whose `AuditJournal` carries the zone (`settings.TIME_ZONE`) its dates are read and shown in, named.
+- `entity_types()` is a loose index scan (recursive CTE, one probe per type) on `audit_entry_target_at`, never a scan of the append-only journal (#26).
 - Index `appointment_start` on `start` (`booking.0005`) serves the admin list, export and dashboard across hospitals.
 - API admin `GET /appointments` takes the list filters, `from`/`to` keep the date of the aware datetime; `POST /jobs/reminders` runs `RunReminders` synchronously and returns `{count}`.
 - The admin file history shows clinician actions as « Personnel ».
