@@ -197,15 +197,27 @@ def search_appointment(request: HttpRequest) -> HttpResponse:
     return bundle_response(APPOINTMENT, query, page.total, entries)
 
 
+def _profile_seen(practitioner_id: Id, who: Reader) -> Id | None:
+    """The clinician profile of a practitioner user the reader sees, else None."""
+    roles = container().directory_queries.roles(RoleFilter(practitioner=practitioner_id), who)
+    return next((r.id for r in roles.items if not r.is_admin), None)
+
+
 def _profile_of(practitioner_id: Id | None, who: Reader) -> Id | None:
     """The clinician profile of a practitioner user; one the reader cannot see is not_found."""
     if practitioner_id is None:
         return None
-    roles = container().directory_queries.roles(RoleFilter(practitioner=practitioner_id), who)
-    found = [r.id for r in roles.items if not r.is_admin]
-    if not found:
+    found = _profile_seen(practitioner_id, who)
+    if found is None:
         raise DomainError(ErrorCode.NOT_FOUND, "Praticien introuvable.")
-    return found[0]
+    return found
+
+
+def _preferred(practitioner_id: Id | None, who: Reader) -> Id | None:
+    """An unseen practitioner passes as is: the use case judges the caller before not_found."""
+    if practitioner_id is None:
+        return None
+    return _profile_seen(practitioner_id, who) or practitioner_id
 
 
 def _created(appointment_id: Id, who: Reader) -> HttpResponse:
@@ -223,7 +235,7 @@ def _join(actor_id: Id, resource: Appointment, who: Reader) -> HttpResponse:
     entry = container().join_waitlist.execute(
         actor_id=actor_id,
         appointment_type_id=asked.appointment_type_id,
-        clinician_id=_profile_of(asked.practitioner_id, who),
+        clinician_id=_preferred(asked.practitioner_id, who),
         from_date=asked.from_date,
         to_date=asked.to_date,
         patient_email=None,

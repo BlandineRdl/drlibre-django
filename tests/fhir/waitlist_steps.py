@@ -37,9 +37,11 @@ def _join_requests(booking: Booking, raw: str) -> tuple[dict[str, Any], dict[str
         participants.append({"actor": {"reference": f"Patient/{patient.id}"}})
         api["patient_email"] = patient.email.value
     if "practitioner" in asked:
-        practitioner = booking.user(asked["practitioner"]).id
+        named = asked["practitioner"]
+        unknown = str(uuid.uuid4())
+        practitioner = unknown if named == "unknown" else booking.user(named).id
         participants.append({"actor": {"reference": f"Practitioner/{practitioner}"}})
-        api["clinician_id"] = str(booking.profile(asked["practitioner"]))
+        api["clinician_id"] = unknown if named == "unknown" else str(booking.profile(named))
     resource: dict[str, Any] = {
         "resourceType": "Appointment",
         "status": "waitlist",

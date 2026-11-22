@@ -27,6 +27,7 @@ Feature: Un patient rejoint la liste d'attente et accepte une offre en FHIR
       | praticien                     | clinician | from=2026-11-23, to=2026-11-24                 | 403    | forbidden |
       | patient qui en inscrit un autre | first     | patient=second, from=2026-11-23, to=2026-11-24 | 403    | forbidden |
       | patient inactif               | admin     | patient=former, from=2026-11-23, to=2026-11-24 | 404    | not_found |
+      | praticien qui nomme un praticien préféré inconnu | clinician | practitioner=unknown, from=2026-11-23, to=2026-11-24 | 403 | forbidden |
 
   Scenario Outline: Un type inactif ou un praticien préféré inactif donne `not_found`. (<case>)
     Given the <inactive> is inactive
