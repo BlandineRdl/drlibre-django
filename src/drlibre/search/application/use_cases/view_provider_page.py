@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from drlibre.search.application.ports.inbound import ViewProviderPage
 from drlibre.search.application.ports.outbound import SearchQueries
@@ -30,4 +31,12 @@ class ViewProviderPageUseCase(ViewProviderPage):
             previous_monday=window.previous,
             next_monday=window.following,
             starts=starts,
+            today=horizon.now.astimezone(ZoneInfo(detail.time_zone)).date(),
+            next_start=None if starts else self._next_start(provider_id, kind.id, horizon, window),
         )
+
+    def _next_start(
+        self, provider_id: Id, type_id: Id, horizon: Horizon, window: Week
+    ) -> datetime | None:
+        later = self._queries.free_starts(provider_id, type_id, horizon, window.end, horizon.end)
+        return later[0] if later else None

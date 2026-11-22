@@ -153,6 +153,8 @@ class ProviderWeek:
     previous_monday: date | None
     next_monday: date | None
     starts: tuple[datetime, ...]
+    today: date | None = None
+    next_start: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -33,6 +33,7 @@ class DayView:
     label: str
     slots: tuple[SlotLinkView, ...]
     empty_text: str
+    past: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +49,8 @@ class ProviderPageView:
     zone_note: str
     week_value: str
     empty_week_text: str
+    next_slot_text: str = ""
+    next_slot_url: str = ""
 
 
 def _provider_url(provider_id: object, type_id: object, week: date | None = None) -> str:
@@ -65,10 +68,12 @@ def provider_page_view(page: ProviderWeek) -> ProviderPageView:
         if at.date() in by_day:
             link = clinician_booking_url(page.type_id, detail.id, start)
             by_day[at.date()].append(SlotLinkView(f"{at:%H:%M}", link))
+    past = page.today or page.monday
     days = tuple(
-        DayView(day_label(day), tuple(slots), "" if slots else NO_SLOT_THAT_DAY)
+        DayView(day_label(day), tuple(slots), _empty_day(day < past, slots), day < past)
         for day, slots in by_day.items()
     )
+    following = page.next_start and local(page.next_start, zone)
     sunday = page.monday + timedelta(days=6)
     return ProviderPageView(
         name=detail.full_name,
@@ -94,7 +99,17 @@ def provider_page_view(page: ProviderWeek) -> ProviderPageView:
         zone_note=f"Heures de {zone}.",
         week_value=page.monday.isoformat(),
         empty_week_text="" if page.starts else "Aucun créneau libre cette semaine.",
+        next_slot_text=f"Prochain créneau libre : {day_label(following.date())} à {following:%H:%M}"
+        if following
+        else "",
+        next_slot_url=_provider_url(detail.id, page.type_id, following.date()) if following else "",
     )
+
+
+def _empty_day(past: bool, slots: list[SlotLinkView]) -> str:
+    if slots:
+        return ""
+    return "Passé" if past else NO_SLOT_THAT_DAY
 
 
 @dataclass(frozen=True, slots=True)
