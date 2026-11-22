@@ -66,13 +66,16 @@ PATIENT = declare(
 _PROFILE = frozenset({"Patient.telecom.phone", "Patient.birthDate"})
 
 
+_CLOSED = "Cette fiche patient ne vous est pas ouverte."
+
+
 def _visible(patient_id: Id, who: Reader) -> PatientRow:
     """The patient as the reader sees them; another existing one is forbidden, absent not_found."""
     found = container().patient_queries.patients(PatientFilter(ids=(patient_id,)), who).items
     if found:
         return found[0]
     if container().patient_queries.exists(patient_id):
-        raise DomainError(ErrorCode.FORBIDDEN, "Cette fiche patient ne vous est pas ouverte.")
+        raise DomainError(ErrorCode.FORBIDDEN, _CLOSED)
     raise missing()
 
 
@@ -150,6 +153,9 @@ def update_patient(request: HttpRequest, resource_id: str) -> HttpResponse:
     who = reader(request)
     patient_id = parse_id(resource_id)
     _visible(patient_id, who)
+    # Only the patient and the admin write it: refused before the version and the fields.
+    if identity.role is not Role.ADMIN and identity.user_id != patient_id:
+        raise DomainError(ErrorCode.FORBIDDEN, _CLOSED)
     incoming = read_body(request, Patient)
     if incoming.id not in (None, resource_id):
         raise invalid_field("Patient.id", "L'id doit être celui de l'adresse.")

@@ -144,6 +144,14 @@ Feature: Un client agit avec le jeton d'un utilisateur et exactement ses droits
     And the patient "first" has phone "0633333333" and birth date "1985-02-03"
 
   @integration @django_db
+  Scenario: Le patient met à jour son propre téléphone et sa date de naissance ; une mise à jour avec un `If-Match` périmé échoue en 412. (pas le praticien, même avec un `If-Match` périmé)
+    Given two patients, a clinician who has seen the first one and an admin
+    When "first" updates the patient "first" with phone "0633333333" and birth date "1985-02-03" at the current version
+    And "clinician" updates the patient "first" with phone "0644444444" and birth date "1985-02-03" at the previous version
+    Then the client is refused with 403 and the code "forbidden"
+    And the patient "first" has phone "0633333333" and birth date "1985-02-03"
+
+  @integration @django_db
   Scenario Outline: Le patient met à jour son propre téléphone et sa date de naissance ; une mise à jour avec un `If-Match` périmé échoue en 412. (<case>)
     Given two patients, a clinician who has seen the first one and an admin
     When "<who>" changes the <field> of the patient "first" to "<value>"
