@@ -76,8 +76,8 @@ def test_l_admin_suit_l_activite_exporte_reserve_pour_un_patient_et_lance_les_ra
     page.get_by_label("Entité").select_option("appointment")
     page.get_by_role("button", name="Filtrer").click()
     journal = page.get_by_role("region", name="Entrées du journal d'audit")
-    expect(journal).to_contain_text("booking.appointments_exported")
-    expect(journal).to_contain_text("booking.appointment_cancelled")
+    expect(journal).to_contain_text("RDV exportés")
+    expect(journal).to_contain_text("RDV annulé")
     assert CANCEL_REASON not in journal.inner_text()
     check_accessible(page)
 

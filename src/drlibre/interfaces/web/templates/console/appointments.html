@@ -10,6 +10,7 @@
 </div>
 <p>{{ view.zone_note }}</p>
 <search>
+{% if view.date_warning %}<div role="alert" class="error-summary"><p>{{ view.date_warning }}</p></div>{% endif %}
 <form method="get" action="/console/appointments/">
   <div class="grid">
     <div>

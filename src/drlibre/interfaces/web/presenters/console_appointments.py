@@ -25,7 +25,7 @@ from drlibre.interfaces.web.presenters.portal import (
     status_key,
     week_strip,
 )
-from drlibre.interfaces.web.presenters.slots import day_label, local
+from drlibre.interfaces.web.presenters.slots import day_label, local, zone_name
 from drlibre.interfaces.web.presenters.workspace import (
     ACTOR_LABELS,
     NONE,
@@ -104,6 +104,9 @@ def filter_query(f: AdminAppointmentFilter) -> dict[str, str]:
     return {k: v for k, v in pairs.items() if v}
 
 
+INVERTED_DATES = "La date « Du » est après la date « Au » : aucun rendez-vous ne peut correspondre."
+
+
 @dataclass(frozen=True, slots=True)
 class FilterView:
     start: str
@@ -134,6 +137,7 @@ class AppointmentsListView:
     book_url: str
     zone_note: str
     status_column: int = HEADERS.index("Statut")
+    date_warning: str = ""
 
 
 def _choices(
@@ -180,7 +184,9 @@ def list_page(
         return f"{CONSOLE_APPOINTMENTS_URL}?{urlencode({**kept, 'page': number})}"
 
     noun = "résultat" if page.total == 1 else "résultats"
+    inverted = bool(shown.start_date and shown.end_date and shown.start_date > shown.end_date)
     return AppointmentsListView(
+        date_warning=INVERTED_DATES if inverted else "",
         filters=FilterView(
             start=kept.get("from", ""),
             end=kept.get("to", ""),
@@ -276,7 +282,13 @@ def file_page(
         notice=NOTICES.get(notice, ""),
         refusal=refusal_text(refusal) if refusal else "",
         reasons=rule_reasons(refusal),
-        facts=(*appointment_facts(file), FactView("Source", SOURCE_LABELS[a.source])),
+        facts=(
+            *appointment_facts(file),
+            FactView("Praticien", file.clinician_name),
+            FactView("Hôpital", file.hospital_name),
+            FactView("Fuseau", f"{zone_name(zone)} ({zone})"),
+            FactView("Source", SOURCE_LABELS[a.source]),
+        ),
         buttons=tuple(
             ButtonView(text, f"{text} : {label}", appointment_url(a.id, segment))
             for action, (segment, text) in STATUS_ACTIONS.items()

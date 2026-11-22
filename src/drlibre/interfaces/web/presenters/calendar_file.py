@@ -1,7 +1,7 @@
 import re
 from datetime import UTC, datetime
 
-from drlibre.booking.application.ports.inbound import Appointment
+from drlibre.booking.application.ports.inbound import Appointment, AppointmentStatus
 
 CRLF = "\r\n"
 FOLD_AT = 75
@@ -50,6 +50,7 @@ def calendar_file(
         f"DTEND:{_stamp(appointment.end)}",
         f"SUMMARY:{_escape(summary)}",
         f"LOCATION:{_escape(location)}",
+        *(("STATUS:CANCELLED",) if appointment.status is AppointmentStatus.CANCELLED else ()),
         "END:VEVENT",
         "END:VCALENDAR",
     )

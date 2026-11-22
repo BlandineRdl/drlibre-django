@@ -58,6 +58,16 @@ def test_a_changed_appointment_notifies_the_patient_and_emails_time_place_and_pr
     assert "Douleur" not in mail.body
 
 
+def test_a_rescheduled_email_recalls_the_former_date(world: FakeWorld) -> None:
+    """Règle §7.6 : l'email de déplacement rappelle l'ancienne date, dans le fuseau nommé."""
+    appointment = reason_appointment(world)
+
+    world.notices.rescheduled(appointment, START - timedelta(days=2))
+
+    (mail,) = world.outbox.queued
+    assert "Il était prévu le 23/11/2026 à 14:30." in mail.body
+
+
 def test_an_appointment_already_reminded_is_neither_notified_nor_emailed_again(
     world: FakeWorld,
 ) -> None:

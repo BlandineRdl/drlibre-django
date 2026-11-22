@@ -13,7 +13,7 @@
   {% endfor %}
 </section>
 <section aria-labelledby="past-heading">
-  <h2 id="past-heading">Passés</h2>
+  <h2 id="past-heading">Passés et annulés</h2>
   {% for card in view.past %}
   {% include "portal/_card.html" with card=card with_actions=True %}
   {% empty %}

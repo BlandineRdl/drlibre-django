@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import parse_qs, urlsplit
 
@@ -57,6 +58,14 @@ def test_unusable_filter_values_fall_back_to_no_filter() -> None:
     )
 
     assert shown == AdminAppointmentFilter()
+
+
+def test_a_from_date_after_the_to_date_is_explained() -> None:
+    """Story liste admin : « Du » après « Au » s'explique au lieu d'une liste vide muette."""
+    inverted = appointment_filter({"from": "2026-11-30", "to": "2026-11-01"})
+
+    assert "après la date « Au »" in listed(Page((), 0, 1), inverted).date_warning
+    assert listed(Page((), 0, 1), AdminAppointmentFilter()).date_warning == ""
 
 
 def test_pagination_and_export_keep_the_filters() -> None:
@@ -146,6 +155,16 @@ def test_the_file_shows_its_source_and_no_notes() -> None:
 
     assert ("Source", "En ligne") in [(f.label, f.value) for f in view.facts]
     assert not hasattr(view, "notes")
+
+
+def test_the_admin_file_names_the_clinician_the_hospital_and_the_zone() -> None:
+    """Story fiche admin : praticien, hôpital et fuseau nommés."""
+    shown = replace(file(entry()), clinician_name="Claire Martin", hospital_name="Hôpital Nord")
+
+    facts = {f.label: f.value for f in file_page(shown, week=None).facts}
+
+    assert (facts["Praticien"], facts["Hôpital"]) == ("Claire Martin", "Hôpital Nord")
+    assert facts["Fuseau"] == "heure de Paris (Europe/Paris)"
 
 
 def test_an_empty_booking_week_points_to_the_next_free_slot() -> None:

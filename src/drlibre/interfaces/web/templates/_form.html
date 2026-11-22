@@ -23,7 +23,7 @@
       {% for c in f.choices %}<option value="{{ c.value }}"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
     </select>
     {% elif f.kind == "textarea" %}
-    <textarea id="field-{{ f.name }}" name="{{ f.name }}" rows="3"{% if f.error %} aria-invalid="true"{% endif %}{% if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}{% if f.autofocus %} autofocus{% endif %}>{{ f.value }}</textarea>
+    <textarea id="field-{{ f.name }}" name="{{ f.name }}" rows="3"{% if f.required %} required{% endif %}{% if f.error %} aria-invalid="true"{% endif %}{% if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}{% if f.autofocus %} autofocus{% endif %}>{{ f.value }}</textarea>
     {% else %}
     <input type="{{ f.kind }}" id="field-{{ f.name }}" name="{{ f.name }}" value="{{ f.value }}" autocomplete="{{ f.autocomplete }}"{% if f.required %} required{% endif %}{% if f.error %} aria-invalid="true"{% endif %}{% if f.described_by %} aria-describedby="{{ f.described_by }}"{% endif %}{% if f.autofocus %} autofocus{% endif %}>
     {% endif %}
