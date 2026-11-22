@@ -92,3 +92,55 @@ Feature: Un client sans jeton découvre le référentiel et les créneaux libres
       | ressource inconnue       | /fhir/Foo                              | 404    | not-found | not_found     |
       | paramètre non pris en charge | /fhir/Organization?colour=red      | 400    | invalid   | invalid_input |
       | référence mal formée     | /fhir/Schedule?actor=Patient/12        | 400    | invalid   | invalid_input |
+
+  Scenario: Les recherches acceptent les paramètres du §15.5 pour ces ressources et `_include` `PractitionerRole:practitioner`, `PractitionerRole:organization`, `Slot:schedule`. (plage incluse)
+    Given on "2026-11-20" the clinician is held at "09:00", booked at "10:00" and off at "11:00" on "2026-11-23"
+    When a client without a token searches "/fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00&start=lt2026-11-24T00:00:00%2B01:00&_include=Slot:schedule"
+    Then the FHIR slots are "09:30 free, 10:30 free, 11:30 free"
+    And the bundle includes only "Schedule" "$rule"
+
+  Scenario: Une recherche `Slot` exige `service-type` et une plage `start` de 31 jours au plus, sinon `invalid_input` ; elle renvoie seulement les créneaux libres de §5.1, avec un id stable pour un même schedule, type et début. (créneaux libres)
+    Given on "2026-11-20" the clinician is held at "09:00", booked at "10:00" and off at "11:00" on "2026-11-23"
+    When a client without a token searches "/fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00&start=lt2026-11-24T00:00:00%2B01:00"
+    Then the FHIR slots are "09:30 free, 10:30 free, 11:30 free"
+    And every slot is of "$online" on "Schedule/$rule" with its stable id
+
+  Scenario: Une recherche `Slot` exige `service-type` et une plage `start` de 31 jours au plus, sinon `invalid_input` ; elle renvoie seulement les créneaux libres de §5.1, avec un id stable pour un même schedule, type et début. (id stable et lecture)
+    Given on "2026-11-20" the clinician is held at "09:00", booked at "10:00" and off at "11:00" on "2026-11-23"
+    When a client without a token searches "/fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00&start=lt2026-11-24T00:00:00%2B01:00"
+    And the client searches the same slots again
+    Then the ids are the same as before
+    When the client reads the first slot
+    Then the answer is a FHIR Slot "free"
+
+  Scenario Outline: Une recherche `Slot` exige `service-type` et une plage `start` de 31 jours au plus, sinon `invalid_input` ; elle renvoie seulement les créneaux libres de §5.1, avec un id stable pour un même schedule, type et début. (praticien ou plage : <case>)
+    Given on "2026-11-20" the clinician is held at "09:00", booked at "10:00" and off at "11:00" on "2026-11-23"
+    When a client without a token searches "/fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00&start=lt2026-11-24T00:00:00%2B01:00&<narrowed>"
+    Then the FHIR slots are "<slots>"
+
+    Examples:
+      | case               | narrowed                                | slots                               |
+      | praticien          | schedule.actor=Practitioner/$clinician  | 09:30 free, 10:30 free, 11:30 free  |
+      | plage              | schedule=Schedule/$rule                 | 09:30 free, 10:30 free, 11:30 free  |
+      | ancien praticien   | schedule.actor=Practitioner/$former     |                                     |
+
+  Scenario Outline: Une recherche `Slot` exige `service-type` et une plage `start` de 31 jours au plus, sinon `invalid_input` ; elle renvoie seulement les créneaux libres de §5.1, avec un id stable pour un même schedule, type et début. (fenêtre coupée par l'instant présent : <case>)
+    Given on "2026-11-20" the clinician is held at "09:00", booked at "10:00" and off at "11:00" on "2026-11-23"
+    When a client without a token searches "/fhir/Slot?service-type=$online&start=ge2026-11-16T00:00:00%2B01:00&start=lt<end>"
+    Then the FHIR slots are ""
+
+    Examples:
+      | case                     | end                       |
+      | période déjà passée      | 2026-11-17T00:00:00%2B01:00 |
+      | période finissant maintenant | 2026-11-20T11:00:00%2B01:00 |
+
+  Scenario Outline: Une recherche `Slot` exige `service-type` et une plage `start` de 31 jours au plus, sinon `invalid_input` ; elle renvoie seulement les créneaux libres de §5.1, avec un id stable pour un même schedule, type et début. (refus : <case>)
+    When a client without a token reads "<path>"
+    Then the answer is <status> with an OperationOutcome "<issue>" and the code "<code>"
+
+    Examples:
+      | case                 | path                                                                                          | status | issue     | code          |
+      | sans type            | /fhir/Slot?start=ge2026-11-23T00:00:00%2B01:00&start=lt2026-11-24T00:00:00%2B01:00                                                                              | 400    | invalid   | invalid_input |
+      | sans borne de fin    | /fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00                           | 400    | invalid   | invalid_input |
+      | plus de 31 jours     | /fhir/Slot?service-type=$online&start=ge2026-11-23T00:00:00%2B01:00&start=lt2026-12-25T00:00:00%2B01:00 | 400 | invalid | invalid_input |
+      | id mal formé         | /fhir/Slot/abc                                                                                | 404    | not-found | not_found     |

@@ -22,6 +22,7 @@ class Exchange:
 
     directory: Directory | None = None
     response: Any = None
+    previous: Any = None
 
     def path(self, raw: str) -> str:
         assert self.directory is not None

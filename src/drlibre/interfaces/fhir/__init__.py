@@ -12,6 +12,7 @@ from drlibre.interfaces.fhir.access import gate
 from drlibre.interfaces.fhir.metadata import router as metadata_router
 from drlibre.interfaces.fhir.outcome import error_outcome, not_supported
 from drlibre.interfaces.fhir.routers.directory import router as directory_router
+from drlibre.interfaces.fhir.routers.slots import router as slots_router
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 _ACCEPTED = frozenset({"application/fhir+json", "application/json"})
@@ -41,6 +42,7 @@ fhir = NinjaAPI(
 )
 fhir.add_router("/", metadata_router)
 fhir.add_router("/", directory_router)
+fhir.add_router("/", slots_router)
 
 
 @fhir.exception_handler(DomainError)

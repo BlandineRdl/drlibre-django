@@ -42,6 +42,14 @@ class SlotEngine:
         }
         return tuple(sorted(found, key=lambda s: s.start))
 
+    def rule_of(self, slot: Slot) -> AvailabilityRule | None:
+        """The rule proposing the slot, the earliest starting one when several do."""
+        day = slot.start.astimezone(self.time_zone).date()
+        ordered = sorted(self.rules, key=lambda r: (r.start, str(r.id)))
+        return next(
+            (r for r in ordered if r.applies_on(day) and slot in self._rule_slots(r, day)), None
+        )
+
     def _proposed(self, window: Period) -> Iterator[Slot]:
         for day in _local_days(window, self.time_zone):
             for rule in self.rules:

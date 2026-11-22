@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from drlibre.scheduling.domain.availability_rule import WEEKDAYS, AvailabilityRule
-from drlibre.scheduling.domain.slot import Slot
+from drlibre.scheduling.domain.slot import Slot, SlotState, SlotStatus
 from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
@@ -18,15 +18,19 @@ __all__ = [
     "ExtendSlotHorizon",
     "FindFreeSlots",
     "FindFreeWeek",
+    "FindSlotStates",
     "FreeCliniciansAt",
     "FreeWeek",
     "IsSlotFree",
     "NextBookableSlots",
+    "ReadSlotState",
     "RecordTimeOff",
     "RefreshSlots",
     "RoomUsage",
     "SaveAvailabilityRule",
     "Slot",
+    "SlotState",
+    "SlotStatus",
     "TimeOff",
 ]
 
@@ -42,6 +46,32 @@ class FindFreeSlots(Protocol):
         ignoring_appointment: Id | None = None,
     ) -> tuple[Slot, ...]:
         """Sorted free slots, the ignored appointment's time freed; invalid_input over 31 days."""
+        ...
+
+
+FREE_ONLY = frozenset({SlotStatus.FREE})
+
+
+class FindSlotStates(Protocol):
+    def execute(
+        self,
+        *,
+        appointment_type_id: Id,
+        clinician_id: Id | None,
+        start: datetime,
+        end: datetime,
+        statuses: frozenset[SlotStatus] = FREE_ONLY,
+        staff: bool = False,
+    ) -> tuple[SlotState, ...]:
+        """FindFreeSlots per clinician with its rule, by start; other statuses staff only."""
+        ...
+
+
+class ReadSlotState(Protocol):
+    def execute(
+        self, *, appointment_type_id: Id, clinician_id: Id, start: datetime, staff: bool = False
+    ) -> SlotState | None:
+        """The clinician's slot starting there, any status for staff, else free only, or None."""
         ...
 
 
