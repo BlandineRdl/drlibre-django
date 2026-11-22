@@ -15,6 +15,7 @@ from drlibre.booking.application.ports.inbound import (
     HistoryActor,
     RoomsDayView,
 )
+from drlibre.interfaces.web.presenters.audit_labels import action_label
 from drlibre.interfaces.web.presenters.availability import (
     GRID_ROWS,
     GRID_START,
@@ -76,13 +77,6 @@ NOTICES = {
     "cancelled": "Le rendez-vous est annulé.",
     "moved": "Le rendez-vous est déplacé.",
     "notes": "Les notes cliniques sont enregistrées.",
-}
-ACTION_LABELS = {
-    "booking.appointment_booked": "RDV réservé",
-    "booking.appointment_cancelled": "RDV annulé",
-    "booking.appointment_rescheduled": "RDV déplacé",
-    "booking.appointment_status_changed": "Statut modifié",
-    "booking.appointment_notes_written": "Notes cliniques enregistrées",
 }
 ACTOR_LABELS = {
     HistoryActor.PATIENT: "Patient",
@@ -366,7 +360,7 @@ def appointment_page(
         history=tuple(
             HistoryRowView(
                 at=f"{local(h.at, zone):%d/%m/%Y %H:%M}",
-                action=ACTION_LABELS.get(h.action, h.action),
+                action=action_label(h.action),
                 actor=ACTOR_LABELS[h.actor],
             )
             for h in file.history

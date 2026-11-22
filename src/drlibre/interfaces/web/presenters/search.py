@@ -8,6 +8,7 @@ from drlibre.interfaces.web.presenters.slots import (
     clinician_booking_url,
     first_available_url,
     slot_label,
+    zone_name,
 )
 from drlibre.search.application.ports.inbound import (
     DEFAULT_PAGE_SIZE,
@@ -205,7 +206,7 @@ def provider_result(item: ProviderResult) -> ResultView:
     lines = (
         f"{item.title} · {item.specialty_name}",
         _near(place, item.distance_km),
-        f"Heures de {item.time_zone}",
+        zone_name(item.time_zone, heading=True),
     )
     return ResultView(
         title=item.full_name,
@@ -227,7 +228,7 @@ def hospital_result(item: HospitalResult) -> ResultView:
         _near(f"{item.street}, {item.postal_code} {item.city}", item.distance_km),
         f"Spécialités : {', '.join(item.specialties)}",
         _plural(item.providers, "praticien réservable", "praticiens réservables"),
-        f"Heures de {item.time_zone}",
+        zone_name(item.time_zone, heading=True),
     )
     if slots:
         lines += (
@@ -255,7 +256,7 @@ def specialty_result(item: SpecialtyResult) -> ResultView:
     lines = (
         _plural(item.providers, "praticien", "praticiens"),
         _near(_plural(item.hospitals, "hôpital", "hôpitaux"), item.distance_km),
-        *((f"Heures de {zone}",) if slots else ()),
+        *((zone_name(zone, heading=True),) if slots else ()),
     )
     return ResultView(
         title=item.name,

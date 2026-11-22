@@ -5,6 +5,7 @@ from datetime import timedelta
 from urllib.parse import urlencode
 
 from drlibre.audit.application.ports.inbound import AuditFilter, AuditRow
+from drlibre.interfaces.web.presenters.audit_labels import action_label, entity_label
 from drlibre.interfaces.web.presenters.forms import ChoiceView
 from drlibre.interfaces.web.presenters.slots import local
 from drlibre.shared_kernel.ids import Id
@@ -37,12 +38,13 @@ def actor_email(raw: str | None) -> str:
 
 
 def _row(row: AuditRow, emails: Mapping[Id, str], time_zone: str) -> tuple[str, ...]:
-    entity = f"{row.entity_type} {row.entity_id}" if row.entity_id else row.entity_type
+    kind = entity_label(row.entity_type)
+    entity = f"{kind} {row.entity_id}" if row.entity_id else kind
     actor = emails.get(row.actor_id, "") if row.actor_id else ""
     return (
         f"{local(row.at, time_zone):%d/%m/%Y %H:%M:%S}",
         actor,
-        row.action,
+        action_label(row.action),
         entity,
         row.correlation_id,
     )
@@ -77,7 +79,7 @@ def audit_page(
         entity_type=shown_type,
         start=start,
         end=end,
-        entity_choices=tuple(ChoiceView(t, t, t == shown_type) for t in entity_types),
+        entity_choices=tuple(ChoiceView(t, entity_label(t), t == shown_type) for t in entity_types),
         headers=HEADERS,
         rows=tuple(_row(r, emails, time_zone) for r in page.items),
         summary=f"{page.total} {noun} · page {page.number} sur {page.pages}",

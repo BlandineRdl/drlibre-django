@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from drlibre.audit.application.ports.inbound import AuditFilter, AuditRow
+from drlibre.interfaces.web.presenters.audit_labels import action_label
 from drlibre.interfaces.web.presenters.console_audit import actor_email, audit_page
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page
@@ -27,7 +28,7 @@ def test_rows_show_paris_time_actor_email_and_correlation_id() -> None:
         AuditRow(
             datetime(2026, 11, 20, 9, 5, tzinfo=UTC),
             ACTOR,
-            "booking.cancelled",
+            "booking.appointment_cancelled",
             "appointment",
             entity,
             "corr-1",
@@ -55,11 +56,11 @@ def test_rows_show_paris_time_actor_email_and_correlation_id() -> None:
         (
             "20/11/2026 10:05:00",
             "admin@drlibre.localhost",
-            "booking.cancelled",
-            f"appointment {entity}",
+            "RDV annulé",
+            f"Rendez-vous {entity}",
             "corr-1",
         ),
-        ("20/11/2026 09:00:00", "", "booking.reminders_sent", "appointment", "corr-2"),
+        ("20/11/2026 09:00:00", "", "Rappels envoyés", "Rendez-vous", "corr-2"),
     )
     assert view.zone_note == "Heures affichées dans le fuseau Europe/Paris."
 
@@ -83,7 +84,10 @@ def test_usable_filters_are_shown_again_and_kept_by_the_pagination() -> None:
         "&entity_type=appointment&from=2026-11-01&to=2026-11-20"
     )
     assert view.previous_url.startswith("/console/audit/?page=1&")
-    assert [c.selected for c in view.entity_choices] == [True, False]
+    assert [(c.label, c.selected) for c in view.entity_choices] == [
+        ("Rendez-vous", True),
+        ("Utilisateur", False),
+    ]
 
 
 def test_an_unusable_filter_falls_back_to_the_default() -> None:
@@ -101,3 +105,9 @@ def test_an_unusable_filter_falls_back_to_the_default() -> None:
 
     assert (view.actor, view.entity_type, view.start, view.end) == ("", "", "", "")
     assert actor_email("  Admin@DrLibre.localhost ") == "admin@drlibre.localhost"
+
+
+def test_a_reference_write_reads_as_its_entity_and_verb() -> None:
+    """Story journal : l'action se lit en clair, même pour une écriture du référentiel."""
+    assert action_label("room.created") == "Salle : créé"
+    assert action_label("unknown.thing") == "unknown.thing"

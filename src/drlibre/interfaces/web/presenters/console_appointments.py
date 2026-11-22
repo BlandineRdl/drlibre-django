@@ -1,6 +1,6 @@
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from drlibre.booking.application.ports.inbound import (
@@ -14,6 +14,7 @@ from drlibre.booking.application.ports.inbound import (
     Source,
 )
 from drlibre.identity.application.ports.inbound import PatientMatch
+from drlibre.interfaces.web.presenters.audit_labels import action_label
 from drlibre.interfaces.web.presenters.forms import ChoiceView, FormView, build_form
 from drlibre.interfaces.web.presenters.portal import (
     REASON_FIELD,
@@ -24,9 +25,8 @@ from drlibre.interfaces.web.presenters.portal import (
     status_key,
     week_strip,
 )
-from drlibre.interfaces.web.presenters.slots import local
+from drlibre.interfaces.web.presenters.slots import day_label, local
 from drlibre.interfaces.web.presenters.workspace import (
-    ACTION_LABELS,
     ACTOR_LABELS,
     NONE,
     STATUS_ACTIONS,
@@ -289,7 +289,7 @@ def file_page(
         history=tuple(
             HistoryRowView(
                 at=f"{local(h.at, zone):%d/%m/%Y %H:%M}",
-                action=ACTION_LABELS.get(h.action, h.action),
+                action=action_label(h.action),
                 actor=ACTOR_LABELS[h.actor],
             )
             for h in file.history
@@ -366,6 +366,8 @@ class BookPage:
     time_zone: str
     action: str
     cancel_url: str
+    next_slot_text: str = ""
+    next_slot_url: str = ""
 
 
 def _picked(options: tuple[ChoiceView, ...], raw: str) -> tuple[ChoiceView, ...]:
@@ -381,9 +383,11 @@ def book_page(
     rooms: tuple[BookingOption, ...],
     week: FreeWeek | None,
     error: DomainError | None = None,
+    upcoming: tuple[datetime, ...] = (),
 ) -> BookPage:
     """Patient, type, clinician, then the week's free slots with an optional room."""
     strip = None
+    following = None
     if week is not None:
         strip = week_strip(week, BOOK_URL)
 
@@ -395,6 +399,9 @@ def book_page(
             previous_url=week_url(week.previous_monday),
             next_url=week_url(week.next_monday),
         )
+        sunday = week.monday + timedelta(days=6)
+        later = (local(s, week.time_zone) for s in upcoming)
+        following = None if week.slots else next((s for s in later if s.date() > sunday), None)
     return BookPage(
         refusal=refusal_text(error) if error else "",
         reasons=rule_reasons(error),
@@ -414,4 +421,12 @@ def book_page(
         time_zone=week.time_zone if week else "",
         action=BOOK_URL,
         cancel_url=CONSOLE_APPOINTMENTS_URL,
+        next_slot_text=(
+            f"Prochain créneau libre : {day_label(following.date())} à {following:%H:%M}"
+            if following
+            else ""
+        ),
+        next_slot_url=(
+            f"{BOOK_URL}?{choice.query(week=following.date().isoformat())}" if following else ""
+        ),
     )

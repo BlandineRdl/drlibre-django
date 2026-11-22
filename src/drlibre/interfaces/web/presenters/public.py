@@ -16,6 +16,7 @@ from drlibre.interfaces.web.presenters.slots import (
     first_available_url,
     local,
     slot_label,
+    zone_name,
 )
 from drlibre.search.application.ports.inbound import (
     DEFAULT_PAGE_SIZE,
@@ -96,7 +97,7 @@ def provider_page_view(page: ProviderWeek) -> ProviderPageView:
             _provider_url(detail.id, page.type_id, page.next_monday) if page.next_monday else ""
         ),
         days=days,
-        zone_note=f"Heures de {zone}.",
+        zone_note=f"Heures affichées à l'{zone_name(zone)} ({zone}).",
         week_value=page.monday.isoformat(),
         empty_week_text="" if page.starts else "Aucun créneau libre cette semaine.",
         next_slot_text=f"Prochain créneau libre : {day_label(following.date())} à {following:%H:%M}"
@@ -156,7 +157,7 @@ def hospital_page_view(page: HospitalPage) -> HospitalPageView:
         specialties=detail.specialties,
         first_by_type=firsts,
         providers=tuple(provider_result(p) for p in page.providers),
-        zone_note=f"Heures de {zone}.",
+        zone_note=f"Heures affichées à l'{zone_name(zone)} ({zone}).",
     )
 
 

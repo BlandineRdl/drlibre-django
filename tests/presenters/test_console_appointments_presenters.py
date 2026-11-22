@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -13,12 +13,15 @@ from drlibre.booking.application.ports.inbound import (
 from drlibre.interfaces.web.presenters.console_appointments import (
     CSV_HEADERS,
     AppointmentsListView,
+    BookChoice,
     appointment_filter,
+    book_page,
     csv_cell,
     csv_rows,
     file_page,
     list_page,
 )
+from drlibre.scheduling.application.ports.inbound import FreeWeek
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page
 from tests.builders_booking import existing_appointment
@@ -143,3 +146,17 @@ def test_the_file_shows_its_source_and_no_notes() -> None:
 
     assert ("Source", "En ligne") in [(f.label, f.value) for f in view.facts]
     assert not hasattr(view, "notes")
+
+
+def test_an_empty_booking_week_points_to_the_next_free_slot() -> None:
+    """Story réserver pour un patient : une semaine vide renvoie au prochain créneau libre."""
+    choice = BookChoice(patient="p", appointment_type="t", clinician="c")
+    week = FreeWeek(date(2026, 11, 16), None, date(2026, 11, 23), "Europe/Paris", ())
+    upcoming = (datetime(2026, 11, 22, 9, tzinfo=UTC), datetime(2026, 11, 24, 8, tzinfo=UTC))
+
+    view = book_page(
+        choice, patients=(), types=(), clinicians=(), rooms=(), week=week, upcoming=upcoming
+    )
+
+    assert view.next_slot_text == "Prochain créneau libre : mar. 24/11 à 09:00"
+    assert parse_qs(urlsplit(view.next_slot_url).query)["week"] == ["2026-11-24"]
