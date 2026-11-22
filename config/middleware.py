@@ -7,7 +7,7 @@ import structlog
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
-from drlibre.interfaces.paths import FHIR_PREFIX
+from drlibre.interfaces.paths import API_PREFIX, FHIR_PREFIX
 
 HEADER = "x-correlation-id"
 _VALID = re.compile(r"[\x21-\x7e]{1,128}")
@@ -72,7 +72,7 @@ def _is_cross_origin(request: HttpRequest) -> bool:
 
 def _forbidden(request: HttpRequest) -> HttpResponse:
     message = "Requête refusée : elle vient d'un autre site."
-    if request.path.startswith("/api/"):
+    if request.path.startswith(API_PREFIX):
         body = {"code": "forbidden", "message": message, "details": {}}
         return JsonResponse(body, status=403)
     return render(request, "errors/403.html", {"message": message}, status=403)
