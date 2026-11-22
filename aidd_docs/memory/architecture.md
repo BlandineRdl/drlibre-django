@@ -40,6 +40,7 @@
 - The slot table is updated in the same transaction as each booking.
 - `scheduling_slot` holds free slots per clinician and type, today to today + 90 days; `RefreshSlots` rebuilds a clinician's rows inside the unit of work of each rule or time-off write, and of each appointment type save or clinician profile attach, edit, delete through organisation's `SlotRefresh` port.
 - A clinician's overlap and duplicate checks are serialised by `select_for_update` on their profile, inside the unit of work of the write.
+- Search text and city match through `unaccent(...) ILIKE unaccent(...)` (extension in `organisation.0004`), so « pediatrie » finds « Pédiatrie ».
 - Past slots and inactive clinicians are filtered at read time; the daily job only extends the horizon.
 - Hold expiry is checked in the slot query, never left to a scheduled job.
 - Django stores session keys raw; the session store must keep only a hash.
