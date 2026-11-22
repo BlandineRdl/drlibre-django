@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: `Patient` et écritures conditionnelles `If-Match`

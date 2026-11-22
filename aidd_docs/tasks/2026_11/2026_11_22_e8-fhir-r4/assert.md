@@ -50,3 +50,24 @@
 | `uv run pytest tests/test_acceptance_names.py -q` | 1 | `bullets without a scenario`: token story (4 bullets, phases 4 to 8); « sans jeton » story: « toute écriture renvoie `unauthenticated` » (no write declared before phase 4); the `Slot` bullets are covered |
 | pre-commit hooks of `290bc45` (Python Doctor included) | 0 | |
 | `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+## Round 4
+- Head: `0af0fda`
+- Uncommitted changes: no (plan docs only)
+- Verdict: PASS for phase 4 scope
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 | |
+| `uv run ruff format --check .` | 0 | |
+| `uv run lint-imports` | 0 | |
+| `uv run pyrefly check` | 0 | |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | |
+| `uv run pytest tests/fhir tests/use_cases tests/properties tests/contracts tests/api tests/presenters tests/test_acceptance_names.py tests/integration/test_concurrent_conditional_writes_postgres.py -q` | 0 | 1653 passed |
+| `test_concurrent_conditional_writes_postgres.py` with the `select_for_update` of `DjangoConditionalWrites` removed | 1 | expected: `second_was_blocked` `[False] == [True]` on both targets |
+| pre-commit hooks of `0af0fda` (Python Doctor included) | 0 | |
+| `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+- `tests/test_acceptance_names.py` is green: the token story's four bullets and « Sans jeton, toute écriture renvoie `unauthenticated` (401). » (on `PUT Patient`, re-proven for every write in phase 11).
+- To record in `architecture.md` (phase 11): `interop/infrastructure/conditional_writes.py` is a second lock adapter locking other contexts' rows by their ORM models (clinician profile, user, appointment, availability rule), the accepted exception beside booking's `schedule_locks`.
+- Deviations: the read port is `PatientQueries` (rule 0-ports: several reads make a `*Queries` port), not `PatientReads`; the token scenarios stay in `tests/features/identity/…` run by `tests/use_cases/identity/test_api_tokens.py`; field errors raised by `UpdateProfile` keep their product names (`phone`, `birth_date`) in `expression`, only diff refusals carry FHIR paths; `phase-3.md` still says `status: pending` although round 3 closed it.
