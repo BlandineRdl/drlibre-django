@@ -91,3 +91,23 @@
 - Every bullet of « Un client réserve et consulte des RDV en FHIR » names a scenario; each refusal is replayed on `POST /api/v1/appointments` with the same token and answers the same status, code and (but for `invalid_input` field paths) details.
 - Deviations: the read port is `InteropAppointmentQueries` (booking already owns an `AppointmentQueries`, rule 0-ports: two reads make a `*Queries` port), not `AppointmentReads`; `comment` is refused on create beside `reasonCode` (no screen writes notes while booking); an inactive patient booked by the admin answers 403 `forbidden`, as `refuse_non_patient` does; a clinician sees no waitlist entry (§15.4, plan decision); a hold carries no patient participant, its visitor has no account.
 - To record in `architecture.md` (phase 11): `SqlInteropAppointmentQueries` takes the `Clock` so an expired hold is absent, as in the slot query.
+
+## Round 6
+- Head: `953d2cf`
+- Uncommitted changes: no (plan docs only)
+- Verdict: PASS for phase 6 scope
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 | |
+| `uv run ruff format --check .` | 0 | |
+| `uv run lint-imports` | 0 | |
+| `uv run pyrefly check` | 0 | |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | |
+| `uv run pytest tests/fhir tests/contracts tests/use_cases tests/api tests/presenters tests/test_acceptance_names.py -q` | 0 | 1679 passed |
+| two mutants (several intentions accepted, cancel reason forced) | 1 | 5 scenarios fail, reverted |
+| pre-commit hooks of `953d2cf` (Python Doctor included) | 0 | |
+| `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+- Every bullet of « Un client déplace, annule et change le statut d'un RDV en FHIR » names a scenario; refusals are replayed on `POST /api/v1/appointments/{id}/…` with the same token (same status, code and, but for `invalid_input`, details); audit, notifications and emails are compared with the application API, notes with the workspace file screen.
+- Deviations: emails are read from the recording outbox of the `bookable` scene, as in phase 5, not from Mailpit; a waitlist entry or a hold answers 409 `invalid_transition` with its own status on any `PUT` (§15.6 updates appointments only; phase 7 accepts offers through `AppointmentResponse`); several intentions in one update answer `invalid_input` naming every changed path; a `cancelationReason` changed without `status` is `invalid_input`; a missing cancellation reason keeps the use case's field name `reason`, as phase 4 kept product names; the « other status » refusal is built in the mapper with the domain's message and `{status}` details, since no use case exists for it.
