@@ -180,3 +180,27 @@
 - Lock order: no organisation use case nor `SaveUser` takes a row lock (`records.py`, `save_user.py`; `RefreshSlots` takes none), so `If-Match` locks the record's own row (`WriteTarget.record`, new `Locked` members); `PractitionerRole` locks the profile as `lock_profile`, `Practitioner` and `Patient` the user row.
 - Deviations: the `ValueSet` stays read-only (POST, PUT, DELETE answer 405) and follows the `CodeSystem` writes, against the bullet « l'admin … `ValueSet` », to record in the PR and `open-questions.md`; writes are served by `routers/reference_writes.py` on the directory router (Ninja needs one router per path); `Organization` gains a `description` extension so a hospital or department round-trips; the profile's title is the write-only `title` extension of `PractitionerRole`, kept when absent, read on `Practitioner.name.prefix`; a staff user's role is the write-only `role` extension of `Practitioner` (`clinician` by default on create, kept when absent), so an admin is also created and their own role change refused there; an admin's `PractitionerRole` (id = user) is not writable (`invalid_input`, write the `Practitioner`); a site `Location` write is `invalid_input` « Le site s'écrit par son Organization `prov` »; admin updates refuse a changed phone or title (`invalid_input`), a patient's phone or birth date and a role's `availableTime` or `notAvailable` (`forbidden`, other role); computed elements (site `partOf`, type specialties, role services, department `active`) are ignored; deletes answer 204 without `If-Match`.
 - To record in `architecture.md` (phase 11): reference writes go through the console's use cases with `require_admin` at the FHIR door; `If-Match` on a reference record locks its own row.
+
+## Round 10
+- Head: `5741f30`
+- Uncommitted changes: yes (phase 10, committed as `7fe2e1b`, its pre-commit hooks all pass)
+- Verdict: PASS for phase 10 scope
+
+| Check | Exit | Failure |
+| --- | --- | --- |
+| `uv run ruff check .` | 0 |  |
+| `uv run ruff format --check .` | 0 |  |
+| `uv run lint-imports` | 0 |  |
+| `uv run pyrefly check` | 0 |  |
+| `uv run python manage.py makemigrations --check --dry-run` | 0 | no migration |
+| `uv run pytest tests/fhir tests/contracts tests/use_cases tests/api tests/presenters tests/integration/test_concurrent_conditional_writes_postgres.py tests/test_acceptance_names.py -q` | 0 | 1834 passed |
+| mutant: the notAvailable write without `all_or_nothing` | 1 | 1 scenario fails (« une période refusée, aucune écrite »), reverted |
+| mutant: a clinician may write another's role | 1 | 1 scenario fails, reverted |
+| mutant: a schedule may name another practitioner | 1 | 3 scenarios fail, reverted |
+| mutant: a clinician's role diff dropped | 1 | 4 scenarios fail, reverted |
+| `uv run pytest -m e2e`, full suite | not run | out of scope: once at the end of the plan |
+
+- Every bullet of « Le praticien gère ses disponibilités en FHIR » names a scenario; each `Schedule` and `notAvailable` write's audit trail is compared entry by entry with the workspace screens (`/workspace/availability/`, `/workspace/time-off/`), actor and metadata included; `Slot` searches show each change at once; a booked appointment inside a new time off stays `BOOKED`.
+- All or nothing: `ConditionalWrites.run(all_or_nothing=True)` opens the outer transaction with or without `If-Match`, locks the target and lets a refusal roll back every use case already run; the default keeps the waitlist's commit-then-raise; the fake only runs the write, so the rollback is proven on PostgreSQL (`test_an_all_or_nothing_refusal_keeps_none_of_the_writes_before_it`) and by the scenario.
+- Deviations: `Schedule` actors are matched to the token holder at the door (`_named_self`: a schedule naming another practitioner, created or updated, is `forbidden` before any diff), `DeleteAvailabilityRule` judges deletes; `Schedule.id`, `meta`, `active` and `planningHorizon` are optional on write, `active` is computed and ignored, a horizon sent on create or changed on update is `invalid_input` (`Schedule.planningHorizon`); `valueTime` `HH:MM:00` maps to the screen's `HH:MM`; `notAvailable` periods match one for one on start, end (instants, any offset) and description, removals run before additions, a description « Indisponible » means no reason, an instant without offset is `invalid_input`; local times are read in the role's hospital zone; a clinician's `PUT PractitionerRole` changing anything but `notAvailable` is `forbidden`, another clinician's role or a patient is `forbidden`.
+- To record in `architecture.md` (phase 11): `Schedule` and `notAvailable` writes go through the workspace's use cases, `If-Match` locking the profile then the rule; `ConditionalWrites` `all_or_nothing` makes a multi-call write atomic.
