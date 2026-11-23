@@ -79,7 +79,7 @@ A subjective self-assessment, 0 to 10 per area:
 | Templates, static files | 8 | Django templates and `staticfiles`; logic stays in presenters |
 | Config | 6 | `settings.py` fed by pydantic-settings instead of plain constants |
 | API | 6 | Django Ninja is well established, DRF remains the canonical choice |
-| Forms | 1 | Views read `request.POST` and use cases validate; a switch to `django.forms` is planned |
+| Forms | 8 | `django.forms` collect, check and render every web form (Django's field templates, one override for Pico); use cases validate again for API and FHIR |
 | Auth, sessions | 2 | Own implementation; only Django's password hashers are reused |
 | Code organisation | 3 | Hexagonal contexts instead of Django apps with rich models |
 | Tests | 3 | pytest-bdd on fakes; no Django `TestCase` for business behaviour |
