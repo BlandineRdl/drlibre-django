@@ -49,6 +49,26 @@ Under `/fhir`, fictitious and localhost only. Fixed bearer tokens: `demo-admin-t
 - `curl 'localhost:8000/fhir/HealthcareService'` then `curl 'localhost:8000/fhir/Slot?service-type=<id>&start=ge2026-12-01T00:00:00%2B01:00&start=lt2026-12-08T00:00:00%2B01:00'` find free slots without a token.
 - `curl -H 'Authorization: Bearer demo-patient-token' localhost:8000/fhir/Appointment` lists the demo patient's appointments.
 
+## Technical choices
+Django is used as the infrastructure framework (ORM, migrations, HTTP, templates, security middleware), not as the place for business rules. Each departure from the usual Django way is deliberate:
+
+| Choice | Instead of | Why |
+| --- | --- | --- |
+| Hexagonal architecture per bounded context (`domain`, `application`, `infrastructure`), checked by import-linter | Fat models, logic in views | The domain stays pure Python, tested on in-memory fakes without Django; web, API, FHIR and Celery run the same use cases through one composition root (`bootstrap/container.py`) |
+| ORM models live in `<context>/infrastructure/django/` | Models as the domain | Models are persistence adapters behind `typing.Protocol` ports |
+| Own session cookie and auth: hashed session tokens, email code, sign-in link, hashed bearer tokens | `django.contrib.auth`, `django.contrib.sessions` | Django stores session keys raw; here only a hash is stored. Django's password hashers are kept |
+| Hand-written admin console (`/console/`) | `django.contrib.admin` | Every write goes through a use case, so it is audited and follows the same rules as the other screens |
+| Django Ninja for `/api/v1` and `/fhir` | Django REST Framework | Pydantic-native schemas, the same validation as the rest of the code |
+| Raw SQL query ports for search, slots, reporting and FHIR reads (light CQRS) | ORM for every read | p95 under 200 ms on the load seed, proven with Locust (`./scripts/load-run.sh`) |
+| PostgreSQL guards: `btree_gist` exclusions, partial unique indexes, `select_for_update`, advisory locks, append-only audit triggers | Checks in Python only | No double booking under concurrency, even if a lock is missed |
+| Celery with beat | Django's built-in tasks | Django's tasks have no production worker or scheduler yet |
+| Hand-written FHIR R4 Pydantic schemas | `fhir.resources` | The library dropped R4 |
+| Templates with HTMX and Pico.css; presenters build ViewModels | SPA, logic in templates | Minimal front, no build step, WCAG 2.2 AA |
+| Pydantic, pydantic-settings, structlog | `settings.py` constants, stdlib logging | Typed validation at every boundary, typed config from `.env`, JSON logs with a correlation id |
+| Gherkin scenarios (pytest-bdd) on fakes, contract tests fake vs real adapter | Mocks, Django `TestCase` | Tests describe behaviour and survive refactoring |
+
+Full rationale and pinned versions: `aidd_docs/INSTALL.md` and `aidd_docs/memory/architecture.md`.
+
 ## Develop
 1. `uv sync` and `uv run pre-commit install`.
 2. With the stack up: `uv run pytest`.
