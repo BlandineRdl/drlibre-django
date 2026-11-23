@@ -7,15 +7,11 @@ from django.views.decorators.http import require_GET, require_http_methods
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role, User
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.console import UserForm
 from drlibre.interfaces.web.presenters.console import console_nav
-from drlibre.interfaces.web.presenters.forms import build_form
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.reference import Column, confirm_view, list_view, yes_no
-from drlibre.interfaces.web.presenters.staff import (
-    ROLE_CHOICES,
-    TEMPORARY_PASSWORD,
-    USER_FIELDS,
-    role_label,
-)
+from drlibre.interfaces.web.presenters.staff import role_label
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import PageRequest
@@ -37,47 +33,32 @@ def _user(record_id: uuid.UUID) -> User:
     return user
 
 
-def _form(
-    request: HttpRequest,
-    *,
-    title: str,
-    values: dict[str, str],
-    creating: bool,
-    error: DomainError | None = None,
-) -> HttpResponse:
-    specs = (*USER_FIELDS, TEMPORARY_PASSWORD) if creating else USER_FIELDS
-    form = build_form(
-        title=title,
-        action=request.path,
-        submit_label="Enregistrer",
-        specs=specs,
-        values=values,
-        error=error,
-        choices={"role": ROLE_CHOICES},
-        cancel_url=BASE,
-    )
-    context = {"form": form, "section_nav": console_nav(request.path)}
-    return render(
-        request, "console/form.html", context, status=error.code.http_status if error else 200
-    )
+def _form(request: HttpRequest, form: UserForm, *, title: str, status: int = 200) -> HttpResponse:
+    page = FormPage(title, request.path, "Enregistrer", form, cancel_url=BASE)
+    context = {"page": page, "section_nav": console_nav(request.path)}
+    return render(request, "console/form.html", context, status=status)
 
 
 def _save(request: HttpRequest, title: str, user_id: Id | None) -> HttpResponse:
-    values = {spec.name: request.POST.get(spec.name, "") for spec in USER_FIELDS}
+    form = UserForm(request.POST, creating=user_id is None)
+    if not form.is_valid():
+        return _form(request, form, title=title, status=ErrorCode.INVALID_INPUT.http_status)
+    data = form.cleaned_data
     try:
         container().save_user.execute(
             actor=current_identity(request).user_id,
             user_id=user_id,
-            full_name=values["full_name"],
-            email=values["email"],
-            role=values["role"],
-            active=values["active"] == "on",
-            temporary_password=request.POST.get("temporary_password", ""),
+            full_name=data["full_name"],
+            email=data["email"],
+            role=data["role"],
+            active=data["active"],
+            temporary_password=data.get("temporary_password", ""),
         )
     except DomainError as error:
         if error.code not in _FORM_REFUSALS:
             raise
-        return _form(request, title=title, values=values, creating=user_id is None, error=error)
+        form.refuse(error)
+        return _form(request, form, title=title, status=error.code.http_status)
     return redirect(f"{BASE}?done={'updated' if user_id else 'created'}")
 
 
@@ -110,7 +91,7 @@ def create_user(request: HttpRequest) -> HttpResponse:
     title = "Ajouter un utilisateur"
     if request.method == "POST":
         return _save(request, title, None)
-    return _form(request, title=title, values={"active": "on"}, creating=True)
+    return _form(request, UserForm(initial={"active": True}, creating=True), title=title)
 
 
 @require_http_methods(["GET", "POST"])
@@ -120,13 +101,13 @@ def edit_user(request: HttpRequest, record_id: uuid.UUID) -> HttpResponse:
     title = f"Modifier « {user.full_name} »"
     if request.method == "POST":
         return _save(request, title, user.id)
-    values = {
+    initial = {
         "full_name": user.full_name,
         "email": user.email.value,
         "role": user.role.value,
-        "active": "on" if user.active else "",
+        "active": user.active,
     }
-    return _form(request, title=title, values=values, creating=False)
+    return _form(request, UserForm(initial=initial, creating=False), title=title)
 
 
 @require_http_methods(["GET", "POST"])

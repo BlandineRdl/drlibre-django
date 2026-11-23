@@ -11,8 +11,16 @@ from django.views.decorators.http import require_GET, require_http_methods
 from drlibre.bootstrap.container import Container, container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import WebForm
+from drlibre.interfaces.web.forms.console import (
+    AppointmentTypeForm,
+    DepartmentForm,
+    HospitalForm,
+    RoomForm,
+    SpecialtyForm,
+)
 from drlibre.interfaces.web.presenters.console import console_nav
-from drlibre.interfaces.web.presenters.forms import Choice, FieldSpec, build_form
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.reference import (
     Column,
     confirm_view,
@@ -26,11 +34,9 @@ from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
 
-NAME = FieldSpec("name", "Nom")
-CODE = FieldSpec(
-    "code", "Code", help="Unique : lettres, chiffres, tirets ; enregistré en majuscules."
-)
-ACTIVE = FieldSpec("active", "Actif", kind="checkbox", required=False)
+INVALID = ErrorCode.INVALID_INPUT.http_status
+
+type Choices = Mapping[str, tuple[tuple[str, str], ...]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,13 +44,13 @@ class Screen:
     slug: str
     title: str
     singular: str
-    fields: tuple[FieldSpec, ...]
+    form: type[WebForm]
     columns: tuple[Column, ...]
     page: Callable[[PageRequest], Page[Any]]
     get: Callable[[Id], Any]
     save: SaveRecord
     delete: DeleteRecord
-    choices: Callable[[], Mapping[str, tuple[Choice, ...]]]
+    choices: Callable[[], Choices]
     defaults: Mapping[str, str]
 
     @property
@@ -52,8 +58,8 @@ class Screen:
         return f"/console/{self.slug}/"
 
 
-def _choices(options: tuple[Any, ...]) -> tuple[Choice, ...]:
-    return tuple(Choice(str(o.id), o.label) for o in options)
+def _choices(options: tuple[Any, ...]) -> tuple[tuple[str, str], ...]:
+    return tuple((str(o.id), o.label) for o in options)
 
 
 def _screens(app: Container) -> dict[str, Screen]:
@@ -73,10 +79,10 @@ def _screens(app: Container) -> dict[str, Screen]:
     def department_of(record: Any) -> str:
         return department_labels().get(record.department_id, "")
 
-    def by_hospital() -> Mapping[str, tuple[Choice, ...]]:
+    def by_hospital() -> Choices:
         return {"hospital_id": _choices(q.hospital_options())}
 
-    def by_department() -> Mapping[str, tuple[Choice, ...]]:
+    def by_department() -> Choices:
         return {"department_id": _choices(q.department_options())}
 
     return {
@@ -84,22 +90,7 @@ def _screens(app: Container) -> dict[str, Screen]:
             slug="hospitals",
             title="Hôpitaux",
             singular="un hôpital",
-            fields=(
-                NAME,
-                CODE,
-                FieldSpec("description", "Description", kind="textarea", required=False),
-                FieldSpec("street", "Adresse", autocomplete="street-address"),
-                FieldSpec("postal_code", "Code postal", autocomplete="postal-code"),
-                FieldSpec("city", "Ville", autocomplete="address-level2"),
-                FieldSpec("country", "Pays", autocomplete="country-name"),
-                FieldSpec("phone", "Téléphone", kind="tel", autocomplete="tel"),
-                FieldSpec(
-                    "time_zone", "Fuseau horaire", help="Nom IANA, par exemple Europe/Paris."
-                ),
-                FieldSpec("latitude", "Latitude", required=False, help="Entre -90 et 90."),
-                FieldSpec("longitude", "Longitude", required=False, help="Entre -180 et 180."),
-                ACTIVE,
-            ),
+            form=HospitalForm,
             columns=(
                 Column("Nom", lambda r: r.name),
                 Column("Code", lambda r: r.code),
@@ -118,7 +109,7 @@ def _screens(app: Container) -> dict[str, Screen]:
             slug="specialties",
             title="Spécialités",
             singular="une spécialité",
-            fields=(NAME, CODE, ACTIVE),
+            form=SpecialtyForm,
             columns=(
                 Column("Nom", lambda r: r.name),
                 Column("Code", lambda r: r.code),
@@ -135,12 +126,7 @@ def _screens(app: Container) -> dict[str, Screen]:
             slug="departments",
             title="Départements",
             singular="un département",
-            fields=(
-                FieldSpec("hospital_id", "Hôpital", kind="select"),
-                NAME,
-                CODE,
-                FieldSpec("description", "Description", kind="textarea", required=False),
-            ),
+            form=DepartmentForm,
             columns=(
                 Column("Nom", lambda r: r.name),
                 Column("Code", lambda r: r.code),
@@ -157,17 +143,7 @@ def _screens(app: Container) -> dict[str, Screen]:
             slug="rooms",
             title="Salles",
             singular="une salle",
-            fields=(
-                FieldSpec("department_id", "Département", kind="select"),
-                NAME,
-                CODE,
-                FieldSpec("floor", "Étage"),
-                FieldSpec("capacity", "Capacité", kind="number", help="Au moins 1."),
-                FieldSpec(
-                    "equipment", "Équipements", required=False, help="Séparés par des virgules."
-                ),
-                ACTIVE,
-            ),
+            form=RoomForm,
             columns=(
                 Column("Nom", lambda r: r.name),
                 Column("Code", lambda r: r.code),
@@ -187,26 +163,7 @@ def _screens(app: Container) -> dict[str, Screen]:
             slug="appointment-types",
             title="Types de RDV",
             singular="un type de RDV",
-            fields=(
-                FieldSpec("department_id", "Département", kind="select"),
-                NAME,
-                CODE,
-                FieldSpec(
-                    "duration_minutes", "Durée en minutes", kind="number", help="Au moins 1."
-                ),
-                FieldSpec(
-                    "buffer_minutes",
-                    "Battement après la visite, en minutes",
-                    kind="number",
-                    help="0 ou plus.",
-                ),
-                FieldSpec("colour", "Couleur", help="Format #RRGGBB, par exemple #336699."),
-                FieldSpec("needs_room", "Nécessite une salle", kind="checkbox", required=False),
-                FieldSpec(
-                    "bookable_online", "Réservable en ligne", kind="checkbox", required=False
-                ),
-                ACTIVE,
-            ),
+            form=AppointmentTypeForm,
             columns=(
                 Column("Nom", lambda r: r.name),
                 Column("Code", lambda r: r.code),
@@ -245,39 +202,34 @@ def _record(screen: Screen, record_id: uuid.UUID) -> Any:
     return record
 
 
+def _bound(screen: Screen, *args: Any, **kwargs: Any) -> WebForm:
+    form = screen.form(*args, **kwargs)
+    for name, choices in screen.choices().items():
+        form.offer(name, choices)
+    return form
+
+
 def _form_page(
-    request: HttpRequest,
-    screen: Screen,
-    *,
-    title: str,
-    values: Mapping[str, str],
-    error: DomainError | None = None,
+    request: HttpRequest, screen: Screen, form: WebForm, *, title: str, status: int = 200
 ) -> HttpResponse:
-    form = build_form(
-        title=title,
-        action=request.path,
-        submit_label="Enregistrer",
-        specs=screen.fields,
-        values=values,
-        error=error,
-        choices=screen.choices(),
-        cancel_url=screen.base_url,
-    )
-    context = {"form": form, "section_nav": console_nav(request.path)}
-    status = error.code.http_status if error else 200
+    page = FormPage(title, request.path, "Enregistrer", form, cancel_url=screen.base_url)
+    context = {"page": page, "section_nav": console_nav(request.path)}
     return render(request, "console/form.html", context, status=status)
 
 
 def _save(request: HttpRequest, screen: Screen, title: str, record_id: Id | None) -> HttpResponse:
-    values = {spec.name: request.POST.get(spec.name, "") for spec in screen.fields}
+    form = _bound(screen, request.POST)
+    if not form.is_valid():
+        return _form_page(request, screen, form, title=title, status=INVALID)
     try:
         screen.save.execute(
-            actor=current_identity(request).user_id, record_id=record_id, fields=values
+            actor=current_identity(request).user_id, record_id=record_id, fields=form.posted()
         )
     except DomainError as error:
         if error.code is not ErrorCode.INVALID_INPUT:
             raise
-        return _form_page(request, screen, title=title, values=values, error=error)
+        form.refuse(error)
+        return _form_page(request, screen, form, title=title, status=INVALID)
     return redirect(f"{screen.base_url}?done={'updated' if record_id else 'created'}")
 
 
@@ -312,7 +264,7 @@ def create_record(request: HttpRequest, slug: str) -> HttpResponse:
     title = f"Ajouter {screen.singular}"
     if request.method == "POST":
         return _save(request, screen, title, None)
-    return _form_page(request, screen, title=title, values=screen.defaults)
+    return _form_page(request, screen, _bound(screen, initial=screen.defaults), title=title)
 
 
 @require_http_methods(["GET", "POST"])
@@ -323,7 +275,7 @@ def edit_record(request: HttpRequest, slug: str, record_id: uuid.UUID) -> HttpRe
     title = f"Modifier « {record.label} »"
     if request.method == "POST":
         return _save(request, screen, title, record.id)
-    return _form_page(request, screen, title=title, values=record_values(record))
+    return _form_page(request, screen, _bound(screen, initial=record_values(record)), title=title)
 
 
 @require_http_methods(["GET", "POST"])

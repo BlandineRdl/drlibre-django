@@ -1,11 +1,8 @@
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
-from typing import Any
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
 from drlibre.booking.application.ports.inbound import (
-    BookingOption,
     WaitlistRow,
     WaitlistStatus,
 )
@@ -14,15 +11,11 @@ from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.forms import (
     Choice,
     ChoiceView,
-    FieldSpec,
-    FormView,
-    build_form,
 )
 from drlibre.interfaces.web.presenters.portal import rule_reasons
 from drlibre.interfaces.web.presenters.slots import day_label, local
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.pagination import Page
-from drlibre.shared_kernel.validation import FieldErrors, parse_id
 
 WAITLIST_URL = "/portal/waitlist"
 CONSOLE_WAITLIST_URL = "/console/waitlist/"
@@ -34,13 +27,6 @@ WAITLIST_STATUS_LABELS = {
 }
 STATUS_CHOICES = tuple(Choice(s.value, label) for s, label in WAITLIST_STATUS_LABELS.items())
 ZONE_NOTE = "Heures affichées dans le fuseau de l'hôpital de chaque entrée, nommé."
-ADD_FIELDS = (
-    FieldSpec("patient_email", "Email du patient", kind="email", autocomplete="off"),
-    FieldSpec("appointment_type_id", "Type de RDV", kind="select"),
-    FieldSpec("clinician_id", "Praticien préféré", kind="select", required=False),
-    FieldSpec("from_date", "Du", kind="date", help="Premier jour où vous êtes disponible."),
-    FieldSpec("to_date", "Au", kind="date", help="Dernier jour, inclus."),
-)
 NOTICES = {
     "joined": "Inscription enregistrée.",
     "added": "Le patient est inscrit sur la liste d'attente.",
@@ -100,26 +86,6 @@ class WaitlistListView:
     zone_note: str
 
 
-def join_input(values: Mapping[str, str]) -> dict[str, Any]:
-    """The join form's raw text as use case arguments; invalid_input names each bad field."""
-    errors = FieldErrors()
-    kind = parse_id(values.get("appointment_type_id", ""))
-    if kind is None:
-        errors.add("appointment_type_id", "Choisissez un type de RDV.")
-    raw_clinician = values.get("clinician_id", "").strip()
-    clinician = parse_id(raw_clinician) if raw_clinician else None
-    if raw_clinician and clinician is None:
-        errors.add("clinician_id", "Choisissez un praticien de la liste.")
-    days: dict[str, date] = {}
-    for name in ("from_date", "to_date"):
-        try:
-            days[name] = date.fromisoformat(values.get(name, "").strip())
-        except ValueError:
-            errors.add(name, "Saisissez une date.")
-    errors.raise_if_any()
-    return {"appointment_type_id": kind, "clinician_id": clinician, **days}
-
-
 def window_text(row: WaitlistRow) -> str:
     """The window as the dates the patient chose, its last day included."""
     first = local(row.entry.earliest, row.time_zone)
@@ -165,37 +131,6 @@ def entry_card(row: WaitlistRow, now: datetime) -> EntryCardView:
         offered=f"Proposé : {offered}" if offered else "",
         accept_url=f"{WAITLIST_URL}/{entry.id}/accept" if accept else "",
     )
-
-
-def _choices(options: tuple[BookingOption, ...]) -> tuple[Choice, ...]:
-    return tuple(Choice(str(o.id), o.label) for o in options)
-
-
-def join_form(
-    *,
-    title: str,
-    action: str,
-    submit_label: str,
-    specs: tuple[FieldSpec, ...],
-    types: tuple[BookingOption, ...],
-    clinicians: tuple[BookingOption, ...],
-    values: Mapping[str, str],
-    error: DomainError | None = None,
-    cancel_url: str = "",
-) -> FormView:
-    form = build_form(
-        title=title,
-        action=action,
-        submit_label=submit_label,
-        specs=specs,
-        values=values,
-        error=error,
-        choices={"appointment_type_id": _choices(types), "clinician_id": _choices(clinicians)},
-        cancel_url=cancel_url,
-    )
-    if error is not None and error.code is not ErrorCode.INVALID_INPUT:
-        form = replace(form, message=refusal_text(error))
-    return form
 
 
 def waitlist_page(

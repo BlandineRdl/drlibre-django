@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from drlibre.booking.application.ports.inbound import (
-    MAX_CANCELLATION_REASON,
     AdminAppointmentFilter,
     AdminAppointmentRow,
     AppointmentFile,
@@ -15,8 +14,10 @@ from drlibre.booking.application.ports.inbound import (
     Source,
 )
 from drlibre.identity.application.ports.inbound import PatientMatch
+from drlibre.interfaces.web.forms.portal import CancelForm
 from drlibre.interfaces.web.presenters.audit_labels import action_label
-from drlibre.interfaces.web.presenters.forms import ChoiceView, FieldSpec, FormView, build_form
+from drlibre.interfaces.web.presenters.form_page import FormPage
+from drlibre.interfaces.web.presenters.forms import ChoiceView
 from drlibre.interfaces.web.presenters.portal import (
     STATUS_LABELS,
     WeekStripView,
@@ -37,7 +38,7 @@ from drlibre.interfaces.web.presenters.workspace import (
 )
 from drlibre.organisation.application.ports.inbound import Option
 from drlibre.scheduling.application.ports.inbound import FreeWeek
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
+from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page
 
@@ -45,14 +46,6 @@ CONSOLE_APPOINTMENTS_URL = "/console/appointments/"
 BOOK_URL = f"{CONSOLE_APPOINTMENTS_URL}book"
 EXPORT_URL = f"{CONSOLE_APPOINTMENTS_URL}export.csv"
 ZONE_NOTE = "Heures affichées dans le fuseau de l'hôpital de chaque rendez-vous, nommé."
-REASON_FIELD = (
-    FieldSpec(
-        "reason",
-        "Motif de l'annulation",
-        kind="textarea",
-        help=f"{MAX_CANCELLATION_REASON} caractères au plus.",
-    ),
-)
 SOURCE_LABELS = {
     Source.ONLINE: "En ligne",
     Source.ROUND_ROBIN: "Premier disponible",
@@ -323,31 +316,29 @@ class AdminCancelPage:
     heading: str
     time_zone: str
     facts: tuple[FactView, ...]
-    form: FormView
+    form: FormPage
 
 
 def cancel_page(
-    file: AppointmentFile, values: Mapping[str, str], error: DomainError | None = None
+    file: AppointmentFile, form: CancelForm, error: DomainError | None = None
 ) -> AdminCancelPage:
     """The reason form; a refusal other than a field error is shown above it."""
     a = file.entry.appointment
-    form = build_form(
-        title="Annuler le rendez-vous",
-        action=appointment_url(a.id, "cancel"),
-        submit_label="Confirmer l'annulation",
-        specs=REASON_FIELD,
-        values=values,
-        error=error,
-        cancel_url=appointment_url(a.id),
-        cancel_label="Retour à la fiche",
-    )
-    if error is not None and error.code is not ErrorCode.INVALID_INPUT:
-        form = replace(form, message=refusal_text(error))
+    if error is not None:
+        form.refuse(error, refusal_text(error))
     return AdminCancelPage(
         heading=f"Annuler le rendez-vous de {file.entry.patient_name}",
         time_zone=file.time_zone,
         facts=appointment_facts(file),
-        form=form,
+        form=FormPage(
+            "Annuler le rendez-vous",
+            appointment_url(a.id, "cancel"),
+            "Confirmer l'annulation",
+            form,
+            cancel_url=appointment_url(a.id),
+            cancel_label="Retour à la fiche",
+            submit_class="danger",
+        ),
     )
 
 

@@ -45,11 +45,6 @@ def _form(
     return workspace_page(request, "console/form.html", me, {"page": page}, status=status)
 
 
-def _posted(request: HttpRequest, form: WebForm) -> dict[str, str]:
-    """The typed text the use case parses, once the form found its shape valid."""
-    return {name: request.POST.get(name, "") for name in form.fields}
-
-
 def _confirm(request: HttpRequest, me: Me, *, label: str, cancel_url: str) -> HttpResponse:
     confirm = confirm_view(label=label, action=request.path, cancel_url=cancel_url)
     return workspace_page(request, "console/confirm_delete.html", me, {"confirm": confirm})
@@ -81,7 +76,7 @@ def _save_rule(
     if form.is_valid():
         try:
             container().save_availability_rule.execute(
-                actor=me.user_id, rule_id=rule.id if rule else None, fields=_posted(request, form)
+                actor=me.user_id, rule_id=rule.id if rule else None, fields=form.posted()
             )
         except DomainError as error:
             if error.code is not ErrorCode.INVALID_INPUT:
@@ -137,7 +132,7 @@ def create_time_off(request: HttpRequest) -> HttpResponse:
     form = TimeOffForm(request.POST, time_zone=me.time_zone)
     if form.is_valid():
         try:
-            container().record_time_off.execute(actor=me.user_id, fields=_posted(request, form))
+            container().record_time_off.execute(actor=me.user_id, fields=form.posted())
         except DomainError as error:
             if error.code is not ErrorCode.INVALID_INPUT:
                 raise

@@ -50,6 +50,10 @@ class WebForm(forms.Form):
             self.add_error(None, message or error.message)
         self._focus_first_error()
 
+    def posted(self) -> dict[str, str]:
+        """The posted text of this form's fields, as use cases taking raw fields parse it."""
+        return {name: self.data.get(name, "") for name in self.fields}
+
     def offer(self, name: str, choices: Iterable[tuple[str, str]]) -> None:
         """Set a select's choices known only at request time, after « Choisir… »."""
         field = cast("forms.ChoiceField", self.fields[name])
