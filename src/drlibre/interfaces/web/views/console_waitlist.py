@@ -7,13 +7,14 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID, options
+from drlibre.interfaces.web.forms.console import WaitlistAddForm
 from drlibre.interfaces.web.presenters.console import console_nav
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.waitlist import (
-    ADD_FIELDS,
     CONSOLE_WAITLIST_URL,
     console_list,
-    join_form,
-    join_input,
+    refusal_text,
 )
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
@@ -56,39 +57,46 @@ def list_entries(request: HttpRequest) -> HttpResponse:
     return _list(request)
 
 
+def _add_form(request: HttpRequest) -> WaitlistAddForm:
+    queries = container().booking_option_queries
+    return WaitlistAddForm(
+        request.POST if request.method == "POST" else None,
+        types=options(queries.type_options(online_only=False)),
+        clinicians=options(queries.clinician_options()),
+    )
+
+
 @require_http_methods(["GET", "POST"])
 @require_role(Role.ADMIN)
 def add_entry(request: HttpRequest) -> HttpResponse:
-    values = {spec.name: request.POST.get(spec.name, "") for spec in ADD_FIELDS}
-    error: DomainError | None = None
+    form = _add_form(request)
+    status = 200
     if request.method == "POST":
-        try:
-            container().join_waitlist.execute(
-                actor_id=current_identity(request).user_id,
-                patient_email=values["patient_email"].strip(),
-                **join_input(values),
-            )
-        except DomainError as refused:
-            if refused.code not in _INLINE_OR_MISSING:
-                raise
-            error = refused
-        else:
-            return redirect(f"{CONSOLE_WAITLIST_URL}?done=added")
-    options = container().booking_option_queries
-    form = join_form(
-        title="Inscrire un patient sur la liste d'attente",
-        action=request.path,
-        submit_label="Inscrire",
-        specs=ADD_FIELDS,
-        types=options.type_options(online_only=False),
-        clinicians=options.clinician_options(),
-        values=values,
-        error=error,
+        status = INVALID
+        if form.is_valid():
+            join = dict(form.cleaned_data)
+            try:
+                container().join_waitlist.execute(
+                    actor_id=current_identity(request).user_id,
+                    patient_email=join.pop("patient_email"),
+                    **join,
+                )
+            except DomainError as refused:
+                if refused.code not in _INLINE_OR_MISSING:
+                    raise
+                form.refuse(refused, refusal_text(refused))
+                status = refused.code.http_status
+            else:
+                return redirect(f"{CONSOLE_WAITLIST_URL}?done=added")
+    page = FormPage(
+        "Inscrire un patient sur la liste d'attente",
+        request.path,
+        "Inscrire",
+        form,
         cancel_url=CONSOLE_WAITLIST_URL,
     )
-    context = {"form": form, "section_nav": console_nav(request.path)}
-    code = error.code.http_status if error else 200
-    return render(request, "console/form.html", context, status=code)
+    context = {"page": page, "section_nav": console_nav(request.path)}
+    return render(request, "console/form.html", context, status=status)
 
 
 @require_POST

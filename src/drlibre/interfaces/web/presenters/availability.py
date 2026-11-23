@@ -4,15 +4,12 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from drlibre.interfaces.web.presenters.forms import Choice, FieldSpec
+from drlibre.interfaces.web.labels import WEEK_ORDER
 from drlibre.scheduling.application.ports.inbound import WEEKDAYS, AvailabilityRule, TimeOff
 from drlibre.shared_kernel.ids import Id
 
 RULES_URL = "/workspace/availability/"
 TIME_OFF_URL = "/workspace/time-off/"
-# Weekdays numbered 0 Sunday to 6 Saturday (spec 3.1), shown Monday first.
-WEEK_ORDER = (1, 2, 3, 4, 5, 6, 0)
-WEEKDAY_CHOICES = tuple(Choice(str(day), WEEKDAYS[day]) for day in WEEK_ORDER)
 GRID_START = time(7)
 GRID_ROWS = 24
 GRID_STEP = timedelta(minutes=30)
@@ -118,34 +115,6 @@ def time_offs_view(
         for t in time_offs
     )
     return TimeOffsView(time_zone=time_zone, rows=rows, status=_DONE.get(done or "", ""))
-
-
-def rule_fields(time_zone: str) -> tuple[FieldSpec, ...]:
-    local = f"HH:MM, heure locale ({time_zone})."
-    return (
-        FieldSpec("weekday", "Jour", kind="select"),
-        FieldSpec("start", "Début", kind="time", help=local),
-        FieldSpec("end", "Fin", kind="time", help=f"Après le début ; {local}"),
-        FieldSpec("step_minutes", "Pas en minutes", kind="number", help="De 5 à 240 minutes."),
-        FieldSpec(
-            "room_id",
-            "Salle",
-            kind="select",
-            required=False,
-            help="Une salle active de votre département.",
-        ),
-    )
-
-
-def time_off_fields(time_zone: str) -> tuple[FieldSpec, ...]:
-    local = f"Date et heure locales ({time_zone})."
-    return (
-        FieldSpec("start", "Début", kind="datetime-local", help=local),
-        FieldSpec("end", "Fin", kind="datetime-local", help=f"Après le début ; {local}"),
-        FieldSpec(
-            "reason", "Motif", kind="textarea", required=False, help="200 caractères au plus."
-        ),
-    )
 
 
 def rule_values(rule: AvailabilityRule) -> dict[str, str]:

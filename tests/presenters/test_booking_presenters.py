@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from drlibre.booking.application.ports.inbound import Appointment, AppointmentStatus, HoldSummary
 from drlibre.booking.domain.appointment import Source
+from drlibre.interfaces.web.forms.booking import CodeForm, DetailsForm
 from drlibre.interfaces.web.presenters.booking import (
     SlotContext,
     SlotRequest,
@@ -13,7 +14,6 @@ from drlibre.interfaces.web.presenters.booking import (
 )
 from drlibre.interfaces.web.presenters.calendar_file import calendar_file
 from drlibre.scheduling.application.ports.inbound import Slot
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 
 KIND = Id()
@@ -50,34 +50,13 @@ def appointment() -> Appointment:
 
 def test_the_details_page_names_the_provider_the_slot_and_the_hospital_zone() -> None:
     """Story réservation : le récapitulatif donne praticien, créneau et fuseau de l'hôpital."""
-    view = details_page(REQUEST, CONTEXT, START, {})
+    view = details_page(REQUEST, CONTEXT, START, DetailsForm())
 
     assert view.summary.provider_line == "Dr Alice Martin"
     assert view.summary.when_line == "lun. 23/11 09:00"
     assert view.summary.zone_note == "Fuseau Europe/Paris"
     assert [s.label for s in view.steps if s.current] == ["Informations"]
     assert ("type", str(KIND)) in view.hidden_fields
-
-
-def test_the_details_page_ties_each_error_to_its_field_and_focuses_the_first() -> None:
-    """Story réservation : erreurs rattachées aux champs, focus sur le premier invalide."""
-    error = DomainError(
-        ErrorCode.INVALID_INPUT,
-        "Corrigez les champs.",
-        {
-            "fields": [
-                {"field": "email", "message": "Saisissez une adresse email valide."},
-                {"field": "full_name", "message": "Ce champ est obligatoire."},
-            ]
-        },
-    )
-
-    view = details_page(REQUEST, CONTEXT, START, {"email": "x"}, error)
-
-    focused = [f.name for f in view.form.fields if f.autofocus]
-    assert focused == ["full_name"]
-    described = {f.name: f.described_by for f in view.form.fields}
-    assert described["email"] == "error-email"
 
 
 def test_a_first_available_booking_shows_the_department_until_a_provider_is_chosen() -> None:
@@ -93,7 +72,7 @@ def test_a_first_available_booking_shows_the_department_until_a_provider_is_chos
         department_id=DEPARTMENT,
     )
 
-    view = details_page(SlotRequest(KIND, None, DEPARTMENT, "x"), context, START, {})
+    view = details_page(SlotRequest(KIND, None, DEPARTMENT, "x"), context, START, DetailsForm())
 
     assert view.summary.provider_line == "Premier praticien disponible · Cardiologie"
     assert ("department", str(DEPARTMENT)) in view.hidden_fields
@@ -112,7 +91,7 @@ def test_the_code_page_gives_the_hold_expiry_in_the_hospital_zone() -> None:
         first_available=False,
     )
 
-    view = code_page(hold, CONTEXT)
+    view = code_page(hold, CONTEXT, CodeForm())
 
     assert view.held_until == "Créneau tenu jusqu'à 10:42"
     assert view.form.action == f"/booking/holds/{hold.hold_id}"

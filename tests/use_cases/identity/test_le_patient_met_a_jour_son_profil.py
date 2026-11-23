@@ -16,6 +16,7 @@ from drlibre.identity.domain.user import Email, Role, User
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from tests.fakes.world import FakeWorld
+from tests.markup import attributes, described_by
 
 scenarios("../../features/identity/le_patient_met_a_jour_son_profil.feature")
 
@@ -213,7 +214,7 @@ def shows_identity(profile: Profile, name: str, email: str) -> None:
     page = body(profile)
     assert f"<dd>{name}</dd>" in page
     assert f"<dd>{email}</dd>" in page
-    assert set(re.findall(r'<input type="[a-z]+" id="field-([a-z_]+)"', page)) == {
+    assert set(re.findall(r'<input [^>]*id="field-([a-z_]+)"', page)) == {
         "phone",
         "birth_date",
     }
@@ -234,7 +235,9 @@ def phone_error(profile: Profile) -> None:
     page = body(profile)
     assert profile.page.status_code == 400
     assert 'href="#field-phone"' in page
-    assert 'aria-invalid="true" aria-describedby="help-phone error-phone" autofocus' in page
+    phone = attributes(page, "field-phone")
+    assert (phone["aria-invalid"], "autofocus" in phone) == ("true", True)
+    assert described_by(page, "field-phone") == ["field-phone_helptext", "field-phone_error"]
 
 
 @then(parsers.parse('the patient lands on the profile with the message "{message}"'))

@@ -5,6 +5,7 @@ from django.test import Client
 from drlibre.identity.domain.user import Role
 from drlibre.identity.infrastructure.django.models import SessionRecord
 from tests.builders import PASSWORD, deactivated, stored_session, stored_user, unique_email
+from tests.markup import attributes
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 COOKIE = settings.SESSION_COOKIE_NAME
@@ -132,8 +133,10 @@ def test_temporary_password_must_be_changed_before_the_area(client: Client) -> N
     )
     body = bad.content.decode()
     assert bad.status_code == 400
-    assert 'id="field-current_password"' in body
-    assert 'aria-invalid="true" aria-describedby="error-current_password" autofocus' in body
+    current = attributes(body, "field-current_password")
+    assert current["aria-invalid"] == "true"
+    assert current["aria-describedby"] == "field-current_password_error"
+    assert "autofocus" in current
 
     done = client.post(
         "/account/password", {"current_password": PASSWORD, "new_password": "my-own-password"}

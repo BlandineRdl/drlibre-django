@@ -12,6 +12,9 @@ from drlibre.booking.application.ports.inbound import AppointmentFile, Clinician
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID
+from drlibre.interfaces.web.forms.portal import CancelForm
+from drlibre.interfaces.web.forms.workspace import NotesForm
 from drlibre.interfaces.web.presenters.slots import local
 from drlibre.interfaces.web.presenters.workspace import (
     NO_PROFILE,
@@ -166,8 +169,7 @@ def _file_page(
     week: str | None = None,
     notice: str = "",
     refusal: DomainError | None = None,
-    notes: Mapping[str, str] | None = None,
-    notes_error: DomainError | None = None,
+    notes: NotesForm | None = None,
     status: int = 200,
 ) -> HttpResponse:
     view = appointment_page(
@@ -176,7 +178,6 @@ def _file_page(
         notice=notice,
         refusal=refusal,
         notes=notes,
-        notes_error=notes_error,
     )
     return _private_page(request, "workspace/appointment.html", me, view, status=status)
 
@@ -230,17 +231,22 @@ no_show = _change_status(ClinicianAction.NO_SHOW)
 @require_role(Role.CLINICIAN)
 @_own_appointment
 def notes(request: HttpRequest, me: Me, appointment_id: Id) -> HttpResponse:
-    values = {"clinical_notes": request.POST.get("clinical_notes", "")}
-    try:
-        container().write_clinical_notes.execute(
-            actor_id=me.user_id, appointment_id=appointment_id, text=values["clinical_notes"]
-        )
-    except DomainError as error:
-        if error.code is not ErrorCode.INVALID_INPUT:
-            raise
-        file = _file(me, appointment_id)
-        return _file_page(request, me, file, notes=values, notes_error=error, status=400)
-    return _done(appointment_url(appointment_id), "notes")
+    form = NotesForm(request.POST)
+    if form.is_valid():
+        try:
+            container().write_clinical_notes.execute(
+                actor_id=me.user_id,
+                appointment_id=appointment_id,
+                text=form.cleaned_data["clinical_notes"],
+            )
+        except DomainError as error:
+            if error.code is not ErrorCode.INVALID_INPUT:
+                raise
+            form.refuse(error)
+        else:
+            return _done(appointment_url(appointment_id), "notes")
+    file = _file(me, appointment_id)
+    return _file_page(request, me, file, notes=form, status=INVALID)
 
 
 @require_http_methods(["GET", "POST"])
@@ -251,16 +257,21 @@ def cancel(request: HttpRequest, me: Me, appointment_id: Id) -> HttpResponse:
     if request.method == "GET":
         if ClinicianAction.CANCEL not in file.entry.actions:
             return redirect(appointment_url(appointment_id))
-        return _private_page(request, "workspace/cancel.html", me, cancel_page(file, {}))
-    values = {"reason": request.POST.get("reason", "")}
+        view = cancel_page(file, CancelForm())
+        return _private_page(request, "workspace/cancel.html", me, view)
+    form = CancelForm(request.POST)
+    if not form.is_valid():
+        view = cancel_page(file, form)
+        status = INVALID
+        return _private_page(request, "workspace/cancel.html", me, view, status=status)
     try:
         container().cancel_appointment.execute(
-            appointment_id=appointment_id, actor_id=me.user_id, reason=values["reason"]
+            appointment_id=appointment_id, actor_id=me.user_id, reason=form.cleaned_data["reason"]
         )
     except DomainError as error:
         if error.code not in _INLINE:
             raise
-        view = cancel_page(file, values, error)
+        view = cancel_page(file, form, error)
         return _private_page(
             request, "workspace/cancel.html", me, view, status=error.code.http_status
         )

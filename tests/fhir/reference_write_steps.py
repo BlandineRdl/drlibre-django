@@ -518,7 +518,7 @@ def _console_form(writing: Writing, sample: str) -> dict[str, str]:
     return {
         "full_name": resource["name"][0]["text"],
         "email": resource["telecom"][0]["value"],
-        "role": "clinician" if sample == "praticien" else "patient",
+        "role": "CLINICIAN" if sample == "praticien" else "PATIENT",
         "active": "on",
         "temporary_password": PASSWORD,
     }

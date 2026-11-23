@@ -14,6 +14,8 @@ from drlibre.booking.application.ports.inbound import (
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID, iso, options
+from drlibre.interfaces.web.forms.portal import CancelForm, ProfileForm, WaitlistJoinForm
 from drlibre.interfaces.web.presenters.calendar_file import calendar_file
 from drlibre.interfaces.web.presenters.portal import (
     APPOINTMENTS_URL,
@@ -28,13 +30,7 @@ from drlibre.interfaces.web.presenters.portal import (
     profile_values,
     reschedule_page,
 )
-from drlibre.interfaces.web.presenters.waitlist import (
-    JOIN_FIELDS,
-    WAITLIST_URL,
-    join_form,
-    join_input,
-    waitlist_page,
-)
+from drlibre.interfaces.web.presenters.waitlist import WAITLIST_URL, refusal_text, waitlist_page
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import PageRequest
@@ -97,18 +93,21 @@ def cancel(request: HttpRequest, appointment_id: UUID) -> HttpResponse:
     identity = current_identity(request)
     entry = _entry(identity, appointment_id)
     if request.method == "GET":
-        return render(request, "portal/cancel.html", {"view": cancel_page(entry, {})})
-    values = {"reason": request.POST.get("reason", "")}
+        return render(request, "portal/cancel.html", {"view": cancel_page(entry, CancelForm())})
+    form = CancelForm(request.POST)
+    if not form.is_valid():
+        view = cancel_page(entry, form)
+        return render(request, "portal/cancel.html", {"view": view}, status=INVALID)
     try:
         container().cancel_appointment.execute(
             appointment_id=entry.appointment.id,
             actor_id=identity.user_id,
-            reason=values["reason"],
+            reason=form.cleaned_data["reason"],
         )
     except DomainError as error:
         if error.code not in _INLINE:
             raise
-        view = cancel_page(entry, values, error)
+        view = cancel_page(entry, form, error)
         return render(request, "portal/cancel.html", {"view": view}, status=error.code.http_status)
     return redirect(f"{APPOINTMENTS_URL}?done=cancelled")
 
@@ -207,40 +206,47 @@ def profile(request: HttpRequest) -> HttpResponse:
     if request.method == "GET":
         view = profile_page(
             user,
-            profile_values(user),
+            ProfileForm(initial=profile_values(user)),
             has_password=identity.has_password,
             notice=request.GET.get("done", ""),
         )
         return private(render(request, "portal/profile.html", {"view": view}))
-    values = {key: request.POST.get(key, "") for key in ("phone", "birth_date")}
-    try:
-        c.update_profile.execute(actor_id=identity.user_id, user_id=identity.user_id, **values)
-    except DomainError as error:
-        if error.code is not ErrorCode.INVALID_INPUT:
-            raise
-        view = profile_page(user, values, has_password=identity.has_password, error=error)
-        return render(request, "portal/profile.html", {"view": view}, status=400)
-    return redirect(f"{PROFILE_URL}?done=saved")
+    form = ProfileForm(request.POST)
+    if form.is_valid():
+        try:
+            c.update_profile.execute(
+                actor_id=identity.user_id,
+                user_id=identity.user_id,
+                phone=form.cleaned_data["phone"],
+                birth_date=iso(form.cleaned_data["birth_date"]),
+            )
+        except DomainError as error:
+            if error.code is not ErrorCode.INVALID_INPUT:
+                raise
+            form.refuse(error)
+        else:
+            return redirect(f"{PROFILE_URL}?done=saved")
+    view = profile_page(user, form, has_password=identity.has_password)
+    return render(request, "portal/profile.html", {"view": view}, status=INVALID)
+
+
+def _join_form(request: HttpRequest | None = None) -> WaitlistJoinForm:
+    c = container()
+    return WaitlistJoinForm(
+        request.POST if request else None,
+        types=options(c.booking_option_queries.type_options(online_only=True)),
+        clinicians=options(c.booking_option_queries.clinician_options()),
+    )
 
 
 def _waitlist_page(
     request: HttpRequest,
-    values: dict[str, str],
+    form: WaitlistJoinForm,
     *,
-    form_error: DomainError | None = None,
+    status: int = 200,
     error: DomainError | None = None,
 ) -> HttpResponse:
     c = container()
-    form = join_form(
-        title="S'inscrire",
-        action=WAITLIST_URL,
-        submit_label="S'inscrire",
-        specs=JOIN_FIELDS,
-        types=c.booking_option_queries.type_options(online_only=True),
-        clinicians=c.booking_option_queries.clinician_options(),
-        values=values,
-        error=form_error,
-    )
     view = waitlist_page(
         c.waitlist_queries.own_entries(current_identity(request).user_id),
         form,
@@ -248,8 +254,6 @@ def _waitlist_page(
         notice=request.GET.get("done", ""),
         error=error,
     )
-    refused = form_error or error
-    status = refused.code.http_status if refused else 200
     return private(render(request, "portal/waitlist.html", {"view": view}, status=status))
 
 
@@ -257,16 +261,19 @@ def _waitlist_page(
 @require_role(Role.PATIENT)
 def waitlist(request: HttpRequest) -> HttpResponse:
     if request.method == "GET":
-        return _waitlist_page(request, {})
-    values = {spec.name: request.POST.get(spec.name, "") for spec in JOIN_FIELDS}
+        return _waitlist_page(request, _join_form())
+    form = _join_form(request)
+    if not form.is_valid():
+        return _waitlist_page(request, form, status=INVALID)
     try:
         container().join_waitlist.execute(
-            actor_id=current_identity(request).user_id, patient_email=None, **join_input(values)
+            actor_id=current_identity(request).user_id, patient_email=None, **form.cleaned_data
         )
     except DomainError as error:
         if error.code not in _INLINE | {ErrorCode.NOT_FOUND}:
             raise
-        return _waitlist_page(request, values, form_error=error)
+        form.refuse(error, refusal_text(error))
+        return _waitlist_page(request, form, status=error.code.http_status)
     return redirect(f"{WAITLIST_URL}?done=joined")
 
 
@@ -280,5 +287,5 @@ def accept_offer(request: HttpRequest, entry_id: UUID) -> HttpResponse:
     except DomainError as error:
         if error.code not in _INLINE:
             raise
-        return _waitlist_page(request, {}, error=error)
+        return _waitlist_page(request, _join_form(), status=error.code.http_status, error=error)
     return redirect(f"{APPOINTMENTS_URL}?done=booked")

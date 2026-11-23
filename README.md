@@ -79,13 +79,13 @@ A subjective self-assessment, 0 to 10 per area:
 | Templates, static files | 8 | Django templates and `staticfiles`; logic stays in presenters |
 | Config | 6 | `settings.py` fed by pydantic-settings instead of plain constants |
 | API | 6 | Django Ninja is well established, DRF remains the canonical choice |
-| Forms | 1 | Views read `request.POST` and use cases validate; a switch to `django.forms` is planned |
+| Forms | 8 | `django.forms` collect, check and render every web form (Django's field templates, one override for Pico); use cases validate again for API and FHIR |
 | Auth, sessions | 2 | Own implementation; only Django's password hashers are reused |
 | Code organisation | 3 | Hexagonal contexts instead of Django apps with rich models |
 | Tests | 3 | pytest-bdd on fakes; no Django `TestCase` for business behaviour |
 | Admin | 0 | Not installed, see below |
 
-About 50% overall: Django is used well where it is used (about 85%), but several built-ins are replaced (about 40% coverage).
+About 55% overall: Django is used well where it is used (about 85%), but several built-ins are replaced (about 50% coverage).
 
 `django.contrib.admin` is left out on purpose. It writes through the ORM, so it would bypass the use cases: no audit entry in the transaction, no slot refresh, no locks, no dependents check. The console is a business feature of the admin role, not a table editor. A read-only admin for debugging would still require `contrib.auth`, `contrib.sessions` and `contrib.messages`, a second sign-in and raw session keys; `psql`, the console and `/fhir` already cover inspection.
 

@@ -8,6 +8,7 @@ from drlibre.booking.application.ports.inbound import (
     PatientAction,
     PatientAppointments,
 )
+from drlibre.interfaces.web.forms.portal import CancelForm, ProfileForm
 from drlibre.interfaces.web.presenters.portal import (
     appointment_card,
     appointments_page,
@@ -139,12 +140,12 @@ def test_a_refused_cancellation_names_the_broken_rule_in_words() -> None:
         {"rules": ["cancellation_window_closed"]},
     )
 
-    view = cancel_page(entry(), {"reason": "Empêchement"}, error)
+    view = cancel_page(entry(), CancelForm({"reason": "Empêchement"}), error)
 
-    assert view.form.message == (
+    assert view.form.form.non_field_errors() == [
         "L'annulation enfreint une règle. Le rendez-vous commence dans moins de 24 h."
-    )
-    assert view.form.fields[0].value == "Empêchement"
+    ]
+    assert view.form.form["reason"].value() == "Empêchement"
     assert (view.form.submit_label, view.form.cancel_label) == ("Confirmer l'annulation", "Retour")
 
 
@@ -155,9 +156,9 @@ def test_a_refused_transition_names_the_current_status() -> None:
         {"status": "COMPLETED"},
     )
 
-    view = cancel_page(entry(), {}, error)
+    view = cancel_page(entry(), CancelForm(), error)
 
-    assert view.form.message.endswith("Statut actuel : Terminé.")
+    assert "Statut actuel : Terminé.</li>" in str(view.form.form.non_field_errors())
 
 
 def test_the_week_strip_groups_free_slots_by_local_day_and_posts_their_start() -> None:
@@ -268,11 +269,11 @@ def test_the_profile_shows_the_password_link_only_to_a_password_holder() -> None
     """Story « profil » : changement de mot de passe pour qui en a un, caché sinon."""
     user = patient_user(Id())
 
-    holder = profile_page(user, {}, has_password=True)
-    passwordless = profile_page(user, {}, has_password=False, notice="saved")
+    holder = profile_page(user, ProfileForm(), has_password=True)
+    passwordless = profile_page(user, ProfileForm(), has_password=False, notice="saved")
 
     assert holder.password_url == "/account/password"
     assert passwordless.password_url == ""
     assert passwordless.notice == "Votre profil est enregistré."
     assert (holder.name, holder.email) == ("Patient Test", "patient@example.org")
-    assert [f.name for f in holder.form.fields] == ["phone", "birth_date"]
+    assert list(holder.form.form.fields) == ["phone", "birth_date"]

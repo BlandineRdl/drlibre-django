@@ -2,6 +2,7 @@ from django.test import Client
 from pytest_bdd import parsers, scenarios, then, when
 
 from tests.fakes.world import FakeWorld
+from tests.markup import attributes, described_by
 from tests.use_cases.booking.support import Scene, mine, open_session, page_text
 
 scenarios("../../features/booking/le_patient_annule_un_rendez_vous.feature")
@@ -41,8 +42,10 @@ def error_tied_to_reason(scene: Scene) -> None:
     body = page_text(scene)
     assert scene.page.status_code == 400
     assert 'href="#field-reason"' in body
-    assert 'aria-invalid="true" aria-describedby="help-reason error-reason" autofocus' in body
-    assert '<small id="error-reason" class="field-error">Ce champ est obligatoire.</small>' in body
+    reason = attributes(body, "field-reason")
+    assert (reason["aria-invalid"], "autofocus" in reason) == ("true", True)
+    assert described_by(body, "field-reason") == ["field-reason_helptext", "field-reason_error"]
+    assert "<li>Ce champ est obligatoire.</li>" in body.split('id="field-reason_error"', 1)[1]
 
 
 @then(parsers.parse('the patient lands on their appointments with the message "{message}"'))

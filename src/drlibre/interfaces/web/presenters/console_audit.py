@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from drlibre.audit.application.ports.inbound import AuditFilter, AuditRow
 from drlibre.interfaces.web.presenters.audit_labels import action_label, entity_label
-from drlibre.interfaces.web.presenters.forms import ChoiceView
+from drlibre.interfaces.web.presenters.choices import ChoiceView
 from drlibre.interfaces.web.presenters.slots import local
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page

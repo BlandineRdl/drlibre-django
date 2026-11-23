@@ -8,7 +8,7 @@
 {% include "booking/_summary.html" %}
 {% if view.notice %}<p role="status">{{ view.notice }}</p>{% endif %}
 <p>Un code a été envoyé à l'adresse saisie. {{ view.held_until }}.</p>
-{% include "_form.html" with form=view.form hidden_fields=None %}
+{% include "forms/page.html" with page=view.form hidden_fields=None %}
 <form method="post" action="{{ view.resend_action }}" class="resend">
   {% csrf_token %}
   <span>Pas reçu de code ?</span> <button type="submit" class="link-button">Renvoyer un code</button>

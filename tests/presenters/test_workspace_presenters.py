@@ -18,6 +18,8 @@ from drlibre.booking.application.ports.inbound import (
     RoomsDayView,
 )
 from drlibre.booking.domain.booking_rules import clinician_actions
+from drlibre.interfaces.web.forms.portal import CancelForm
+from drlibre.interfaces.web.forms.workspace import NotesForm
 from drlibre.interfaces.web.presenters.workspace import (
     appointment_page,
     calendar_page,
@@ -256,43 +258,30 @@ def test_a_refused_move_is_explained_with_the_current_status_and_rules() -> None
     assert by_status.refusal.endswith("Statut actuel : Terminé.")
 
 
-def test_notes_are_saved_on_their_own_form_and_a_refusal_names_the_field() -> None:
-    """Story notes : enregistrées depuis la fiche, à part ; au-delà de 5000 caractères, refus."""
+def test_notes_are_posted_on_their_own_form_starting_from_the_saved_text() -> None:
+    """Story notes : enregistrées depuis la fiche, à part ; un refus garde le texte saisi."""
     noted = entry()
     noted = dataclasses.replace(
         noted, appointment=dataclasses.replace(noted.appointment, clinical_notes="RAS")
     )
-    error = DomainError(
-        ErrorCode.INVALID_INPUT,
-        "Corrigez le champ.",
-        {"fields": [{"field": "clinical_notes", "message": "5000 caractères au plus."}]},
-    )
+    typed = NotesForm({"clinical_notes": "x" * 5001})
 
     saved = appointment_page(file(noted), week=None)
-    refused = appointment_page(
-        file(noted), week=None, notes={"clinical_notes": "x" * 5001}, notes_error=error
-    )
+    refused = appointment_page(file(noted), week=None, notes=typed)
 
     assert saved.notes.action == f"/workspace/appointments/{noted.appointment.id}/notes"
-    assert saved.notes.fields[0].value == "RAS"
-    assert refused.notes.fields[0].error == "5000 caractères au plus."
-    assert refused.notes.fields[0].autofocus
+    assert saved.notes.form["clinical_notes"].value() == "RAS"
+    assert refused.notes.form is typed
 
 
 def test_cancelling_needs_a_reason_tied_to_its_field() -> None:
     """Story annule : le motif est obligatoire ; sans motif, invalid_input sur le champ."""
-    error = DomainError(
-        ErrorCode.INVALID_INPUT,
-        "Corrigez le champ.",
-        {"fields": [{"field": "reason", "message": "Ce champ est obligatoire."}]},
-    )
-
     booked = entry()
 
-    view = cancel_page(file(booked), {"reason": ""}, error)
+    view = cancel_page(file(booked), CancelForm({"reason": ""}))
 
     assert view.form.action == f"/workspace/appointments/{booked.appointment.id}/cancel"
-    assert view.form.fields[0].error == "Ce champ est obligatoire."
+    assert view.form.form.errors["reason"] == ["Ce champ est obligatoire."]
     assert view.form.cancel_url == f"/workspace/appointments/{booked.appointment.id}"
 
 

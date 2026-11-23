@@ -1,4 +1,3 @@
-import re
 from typing import Any
 
 import pytest
@@ -16,6 +15,7 @@ from drlibre.organisation.infrastructure.django.models import (
 )
 from tests.builders import stored_session, stored_user
 from tests.builders_organisation import code
+from tests.markup import attributes, described_by
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -115,7 +115,10 @@ def test_invalid_field_is_refused_with_focus_on_it(admin_client: Client) -> None
     body = response.content.decode()
     assert response.status_code == 400
     assert 'role="alert"' in body
-    assert re.search(r'id="field-time_zone"[^>]*aria-invalid="true"[^>]*autofocus', body)
+    time_zone = attributes(body, "field-time_zone")
+    assert time_zone["aria-invalid"] == "true"
+    assert "autofocus" in time_zone
+    assert "field-time_zone_error" in described_by(body, "field-time_zone")
 
 
 def test_unusable_page_value_falls_back_to_the_first_page(admin_client: Client) -> None:

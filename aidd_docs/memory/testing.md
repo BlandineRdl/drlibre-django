@@ -5,6 +5,7 @@
 | A use case or business behaviour | Gherkin scenario run with pytest-bdd on in-memory fakes |
 | A domain rule with many edge cases, such as slots or round robin | Behaviour-level test with Hypothesis properties, never its internal functions |
 | A presenter or ViewModel | Unit test of the ViewModel the template renders |
+| A web form | Unit test of the bound form in `tests/forms/` |
 | Search filters and sorts | Gherkin scenario run with pytest-bdd on PostgreSQL (`integration`): the rules live in the SQL |
 | A port or adapter | Contract suite run against the fake and the real adapter |
 | An ORM, SQL, mail or Redis adapter | Integration test on PostgreSQL, Mailpit or Redis |

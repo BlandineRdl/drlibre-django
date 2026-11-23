@@ -12,14 +12,16 @@ from drlibre.interfaces.web.auth import (
     session_token,
     set_session_cookie,
 )
+from drlibre.interfaces.web.forms.auth import LinkRequestForm, PasswordChangeForm, SignInForm
+from drlibre.interfaces.web.forms.base import INVALID
 from drlibre.interfaces.web.presenters.auth import (
     link_continue,
     link_missing,
     link_refused,
-    link_request_form,
+    link_request_page,
     link_sent,
-    password_form,
-    sign_in_form,
+    password_page,
+    sign_in_page,
 )
 from drlibre.shared_kernel.errors import DomainError
 
@@ -29,27 +31,38 @@ def _safe_next(request: HttpRequest, raw: str, home_path: str) -> str:
     return raw if allowed and raw.startswith(home_path) else home_path
 
 
+def _sign_in_page(
+    request: HttpRequest,
+    form: SignInForm,
+    link_form: LinkRequestForm,
+    next_url: str = "",
+    status: int = 200,
+) -> HttpResponse:
+    context = {
+        "page": sign_in_page(form),
+        "link_page": link_request_page(link_form),
+        "hidden_fields": [("next", next_url)] if next_url else [],
+    }
+    return render(request, "auth/form_page.html", context, status=status)
+
+
 @require_http_methods(["GET", "POST"])
 def sign_in(request: HttpRequest) -> HttpResponse:
     next_url = request.POST.get("next") or request.GET.get("next", "")
-    context: dict[str, object] = {"hidden_fields": [("next", next_url)] if next_url else []}
     if request.method == "GET":
-        forms = {"form": sign_in_form({}), "link_form": link_request_form({})}
-        return render(request, "auth/form_page.html", {**context, **forms})
+        return _sign_in_page(request, SignInForm(), LinkRequestForm(), next_url)
+    form = SignInForm(request.POST)
+    if not form.is_valid():
+        return _sign_in_page(request, form, LinkRequestForm(), next_url, INVALID)
     try:
         signed = container().sign_in.execute(
-            email=request.POST.get("email", ""),
-            password=request.POST.get("password", ""),
+            email=form.cleaned_data["email"],
+            password=form.cleaned_data["password"],
             user_agent=request.headers.get("User-Agent", ""),
         )
     except DomainError as error:
-        forms = {
-            "form": sign_in_form({"email": request.POST.get("email", "")}, error),
-            "link_form": link_request_form({}),
-        }
-        return render(
-            request, "auth/form_page.html", {**context, **forms}, status=error.code.http_status
-        )
+        form.refuse(error)
+        return _sign_in_page(request, form, LinkRequestForm(), next_url, error.code.http_status)
     response = redirect(_safe_next(request, next_url, HOMES[signed.role]))
     set_session_cookie(response, signed.token, signed.expires_at)
     return response
@@ -57,22 +70,16 @@ def sign_in(request: HttpRequest) -> HttpResponse:
 
 @require_POST
 def request_link(request: HttpRequest) -> HttpResponse:
-    email = request.POST.get("link_email", "")
+    form = LinkRequestForm(request.POST)
+    if not form.is_valid():
+        return _sign_in_page(request, SignInForm(), form, status=INVALID)
     try:
         container().request_sign_in_link.execute(
-            email=email, network=request.META.get("REMOTE_ADDR", "")
+            email=form.cleaned_data["link_email"], network=request.META.get("REMOTE_ADDR", "")
         )
     except DomainError as error:
-        forms = {
-            "form": sign_in_form({}),
-            "link_form": link_request_form({"link_email": email}, error),
-        }
-        return render(
-            request,
-            "auth/form_page.html",
-            {"hidden_fields": [], **forms},
-            status=error.code.http_status,
-        )
+        form.refuse(error)
+        return _sign_in_page(request, SignInForm(), form, status=error.code.http_status)
     return render(request, "auth/link_sent.html", {"view": link_sent()})
 
 
@@ -115,16 +122,25 @@ def change_password(request: HttpRequest) -> HttpResponse:
         "Votre mot de passe est temporaire : choisissez le vôtre pour continuer." if forced else ""
     )
     if request.method == "GET":
-        form = password_form(forced=forced)
-        return render(request, "auth/form_page.html", {"form": form, "intro": intro})
+        return _password_page(request, PasswordChangeForm(), forced=forced, intro=intro)
+    form = PasswordChangeForm(request.POST)
+    if not form.is_valid():
+        return _password_page(request, form, forced=forced, intro=intro, status=INVALID)
     try:
         container().change_password.execute(
             user_id=identity.user_id,
-            current_password=request.POST.get("current_password", ""),
-            new_password=request.POST.get("new_password", ""),
+            current_password=form.cleaned_data["current_password"],
+            new_password=form.cleaned_data["new_password"],
         )
     except DomainError as error:
-        form = password_form(forced=forced, error=error)
-        context = {"form": form, "intro": intro}
-        return render(request, "auth/form_page.html", context, status=error.code.http_status)
+        form.refuse(error)
+        status = error.code.http_status
+        return _password_page(request, form, forced=forced, intro=intro, status=status)
     return redirect(HOMES[identity.role])
+
+
+def _password_page(
+    request: HttpRequest, form: PasswordChangeForm, *, forced: bool, intro: str, status: int = 200
+) -> HttpResponse:
+    context = {"page": password_page(form, forced=forced), "intro": intro}
+    return render(request, "auth/form_page.html", context, status=status)

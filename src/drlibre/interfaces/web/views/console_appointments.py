@@ -14,6 +14,8 @@ from drlibre.booking.application.ports.inbound import (
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID
+from drlibre.interfaces.web.forms.portal import CancelForm
 from drlibre.interfaces.web.presenters.console import console_nav
 from drlibre.interfaces.web.presenters.console_appointments import (
     CONSOLE_APPOINTMENTS_URL,
@@ -182,16 +184,24 @@ def cancel(request: HttpRequest, appointment_id: uuid.UUID) -> HttpResponse:
     if request.method == "GET":
         if ClinicianAction.CANCEL not in file.entry.actions:
             return redirect(appointment_url(target))
-        return _render(request, "console/appointment_cancel.html", {"view": cancel_page(file, {})})
-    values = {"reason": request.POST.get("reason", "")}
+        view = cancel_page(file, CancelForm())
+        return _render(request, "console/appointment_cancel.html", {"view": view})
+    form = CancelForm(request.POST)
+    if not form.is_valid():
+        return _render(
+            request,
+            "console/appointment_cancel.html",
+            {"view": cancel_page(file, form)},
+            status=INVALID,
+        )
     try:
         container().cancel_appointment.execute(
-            appointment_id=target, actor_id=_actor(request), reason=values["reason"]
+            appointment_id=target, actor_id=_actor(request), reason=form.cleaned_data["reason"]
         )
     except DomainError as error:
         if error.code not in _INLINE:
             raise
-        view = cancel_page(file, values, error)
+        view = cancel_page(file, form, error)
         return _render(
             request,
             "console/appointment_cancel.html",

@@ -1,11 +1,9 @@
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from drlibre.booking.application.ports.inbound import (
-    MAX_CLINICAL_NOTES,
     AppointmentFile,
     ClinicianAction,
     ClinicianDayView,
@@ -15,6 +13,8 @@ from drlibre.booking.application.ports.inbound import (
     HistoryActor,
     RoomsDayView,
 )
+from drlibre.interfaces.web.forms.portal import CancelForm
+from drlibre.interfaces.web.forms.workspace import NotesForm
 from drlibre.interfaces.web.presenters.audit_labels import action_label
 from drlibre.interfaces.web.presenters.availability import (
     GRID_ROWS,
@@ -26,9 +26,8 @@ from drlibre.interfaces.web.presenters.availability import (
     week_view,
 )
 from drlibre.interfaces.web.presenters.console import NavLink
-from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_form
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.portal import (
-    REASON_FIELD,
     STATUS_LABELS,
     WeekStripView,
     refusal_text,
@@ -43,7 +42,7 @@ from drlibre.scheduling.application.ports.inbound import (
     FreeWeek,
     TimeOff,
 )
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
+from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page
 
@@ -83,15 +82,6 @@ ACTOR_LABELS = {
     HistoryActor.CLINICIAN: "Praticien",
     HistoryActor.STAFF: "Personnel",
 }
-NOTES_FIELD = (
-    FieldSpec(
-        "clinical_notes",
-        "Notes cliniques",
-        kind="textarea",
-        required=False,
-        help=f"{MAX_CLINICAL_NOTES} caractères au plus ; visibles par vous seul.",
-    ),
-)
 
 
 def workspace_nav(path: str) -> tuple[NavLink, ...]:
@@ -291,7 +281,7 @@ class AppointmentPage:
     facts: tuple[FactView, ...]
     buttons: tuple[ButtonView, ...]
     cancel_url: str
-    notes: FormView
+    notes: FormPage
     strip: WeekStripView | None
     history: tuple[HistoryRowView, ...]
     back_url: str
@@ -331,8 +321,7 @@ def appointment_page(
     week: FreeWeek | None,
     notice: str = "",
     refusal: DomainError | None = None,
-    notes: Mapping[str, str] | None = None,
-    notes_error: DomainError | None = None,
+    notes: NotesForm | None = None,
 ) -> AppointmentPage:
     """Facts, allowed actions, own notes form, week strip when movable and audit history."""
     entry, zone = file.entry, file.time_zone
@@ -348,13 +337,11 @@ def appointment_page(
         facts=appointment_facts(file),
         buttons=_buttons(entry, label),
         cancel_url=_cancel_url(entry),
-        notes=build_form(
-            title="Notes cliniques",
-            action=appointment_url(a.id, "notes"),
-            submit_label="Enregistrer les notes",
-            specs=NOTES_FIELD,
-            values=notes if notes is not None else notes_values(file),
-            error=notes_error,
+        notes=FormPage(
+            "Notes cliniques",
+            appointment_url(a.id, "notes"),
+            "Enregistrer les notes",
+            notes if notes is not None else NotesForm(initial=notes_values(file)),
         ),
         strip=week_strip(week, appointment_url(a.id, "reschedule")) if movable and week else None,
         history=tuple(
@@ -374,31 +361,29 @@ class CancelPage:
     heading: str
     time_zone: str
     facts: tuple[FactView, ...]
-    form: FormView
+    form: FormPage
 
 
 def cancel_page(
-    file: AppointmentFile, values: Mapping[str, str], error: DomainError | None = None
+    file: AppointmentFile, form: CancelForm, error: DomainError | None = None
 ) -> CancelPage:
     """The reason form; a refusal other than a field error is shown above it."""
     a = file.entry.appointment
-    form = build_form(
-        title="Annuler le rendez-vous",
-        action=appointment_url(a.id, "cancel"),
-        submit_label="Confirmer l'annulation",
-        specs=REASON_FIELD,
-        values=values,
-        error=error,
-        cancel_url=appointment_url(a.id),
-        cancel_label="Retour à la fiche",
-    )
-    if error is not None and error.code is not ErrorCode.INVALID_INPUT:
-        form = replace(form, message=refusal_text(error))
+    if error is not None:
+        form.refuse(error, refusal_text(error))
     return CancelPage(
         heading=f"Annuler le rendez-vous de {file.entry.patient_name}",
         time_zone=file.time_zone,
         facts=appointment_facts(file),
-        form=form,
+        form=FormPage(
+            "Annuler le rendez-vous",
+            appointment_url(a.id, "cancel"),
+            "Confirmer l'annulation",
+            form,
+            cancel_url=appointment_url(a.id),
+            cancel_label="Retour à la fiche",
+            submit_class="danger",
+        ),
     )
 
 

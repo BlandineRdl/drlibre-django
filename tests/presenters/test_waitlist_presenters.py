@@ -8,7 +8,6 @@ from drlibre.booking.domain.waitlist import WaitlistEntry
 from drlibre.interfaces.web.presenters.waitlist import (
     console_list,
     entry_card,
-    join_input,
     refusal_text,
 )
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
@@ -116,12 +115,3 @@ def test_refusals_name_the_entry_status_and_the_broken_rules() -> None:
 
     assert refusal_text(transition) == "Refusé. Statut actuel : RDV obtenu."
     assert refusal_text(rules) == "Refusé. Vous avez déjà 3 réservations en ligne."
-
-
-def test_the_join_form_names_each_unusable_field() -> None:
-    """Story « le patient s'inscrit » : type, praticien facultatif et fenêtre de dates."""
-    with pytest.raises(DomainError) as refused:
-        join_input({"appointment_type_id": "x", "clinician_id": "y", "from_date": ""})
-
-    fields = [f["field"] for f in refused.value.details["fields"]]
-    assert fields == ["appointment_type_id", "clinician_id", "from_date", "to_date"]

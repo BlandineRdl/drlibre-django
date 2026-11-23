@@ -1,9 +1,7 @@
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from drlibre.booking.application.ports.inbound import (
-    MAX_CANCELLATION_REASON,
     AgendaEntry,
     AppointmentStatus,
     BookingRule,
@@ -11,8 +9,9 @@ from drlibre.booking.application.ports.inbound import (
     PatientAppointments,
 )
 from drlibre.identity.application.ports.inbound import User
+from drlibre.interfaces.web.forms.portal import CancelForm, ProfileForm
 from drlibre.interfaces.web.presenters.console import NavLink
-from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_form
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.slots import day_label, local, slot_instant
 from drlibre.notifications.application.ports.inbound import Notification, NotificationKind
 from drlibre.scheduling.application.ports.inbound import FreeWeek
@@ -60,32 +59,6 @@ NOTICES = {
     "booked": "Le créneau proposé est réservé.",
     "saved": "Votre profil est enregistré.",
 }
-REASON_FIELD = (
-    FieldSpec(
-        "reason",
-        "Motif de l'annulation",
-        kind="textarea",
-        help=f"{MAX_CANCELLATION_REASON} caractères au plus.",
-    ),
-)
-PROFILE_FIELDS = (
-    FieldSpec(
-        "phone",
-        "Téléphone",
-        kind="tel",
-        required=False,
-        autocomplete="tel",
-        help="De 7 à 20 caractères : chiffres, espaces et + ( ) -. Laisser vide pour l'effacer.",
-    ),
-    FieldSpec(
-        "birth_date",
-        "Date de naissance",
-        kind="date",
-        required=False,
-        autocomplete="bday",
-        help="Laisser vide pour l'effacer.",
-    ),
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +97,7 @@ class AppointmentsPageView:
 @dataclass(frozen=True, slots=True)
 class CancelPageView:
     appointment: AppointmentCardView
-    form: FormView
+    form: FormPage
     time_zone: str
 
 
@@ -188,7 +161,7 @@ class ProfilePageView:
     notice: str
     name: str
     email: str
-    form: FormView
+    form: FormPage
     password_url: str
 
 
@@ -304,22 +277,22 @@ def rule_reasons(error: DomainError | None) -> tuple[str, ...]:
 
 
 def cancel_page(
-    entry: AgendaEntry, values: Mapping[str, str], error: DomainError | None = None
+    entry: AgendaEntry, form: CancelForm, error: DomainError | None = None
 ) -> CancelPageView:
-    form = build_form(
-        title="Annuler le rendez-vous",
-        action=appointment_url(entry, "cancel"),
-        submit_label="Confirmer l'annulation",
-        specs=REASON_FIELD,
-        values=values,
-        error=error,
+    """The reason form; a refusal other than a field error is spelled out above it."""
+    if error is not None:
+        reasons = "".join(f" {r[0].upper()}{r[1:]}." for r in rule_reasons(error))
+        form.refuse(error, refusal_text(error) + reasons)
+    page = FormPage(
+        "Annuler le rendez-vous",
+        appointment_url(entry, "cancel"),
+        "Confirmer l'annulation",
+        form,
         cancel_url=APPOINTMENTS_URL,
         cancel_label="Retour",
+        submit_class="danger",
     )
-    if error is not None and error.code is not ErrorCode.INVALID_INPUT:
-        reasons = "".join(f" {r[0].upper()}{r[1:]}." for r in rule_reasons(error))
-        form = replace(form, message=refusal_text(error) + reasons)
-    return CancelPageView(appointment_card(entry), form, entry.time_zone)
+    return CancelPageView(appointment_card(entry), page, entry.time_zone)
 
 
 def week_strip(week: FreeWeek, action: str) -> WeekStripView:
@@ -392,30 +365,21 @@ def notifications_page(page: Page[Notification], fallback_zone: str) -> Notifica
     )
 
 
-def profile_values(user: User) -> dict[str, str]:
-    birth = user.birth_date.isoformat() if user.birth_date else ""
-    return {"phone": user.phone or "", "birth_date": birth}
+def profile_values(user: User) -> dict[str, object]:
+    return {"phone": user.phone or "", "birth_date": user.birth_date}
 
 
 def profile_page(
     user: User,
-    values: Mapping[str, str],
+    form: ProfileForm,
     *,
     has_password: bool,
     notice: str = "",
-    error: DomainError | None = None,
 ) -> ProfilePageView:
     return ProfilePageView(
         notice=NOTICES.get(notice, ""),
         name=user.full_name,
         email=user.email.value,
-        form=build_form(
-            title="Mes coordonnées",
-            action=PROFILE_URL,
-            submit_label="Enregistrer",
-            specs=PROFILE_FIELDS,
-            values=values,
-            error=error,
-        ),
+        form=FormPage("Mes coordonnées", PROFILE_URL, "Enregistrer", form),
         password_url=PASSWORD_URL if has_password else "",
     )

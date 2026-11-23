@@ -1,0 +1,11 @@
+{% if field.use_fieldset %}
+<fieldset{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>{% if field.label %}{{ field.legend_tag }}{% endif %}{{ field }}
+{% elif field.widget_type == "checkbox" %}
+<label for="{{ field.id_for_label }}">{{ field }} {{ field.label }}</label>
+{% else %}
+<label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} (facultatif){% endif %}</label>
+{{ field }}
+{% endif %}
+{% if field.help_text %}<small class="helptext" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</small>{% endif %}
+{{ field.errors }}
+{% if field.use_fieldset %}</fieldset>{% endif %}
