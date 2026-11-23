@@ -69,6 +69,26 @@ Django is used as the infrastructure framework (ORM, migrations, HTTP, templates
 
 The hexagon pays off where the rules are: `booking` and `scheduling` (placement, locks, round robin, waitlist). `organisation` is mostly reference data CRUD and alone would not justify ports and mapping; it follows the same layout for consistency across the showcase. Read sides (`search`, `reporting`, `interop`) skip the domain and read SQL directly. In practice the ports' value here is in-memory fakes for tests, not swapping providers: no adapter has been replaced. Pattern reference: [Hexagonal Architecture with Django](https://medium.com/@andremrufino/hexagonal-architecture-with-django-fundamentals-and-comparison-with-clean-architecture-38d74608d961) (André Rufino), where Django is the HTTP and persistence adapter.
 
+### How Django-idiomatic is it?
+A subjective self-assessment, 0 to 10 per area:
+
+| Area | Score | Why |
+| --- | --- | --- |
+| ORM, migrations, PostgreSQL constraints | 9 | Idiomatic and advanced (`ExclusionConstraint`, partial indexes, `select_for_update`); only the read sides use raw SQL |
+| Security middleware (CSRF, CSP, clickjacking, `check --deploy`) | 9 | Django's own, kept as is |
+| Templates, static files | 8 | Django templates and `staticfiles`; logic stays in presenters |
+| Config | 6 | `settings.py` fed by pydantic-settings instead of plain constants |
+| API | 6 | Django Ninja is well established, DRF remains the canonical choice |
+| Forms | 1 | Views read `request.POST` and use cases validate; a switch to `django.forms` is planned |
+| Auth, sessions | 2 | Own implementation; only Django's password hashers are reused |
+| Code organisation | 3 | Hexagonal contexts instead of Django apps with rich models |
+| Tests | 3 | pytest-bdd on fakes; no Django `TestCase` for business behaviour |
+| Admin | 0 | Not installed, see below |
+
+About 50% overall: Django is used well where it is used (about 85%), but several built-ins are replaced (about 40% coverage).
+
+`django.contrib.admin` is left out on purpose. It writes through the ORM, so it would bypass the use cases: no audit entry in the transaction, no slot refresh, no locks, no dependents check. The console is a business feature of the admin role, not a table editor. A read-only admin for debugging would still require `contrib.auth`, `contrib.sessions` and `contrib.messages`, a second sign-in and raw session keys; `psql`, the console and `/fhir` already cover inspection.
+
 Full rationale and pinned versions: `aidd_docs/INSTALL.md` and `aidd_docs/memory/architecture.md`.
 
 ## Develop
