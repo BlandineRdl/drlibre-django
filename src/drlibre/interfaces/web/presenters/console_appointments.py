@@ -16,8 +16,8 @@ from drlibre.booking.application.ports.inbound import (
 from drlibre.identity.application.ports.inbound import PatientMatch
 from drlibre.interfaces.web.forms.portal import CancelForm
 from drlibre.interfaces.web.presenters.audit_labels import action_label
+from drlibre.interfaces.web.presenters.choices import ChoiceView
 from drlibre.interfaces.web.presenters.form_page import FormPage
-from drlibre.interfaces.web.presenters.forms import ChoiceView
 from drlibre.interfaces.web.presenters.portal import (
     STATUS_LABELS,
     WeekStripView,

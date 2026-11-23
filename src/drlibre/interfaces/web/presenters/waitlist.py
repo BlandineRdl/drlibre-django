@@ -7,11 +7,11 @@ from drlibre.booking.application.ports.inbound import (
     WaitlistStatus,
 )
 from drlibre.interfaces.web.forms.portal import WaitlistJoinForm
-from drlibre.interfaces.web.presenters.form_page import FormPage
-from drlibre.interfaces.web.presenters.forms import (
+from drlibre.interfaces.web.presenters.choices import (
     Choice,
     ChoiceView,
 )
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.portal import rule_reasons
 from drlibre.interfaces.web.presenters.slots import day_label, local
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
