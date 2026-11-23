@@ -67,6 +67,8 @@ Django is used as the infrastructure framework (ORM, migrations, HTTP, templates
 | Pydantic, pydantic-settings, structlog | `settings.py` constants, stdlib logging | Typed validation at every boundary, typed config from `.env`, JSON logs with a correlation id |
 | Gherkin scenarios (pytest-bdd) on fakes, contract tests fake vs real adapter | Mocks, Django `TestCase` | Tests describe behaviour and survive refactoring |
 
+The hexagon pays off where the rules are: `booking` and `scheduling` (placement, locks, round robin, waitlist). `organisation` is mostly reference data CRUD and alone would not justify ports and mapping; it follows the same layout for consistency across the showcase. Read sides (`search`, `reporting`, `interop`) skip the domain and read SQL directly. In practice the ports' value here is in-memory fakes for tests, not swapping providers: no adapter has been replaced. Pattern reference: [Hexagonal Architecture with Django](https://medium.com/@andremrufino/hexagonal-architecture-with-django-fundamentals-and-comparison-with-clean-architecture-38d74608d961) (André Rufino), where Django is the HTTP and persistence adapter.
+
 Full rationale and pinned versions: `aidd_docs/INSTALL.md` and `aidd_docs/memory/architecture.md`.
 
 ## Develop
