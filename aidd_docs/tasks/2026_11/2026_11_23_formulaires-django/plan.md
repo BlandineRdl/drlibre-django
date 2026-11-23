@@ -1,6 +1,6 @@
 ---
 objective: "Every web form is a `django.forms.Form` rendered by Django's form templates, validated by the form then by the use case, with the current accessible markup kept, and the home-grown `FieldSpec`/`build_form` layer gone."
-status: in-progress
+status: implemented
 ---
 
 # Plan: formulaires Django
