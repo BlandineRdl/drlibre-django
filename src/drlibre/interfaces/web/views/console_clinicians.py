@@ -10,6 +10,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID, options
 from drlibre.interfaces.web.forms.console import ClinicianProfileForm
 from drlibre.interfaces.web.presenters.availability import (
     AVAILABLE,
@@ -35,7 +36,6 @@ from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import PageRequest
 
 BASE = "/console/clinicians/"
-INVALID = ErrorCode.INVALID_INPUT.http_status
 
 
 def _profile(record_id: uuid.UUID) -> ClinicianProfile:
@@ -49,16 +49,12 @@ def _names() -> Mapping[Id, str]:
     return {m.user_id: m.full_name for m in container().staff_lookup.active_clinicians()}
 
 
-def _options(options: tuple[Any, ...]) -> tuple[tuple[str, str], ...]:
-    return tuple((str(o.id), o.label) for o in options)
-
-
 def _profile_form(*args: Any, attaching: bool, **kwargs: Any) -> ClinicianProfileForm:
     q = container().reference_queries
     form = ClinicianProfileForm(*args, attaching=attaching, **kwargs)
-    form.offer("department_id", _options(q.department_options()))
-    form.offer("specialty_id", _options(q.specialty_options()))
-    form.offer("default_room_id", _options(q.room_options()))
+    form.offer("department_id", options(q.department_options()))
+    form.offer("specialty_id", options(q.specialty_options()))
+    form.offer("default_room_id", options(q.room_options()))
     if attaching:
         taken = q.profiled_user_ids()
         free = [m for m in container().staff_lookup.active_clinicians() if m.user_id not in taken]

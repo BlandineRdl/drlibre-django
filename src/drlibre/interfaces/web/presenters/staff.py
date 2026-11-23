@@ -1,6 +1,5 @@
 from drlibre.identity.application.ports.inbound import Role
-
-ROLE_LABELS = {Role.ADMIN: "Admin", Role.CLINICIAN: "Praticien", Role.PATIENT: "Patient"}
+from drlibre.interfaces.web.labels import ROLE_LABELS
 
 
 def role_label(role: Role) -> str:

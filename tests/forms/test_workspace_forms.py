@@ -49,3 +49,16 @@ def test_a_re_rendered_time_off_keeps_the_value_a_datetime_input_reads() -> None
     assert list(form.errors) == ["end"]
     assert attributes(html, "field-start")["value"] == "2026-11-23T09:00"
     assert "Date et heure locales (Europe/Paris)." in html
+
+
+def test_a_time_off_typed_in_the_hospital_zone_is_left_to_the_use_case() -> None:
+    """Story absences : l'heure est lue dans le fuseau de l'hôpital, pas celui du serveur."""
+    # 02:30 on 25 Oct 2026 happens twice in Europe/Paris, once in America/Montreal.
+    fields = {"start": "2026-10-25T02:30", "end": "2026-10-25T03:30"}
+    form = TimeOffForm(fields, time_zone="America/Montreal")
+
+    assert form.is_valid()
+    assert (form.cleaned_data["start"], form.cleaned_data["end"]) == (
+        fields["start"],
+        fields["end"],
+    )

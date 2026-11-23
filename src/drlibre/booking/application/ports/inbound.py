@@ -23,6 +23,11 @@ from drlibre.booking.domain.appointment import (
     Source,
 )
 from drlibre.booking.domain.booking_rules import BookingRule, ClinicianAction, PatientAction
+from drlibre.booking.domain.visitor_details import (
+    MAX_BOOKING_REASON,
+    MAX_FULL_NAME,
+    MAX_PHONE,
+)
 from drlibre.booking.domain.waitlist import WaitlistEntry, WaitlistStatus
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.errors import DomainError
@@ -30,8 +35,11 @@ from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
 
 __all__ = [
+    "MAX_BOOKING_REASON",
     "MAX_CANCELLATION_REASON",
     "MAX_CLINICAL_NOTES",
+    "MAX_FULL_NAME",
+    "MAX_PHONE",
     "AcceptWaitlistOffer",
     "AdminAppointmentFilter",
     "AdminAppointmentRow",

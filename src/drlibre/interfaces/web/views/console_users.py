@@ -7,6 +7,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role, User
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID
 from drlibre.interfaces.web.forms.console import UserForm
 from drlibre.interfaces.web.presenters.console import console_nav
 from drlibre.interfaces.web.presenters.form_page import FormPage
@@ -42,7 +43,7 @@ def _form(request: HttpRequest, form: UserForm, *, title: str, status: int = 200
 def _save(request: HttpRequest, title: str, user_id: Id | None) -> HttpResponse:
     form = UserForm(request.POST, creating=user_id is None)
     if not form.is_valid():
-        return _form(request, form, title=title, status=ErrorCode.INVALID_INPUT.http_status)
+        return _form(request, form, title=title, status=INVALID)
     data = form.cleaned_data
     try:
         container().save_user.execute(

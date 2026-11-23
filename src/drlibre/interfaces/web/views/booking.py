@@ -9,7 +9,7 @@ from drlibre.booking.application.ports.inbound import Appointment, HoldSummary
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity
 from drlibre.interfaces.web.auth import identity_of, set_session_cookie, to_sign_in
-from drlibre.interfaces.web.forms.base import iso
+from drlibre.interfaces.web.forms.base import INVALID, iso
 from drlibre.interfaces.web.forms.booking import CodeForm, DetailsForm
 from drlibre.interfaces.web.presenters.booking import (
     SlotContext,
@@ -36,7 +36,6 @@ _INLINE = frozenset(
     }
 )
 _NOT_FOUND = DomainError(ErrorCode.NOT_FOUND, "Créneau introuvable.")
-INVALID = ErrorCode.INVALID_INPUT.http_status
 
 
 def _uuid(raw: str | None) -> Id | None:

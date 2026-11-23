@@ -12,6 +12,7 @@ from drlibre.booking.application.ports.inbound import AppointmentFile, Clinician
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID
 from drlibre.interfaces.web.forms.portal import CancelForm
 from drlibre.interfaces.web.forms.workspace import NotesForm
 from drlibre.interfaces.web.presenters.slots import local
@@ -245,7 +246,7 @@ def notes(request: HttpRequest, me: Me, appointment_id: Id) -> HttpResponse:
         else:
             return _done(appointment_url(appointment_id), "notes")
     file = _file(me, appointment_id)
-    return _file_page(request, me, file, notes=form, status=ErrorCode.INVALID_INPUT.http_status)
+    return _file_page(request, me, file, notes=form, status=INVALID)
 
 
 @require_http_methods(["GET", "POST"])
@@ -261,7 +262,7 @@ def cancel(request: HttpRequest, me: Me, appointment_id: Id) -> HttpResponse:
     form = CancelForm(request.POST)
     if not form.is_valid():
         view = cancel_page(file, form)
-        status = ErrorCode.INVALID_INPUT.http_status
+        status = INVALID
         return _private_page(request, "workspace/cancel.html", me, view, status=status)
     try:
         container().cancel_appointment.execute(

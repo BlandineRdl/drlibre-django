@@ -51,3 +51,14 @@ def test_untouched_form_shows_no_error_and_no_focus() -> None:
 
     assert 'role="alert"' not in html
     assert "autofocus" not in html
+
+
+def test_a_refused_sign_in_shows_its_message_without_an_empty_field_list() -> None:
+    form = SignInForm({"email": "ana@example.org", "password": "wrong-password"})
+    assert form.is_valid()
+
+    form.refuse(DomainError(ErrorCode.INVALID_INPUT, "Email ou mot de passe incorrect."))
+
+    html = form.render()
+    assert "Email ou mot de passe incorrect." in html
+    assert "<ul>" not in html

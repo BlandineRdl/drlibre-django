@@ -20,3 +20,18 @@
 | 4.3 | `uv run pre-commit run --all-files` | all hooks passed |
 | 4.3 | `uv run pytest` | 2155 passed, 11 deselected |
 | 4.3 | `uv run pytest -m e2e` on the `drlibre-e2e` stack (port 28000) | 11 passed, axe-core at 375 and 1440 px |
+
+## Run 2: review repair
+- Head: `e5d1b8b`
+- Left: none
+
+| Finding | Validation | Result |
+| --- | --- | --- |
+| time off parsed in `settings.TIME_ZONE` | `TimeOffForm` start/end are text with the `datetime-local` widget; `test_a_time_off_typed_in_the_hospital_zone_is_left_to_the_use_case` fails on the old form | passed |
+| length literals | `PASSWORD_MIN_LENGTH`/`PASSWORD_MAX_LENGTH`, `MAX_TIME_OFF_REASON`, `MAX_FULL_NAME`/`MAX_PHONE`/`MAX_BOOKING_REASON` re-exported by the inbound ports; `uv run lint-imports` | passed |
+| unreachable redirect, `.field-error`, empty summary `<ul>` | `test_a_refused_sign_in_shows_its_message_without_an_empty_field_list` fails on the old template | passed |
+| `options`/`INVALID` copies | one each in `forms/base.py` | passed |
+| forms ↔ presenters imports | `WEEK_ORDER`, `ROLE_LABELS` in `interfaces/web/labels.py` | passed |
+| test names | portal and console join tests renamed | passed |
+| gates | `uv run pre-commit run --all-files`; `uv run pytest` | all hooks passed; 2157 passed, 11 deselected |
+| e2e | `uv run pytest -m e2e` on the `drlibre-e2e` stack (port 28000), removed after | 11 passed |

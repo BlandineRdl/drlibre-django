@@ -7,7 +7,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import require_role
-from drlibre.interfaces.web.forms.base import WebForm
+from drlibre.interfaces.web.forms.base import INVALID, WebForm, options
 from drlibre.interfaces.web.forms.workspace import RuleForm, TimeOffForm
 from drlibre.interfaces.web.presenters.availability import (
     RULES_URL,
@@ -24,12 +24,10 @@ from drlibre.scheduling.application.ports.inbound import AvailabilityRule
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 
-INVALID = ErrorCode.INVALID_INPUT.http_status
-
 
 def _rooms(me: Me) -> tuple[tuple[str, str], ...]:
     rooms = container().reference_queries.department_rooms(me.department_id)
-    return tuple((str(room.id), room.label) for room in rooms if room.active)
+    return options(room for room in rooms if room.active)
 
 
 def _form(
@@ -66,13 +64,17 @@ def list_rules(request: HttpRequest) -> HttpResponse:
 def _save_rule(
     request: HttpRequest, me: Me, *, title: str, rule: AvailabilityRule | None
 ) -> HttpResponse:
-    options = {"time_zone": me.time_zone, "rooms": _rooms(me)}
+    form_options = {"time_zone": me.time_zone, "rooms": _rooms(me)}
     if request.method == "GET":
         initial = rule_values(rule) if rule else {"step_minutes": "15"}
         return _form(
-            request, me, RuleForm(initial=initial, **options), title=title, cancel_url=RULES_URL
+            request,
+            me,
+            RuleForm(initial=initial, **form_options),
+            title=title,
+            cancel_url=RULES_URL,
         )
-    form = RuleForm(request.POST, **options)
+    form = RuleForm(request.POST, **form_options)
     if form.is_valid():
         try:
             container().save_availability_rule.execute(

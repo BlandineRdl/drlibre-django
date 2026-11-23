@@ -9,13 +9,12 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from drlibre.booking.application.ports.inbound import (
     AgendaEntry,
     AgendaFilter,
-    BookingOption,
     PatientAppointments,
 )
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity, Role
 from drlibre.interfaces.web.auth import current_identity, require_role
-from drlibre.interfaces.web.forms.base import iso
+from drlibre.interfaces.web.forms.base import INVALID, iso, options
 from drlibre.interfaces.web.forms.portal import CancelForm, ProfileForm, WaitlistJoinForm
 from drlibre.interfaces.web.presenters.calendar_file import calendar_file
 from drlibre.interfaces.web.presenters.portal import (
@@ -47,7 +46,6 @@ _INLINE = frozenset(
     }
 )
 _ONE_INSTANT = timedelta(microseconds=1)
-INVALID = ErrorCode.INVALID_INPUT.http_status
 
 
 def _agenda(identity: Identity, agenda_filter: AgendaFilter | None = None) -> PatientAppointments:
@@ -230,20 +228,15 @@ def profile(request: HttpRequest) -> HttpResponse:
             return redirect(f"{PROFILE_URL}?done=saved")
     view = profile_page(user, form, has_password=identity.has_password)
     return render(request, "portal/profile.html", {"view": view}, status=INVALID)
-    return redirect(f"{PROFILE_URL}?done=saved")
 
 
 def _join_form(request: HttpRequest | None = None) -> WaitlistJoinForm:
     c = container()
     return WaitlistJoinForm(
         request.POST if request else None,
-        types=_options(c.booking_option_queries.type_options(online_only=True)),
-        clinicians=_options(c.booking_option_queries.clinician_options()),
+        types=options(c.booking_option_queries.type_options(online_only=True)),
+        clinicians=options(c.booking_option_queries.clinician_options()),
     )
-
-
-def _options(options: tuple[BookingOption, ...]) -> tuple[tuple[str, str], ...]:
-    return tuple((str(o.id), o.label) for o in options)
 
 
 def _waitlist_page(

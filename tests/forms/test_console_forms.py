@@ -49,7 +49,7 @@ def test_a_refused_new_account_never_shows_its_temporary_password_again() -> Non
     assert "temporary_password" not in UserForm(creating=False).fields
 
 
-def test_a_staff_join_names_the_patient_first_and_gives_the_use_case_ids_and_days() -> None:
+def test_an_admin_joins_a_patient_by_email_first_for_a_type_and_a_window_of_days() -> None:
     """Liste d'attente console : l'admin inscrit un patient par son email."""
     form = WaitlistAddForm(
         {

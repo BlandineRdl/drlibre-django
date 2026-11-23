@@ -2,11 +2,13 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
-from drlibre.identity.domain.user import Role, User
+from drlibre.identity.domain.user import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, Role, User
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
 
 __all__ = [
+    "PASSWORD_MAX_LENGTH",
+    "PASSWORD_MIN_LENGTH",
     "AuthenticateSession",
     "AuthenticateToken",
     "ChangePassword",

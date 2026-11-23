@@ -98,7 +98,6 @@ article, .card { border: 1px solid var(--dl-border); border-radius: var(--dl-rad
 button.danger, [role="button"].danger, input[type="submit"].danger { --pico-background-color: var(--dl-danger); --pico-border-color: var(--dl-danger); --pico-color: #fff; }
 button.danger:hover, [role="button"].danger:hover { --pico-background-color: var(--dl-danger-hover); --pico-border-color: var(--dl-danger-hover); }
 a.danger-link { color: var(--dl-danger); }
-.field-error { color: var(--dl-danger); }
 .errorlist { list-style: none; padding: 0; margin: calc(var(--pico-spacing) * -0.75) 0 var(--pico-spacing); color: var(--dl-danger); font-size: 0.875em; }
 .errorlist li { list-style: none; }
 .helptext { display: block; }

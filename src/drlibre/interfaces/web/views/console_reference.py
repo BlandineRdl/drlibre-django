@@ -11,7 +11,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from drlibre.bootstrap.container import Container, container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
-from drlibre.interfaces.web.forms.base import WebForm
+from drlibre.interfaces.web.forms.base import INVALID, WebForm, options
 from drlibre.interfaces.web.forms.console import (
     AppointmentTypeForm,
     DepartmentForm,
@@ -33,8 +33,6 @@ from drlibre.organisation.application.ports.inbound import DeleteRecord, SaveRec
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import Page, PageRequest
-
-INVALID = ErrorCode.INVALID_INPUT.http_status
 
 type Choices = Mapping[str, tuple[tuple[str, str], ...]]
 
@@ -58,10 +56,6 @@ class Screen:
         return f"/console/{self.slug}/"
 
 
-def _choices(options: tuple[Any, ...]) -> tuple[tuple[str, str], ...]:
-    return tuple((str(o.id), o.label) for o in options)
-
-
 def _screens(app: Container) -> dict[str, Screen]:
     q = app.reference_queries
 
@@ -80,10 +74,10 @@ def _screens(app: Container) -> dict[str, Screen]:
         return department_labels().get(record.department_id, "")
 
     def by_hospital() -> Choices:
-        return {"hospital_id": _choices(q.hospital_options())}
+        return {"hospital_id": options(q.hospital_options())}
 
     def by_department() -> Choices:
-        return {"department_id": _choices(q.department_options())}
+        return {"department_id": options(q.department_options())}
 
     return {
         "hospitals": Screen(

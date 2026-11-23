@@ -14,6 +14,7 @@ from drlibre.booking.application.ports.inbound import (
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Role
 from drlibre.interfaces.web.auth import current_identity, require_role
+from drlibre.interfaces.web.forms.base import INVALID
 from drlibre.interfaces.web.forms.portal import CancelForm
 from drlibre.interfaces.web.presenters.console import console_nav
 from drlibre.interfaces.web.presenters.console_appointments import (
@@ -191,7 +192,7 @@ def cancel(request: HttpRequest, appointment_id: uuid.UUID) -> HttpResponse:
             request,
             "console/appointment_cancel.html",
             {"view": cancel_page(file, form)},
-            status=ErrorCode.INVALID_INPUT.http_status,
+            status=INVALID,
         )
     try:
         container().cancel_appointment.execute(

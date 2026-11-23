@@ -1,12 +1,15 @@
 from django import forms
 
+from drlibre.booking.application.ports.inbound import MAX_BOOKING_REASON, MAX_FULL_NAME, MAX_PHONE
 from drlibre.interfaces.web.forms.base import TelInput, WebForm
 from drlibre.shared_kernel.booking_policy import CODE_LIFETIME
 
 
 class DetailsForm(WebForm):
     full_name = forms.CharField(
-        label="Nom complet", max_length=150, widget=forms.TextInput({"autocomplete": "name"})
+        label="Nom complet",
+        max_length=MAX_FULL_NAME,
+        widget=forms.TextInput({"autocomplete": "name"}),
     )
     birth_date = forms.DateField(
         label="Date de naissance",
@@ -15,10 +18,16 @@ class DetailsForm(WebForm):
     )
     email = forms.EmailField(label="Email", widget=forms.EmailInput({"autocomplete": "email"}))
     phone = forms.CharField(
-        label="Téléphone", required=False, max_length=30, widget=TelInput({"autocomplete": "tel"})
+        label="Téléphone",
+        required=False,
+        max_length=MAX_PHONE,
+        widget=TelInput({"autocomplete": "tel"}),
     )
     reason = forms.CharField(
-        label="Motif", required=False, max_length=500, widget=forms.Textarea({"rows": 3})
+        label="Motif",
+        required=False,
+        max_length=MAX_BOOKING_REASON,
+        widget=forms.Textarea({"rows": 3}),
     )
     # Not required here: the use case refuses unaccepted terms with its own message.
     accepted_terms = forms.BooleanField(

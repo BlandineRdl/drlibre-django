@@ -5,8 +5,8 @@ from django import forms
 
 from drlibre.booking.application.ports.inbound import MAX_CLINICAL_NOTES
 from drlibre.interfaces.web.forms.base import WebForm, with_placeholder
-from drlibre.interfaces.web.presenters.availability import WEEK_ORDER
-from drlibre.scheduling.application.ports.inbound import WEEKDAYS
+from drlibre.interfaces.web.labels import WEEK_ORDER
+from drlibre.scheduling.application.ports.inbound import MAX_TIME_OFF_REASON, WEEKDAYS
 
 
 class NotesForm(WebForm):
@@ -40,20 +40,22 @@ class RuleForm(WebForm):
         self.offer("room_id", rooms)
 
 
+def _local_datetime(label: str) -> forms.CharField:
+    # Text only: the use case parses it in the hospital zone, not settings.TIME_ZONE.
+    return forms.CharField(
+        label=label,
+        widget=forms.DateTimeInput({"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
+    )
+
+
 class TimeOffForm(WebForm):
-    start = forms.DateTimeField(
-        label="Début",
-        widget=forms.DateTimeInput({"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
-    )
-    end = forms.DateTimeField(
-        label="Fin",
-        widget=forms.DateTimeInput({"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"),
-    )
+    start = _local_datetime("Début")
+    end = _local_datetime("Fin")
     reason = forms.CharField(
         label="Motif",
         required=False,
-        max_length=200,
-        help_text="200 caractères au plus.",
+        max_length=MAX_TIME_OFF_REASON,
+        help_text=f"{MAX_TIME_OFF_REASON} caractères au plus.",
         widget=forms.Textarea({"rows": 3}),
     )
 

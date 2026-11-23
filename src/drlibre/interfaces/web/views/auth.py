@@ -13,6 +13,7 @@ from drlibre.interfaces.web.auth import (
     set_session_cookie,
 )
 from drlibre.interfaces.web.forms.auth import LinkRequestForm, PasswordChangeForm, SignInForm
+from drlibre.interfaces.web.forms.base import INVALID
 from drlibre.interfaces.web.presenters.auth import (
     link_continue,
     link_missing,
@@ -22,9 +23,7 @@ from drlibre.interfaces.web.presenters.auth import (
     password_page,
     sign_in_page,
 )
-from drlibre.shared_kernel.errors import DomainError, ErrorCode
-
-INVALID = ErrorCode.INVALID_INPUT.http_status
+from drlibre.shared_kernel.errors import DomainError
 
 
 def _safe_next(request: HttpRequest, raw: str, home_path: str) -> str:

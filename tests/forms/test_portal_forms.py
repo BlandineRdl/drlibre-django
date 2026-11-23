@@ -35,7 +35,7 @@ def test_the_profile_starts_from_the_stored_birth_date_as_a_date_input_reads_it(
     assert ProfileForm({"phone": "", "birth_date": ""}).is_valid()
 
 
-def test_a_join_gives_the_use_case_ids_and_days() -> None:
+def test_a_join_names_a_type_an_optional_clinician_and_a_window_of_days() -> None:
     """Story « le patient s'inscrit » : type, praticien facultatif et fenêtre de dates."""
     form = join(
         {"appointment_type_id": str(KIND), "from_date": "2026-11-23", "to_date": "2026-11-27"}

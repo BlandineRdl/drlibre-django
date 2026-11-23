@@ -4,13 +4,12 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from drlibre.interfaces.web.labels import WEEK_ORDER
 from drlibre.scheduling.application.ports.inbound import WEEKDAYS, AvailabilityRule, TimeOff
 from drlibre.shared_kernel.ids import Id
 
 RULES_URL = "/workspace/availability/"
 TIME_OFF_URL = "/workspace/time-off/"
-# Weekdays numbered 0 Sunday to 6 Saturday (spec 3.1), shown Monday first.
-WEEK_ORDER = (1, 2, 3, 4, 5, 6, 0)
 GRID_START = time(7)
 GRID_ROWS = 24
 GRID_STEP = timedelta(minutes=30)

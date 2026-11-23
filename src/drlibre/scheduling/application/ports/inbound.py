@@ -5,11 +5,13 @@ from typing import Protocol
 
 from drlibre.scheduling.domain.availability_rule import WEEKDAYS, AvailabilityRule
 from drlibre.scheduling.domain.slot import Slot, SlotState, SlotStatus
+from drlibre.scheduling.domain.time_off import MAX_REASON as MAX_TIME_OFF_REASON
 from drlibre.scheduling.domain.time_off import TimeOff
 from drlibre.shared_kernel.dependents import Dependent
 from drlibre.shared_kernel.ids import Id
 
 __all__ = [
+    "MAX_TIME_OFF_REASON",
     "WEEKDAYS",
     "AvailabilityQueries",
     "AvailabilityRule",

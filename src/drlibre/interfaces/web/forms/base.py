@@ -7,6 +7,12 @@ from django import forms
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
 CHOOSE = ("", "Choisir…")
+INVALID = ErrorCode.INVALID_INPUT.http_status
+
+
+def options(items: Iterable[Any]) -> tuple[tuple[str, str], ...]:
+    """Picklist choices of read-side options, each with an `id` and a `label`."""
+    return tuple((str(o.id), o.label) for o in items)
 
 
 def with_placeholder(choices: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -49,6 +55,11 @@ class WebForm(forms.Form):
         if not named:
             self.add_error(None, message or error.message)
         self._focus_first_error()
+
+    @property
+    def errored_fields(self) -> list[forms.BoundField]:
+        """Visible fields with an error, as the error summary links them."""
+        return [field for field in self.visible_fields() if field.errors]
 
     def posted(self) -> dict[str, str]:
         """The posted text of this form's fields, as use cases taking raw fields parse it."""

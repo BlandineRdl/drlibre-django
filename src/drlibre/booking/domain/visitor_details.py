@@ -7,6 +7,9 @@ from drlibre.shared_kernel.validation import FieldErrors
 _EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
 _PHONE = re.compile(r"[0-9+()\-. ]{6,30}")
 _OLDEST_BIRTH = date(1900, 1, 1)
+MAX_FULL_NAME = 150
+MAX_PHONE = 30
+MAX_BOOKING_REASON = 500
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,15 +35,15 @@ class VisitorDetails:
         today: date,
     ) -> "VisitorDetails":
         errors = FieldErrors()
-        name = errors.text("full_name", full_name, max_length=150)
+        name = errors.text("full_name", full_name, max_length=MAX_FULL_NAME)
         born = cls._birth_date(errors, birth_date, today)
         address = email.strip().lower()
         if len(address) > 254 or not _EMAIL.fullmatch(address):
             errors.add("email", "Saisissez une adresse email valide.")
-        number = errors.text("phone", phone, required=False, max_length=30)
+        number = errors.text("phone", phone, required=False, max_length=MAX_PHONE)
         if number and not _PHONE.fullmatch(number):
             errors.add("phone", "Saisissez un numéro de téléphone valide.")
-        why = errors.text("reason", reason, required=False, max_length=500)
+        why = errors.text("reason", reason, required=False, max_length=MAX_BOOKING_REASON)
         if not accepted_terms:
             errors.add("accepted_terms", "Acceptez les conditions et la notice de confidentialité.")
         errors.raise_if_any()

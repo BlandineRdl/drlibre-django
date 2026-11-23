@@ -1,6 +1,9 @@
 from django import forms
 
+from drlibre.identity.application.ports.inbound import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 from drlibre.interfaces.web.forms.base import WebForm
+
+PASSWORD_LENGTHS = f"De {PASSWORD_MIN_LENGTH} à {PASSWORD_MAX_LENGTH} caractères"
 
 
 class SignInForm(WebForm):
@@ -25,8 +28,8 @@ class PasswordChangeForm(WebForm):
     new_password = forms.CharField(
         label="Nouveau mot de passe",
         strip=False,
-        min_length=10,
-        max_length=72,
-        help_text="De 10 à 72 caractères, différent de l'actuel.",
+        min_length=PASSWORD_MIN_LENGTH,
+        max_length=PASSWORD_MAX_LENGTH,
+        help_text=f"{PASSWORD_LENGTHS}, différent de l'actuel.",
         widget=forms.PasswordInput({"autocomplete": "new-password"}),
     )

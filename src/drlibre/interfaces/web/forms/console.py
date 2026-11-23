@@ -2,9 +2,10 @@ from typing import Any
 
 from django import forms
 
+from drlibre.interfaces.web.forms.auth import PASSWORD_LENGTHS
 from drlibre.interfaces.web.forms.base import TelInput, WebForm, with_placeholder
 from drlibre.interfaces.web.forms.portal import WaitlistJoinForm
-from drlibre.interfaces.web.presenters.staff import ROLE_LABELS
+from drlibre.interfaces.web.labels import ROLE_LABELS
 
 
 def _text(label: str, *, autocomplete: str = "", **kwargs: Any) -> forms.CharField:
@@ -96,7 +97,7 @@ class UserForm(WebForm):
     temporary_password = forms.CharField(
         label="Mot de passe temporaire",
         strip=False,
-        help_text="De 10 à 72 caractères ; la personne le changera à sa première connexion.",
+        help_text=f"{PASSWORD_LENGTHS} ; la personne le changera à sa première connexion.",
         widget=forms.PasswordInput({"autocomplete": "new-password"}),
     )
 
