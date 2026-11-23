@@ -49,6 +49,48 @@ Under `/fhir`, fictitious and localhost only. Fixed bearer tokens: `demo-admin-t
 - `curl 'localhost:8000/fhir/HealthcareService'` then `curl 'localhost:8000/fhir/Slot?service-type=<id>&start=ge2026-12-01T00:00:00%2B01:00&start=lt2026-12-08T00:00:00%2B01:00'` find free slots without a token.
 - `curl -H 'Authorization: Bearer demo-patient-token' localhost:8000/fhir/Appointment` lists the demo patient's appointments.
 
+## Technical choices
+Django is used as the infrastructure framework (ORM, migrations, HTTP, templates, security middleware), not as the place for business rules. Each departure from the usual Django way is deliberate:
+
+| Choice | Instead of | Why |
+| --- | --- | --- |
+| Hexagonal architecture per bounded context (`domain`, `application`, `infrastructure`), checked by import-linter | Fat models, logic in views | The domain stays pure Python, tested on in-memory fakes without Django; web, API, FHIR and Celery run the same use cases through one composition root (`bootstrap/container.py`) |
+| ORM models live in `<context>/infrastructure/django/` | Models as the domain | Models are persistence adapters behind `typing.Protocol` ports |
+| Own session cookie and auth: hashed session tokens, email code, sign-in link, hashed bearer tokens | `django.contrib.auth`, `django.contrib.sessions` | Django stores session keys raw; here only a hash is stored. Django's password hashers are kept |
+| Hand-written admin console (`/console/`) | `django.contrib.admin` | Every write goes through a use case, so it is audited and follows the same rules as the other screens |
+| Django Ninja for `/api/v1` and `/fhir` | Django REST Framework | Pydantic-native schemas, the same validation as the rest of the code |
+| Raw SQL query ports for search, slots, reporting and FHIR reads (light CQRS) | ORM for every read | p95 under 200 ms on the load seed, proven with Locust (`./scripts/load-run.sh`) |
+| PostgreSQL guards: `btree_gist` exclusions, partial unique indexes, `select_for_update`, advisory locks, append-only audit triggers | Checks in Python only | No double booking under concurrency, even if a lock is missed |
+| Celery with beat | Django's built-in tasks | Django's tasks have no production worker or scheduler yet |
+| Hand-written FHIR R4 Pydantic schemas | `fhir.resources` | The library dropped R4 |
+| Templates with HTMX and Pico.css; presenters build ViewModels | SPA, logic in templates | Minimal front, no build step, WCAG 2.2 AA |
+| Pydantic, pydantic-settings, structlog | `settings.py` constants, stdlib logging | Typed validation at every boundary, typed config from `.env`, JSON logs with a correlation id |
+| Gherkin scenarios (pytest-bdd) on fakes, contract tests fake vs real adapter | Mocks, Django `TestCase` | Tests describe behaviour and survive refactoring |
+
+The hexagon pays off where the rules are: `booking` and `scheduling` (placement, locks, round robin, waitlist). `organisation` is mostly reference data CRUD and alone would not justify ports and mapping; it follows the same layout for consistency across the showcase. Read sides (`search`, `reporting`, `interop`) skip the domain and read SQL directly. In practice the ports' value here is in-memory fakes for tests, not swapping providers: no adapter has been replaced. Pattern reference: [Hexagonal Architecture with Django](https://medium.com/@andremrufino/hexagonal-architecture-with-django-fundamentals-and-comparison-with-clean-architecture-38d74608d961) (André Rufino), where Django is the HTTP and persistence adapter.
+
+### How Django-idiomatic is it?
+A subjective self-assessment, 0 to 10 per area:
+
+| Area | Score | Why |
+| --- | --- | --- |
+| ORM, migrations, PostgreSQL constraints | 9 | Idiomatic and advanced (`ExclusionConstraint`, partial indexes, `select_for_update`); only the read sides use raw SQL |
+| Security middleware (CSRF, CSP, clickjacking, `check --deploy`) | 9 | Django's own, kept as is |
+| Templates, static files | 8 | Django templates and `staticfiles`; logic stays in presenters |
+| Config | 6 | `settings.py` fed by pydantic-settings instead of plain constants |
+| API | 6 | Django Ninja is well established, DRF remains the canonical choice |
+| Forms | 1 | Views read `request.POST` and use cases validate; a switch to `django.forms` is planned |
+| Auth, sessions | 2 | Own implementation; only Django's password hashers are reused |
+| Code organisation | 3 | Hexagonal contexts instead of Django apps with rich models |
+| Tests | 3 | pytest-bdd on fakes; no Django `TestCase` for business behaviour |
+| Admin | 0 | Not installed, see below |
+
+About 50% overall: Django is used well where it is used (about 85%), but several built-ins are replaced (about 40% coverage).
+
+`django.contrib.admin` is left out on purpose. It writes through the ORM, so it would bypass the use cases: no audit entry in the transaction, no slot refresh, no locks, no dependents check. The console is a business feature of the admin role, not a table editor. A read-only admin for debugging would still require `contrib.auth`, `contrib.sessions` and `contrib.messages`, a second sign-in and raw session keys; `psql`, the console and `/fhir` already cover inspection.
+
+Full rationale and pinned versions: `aidd_docs/INSTALL.md` and `aidd_docs/memory/architecture.md`.
+
 ## Develop
 1. `uv sync` and `uv run pre-commit install`.
 2. With the stack up: `uv run pytest`.
