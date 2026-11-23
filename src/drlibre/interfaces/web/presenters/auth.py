@@ -1,55 +1,38 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
 
-from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_form
+from drlibre.interfaces.web.forms.auth import LinkRequestForm, PasswordChangeForm, SignInForm
+from drlibre.interfaces.web.forms.base import WebForm
 from drlibre.shared_kernel.booking_policy import LINK_LIFETIME
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
-SIGN_IN_FIELDS = (
-    FieldSpec("email", "Email", kind="email", autocomplete="username"),
-    FieldSpec("password", "Mot de passe", kind="password", autocomplete="current-password"),
-)
-LINK_FIELDS = (FieldSpec("link_email", "Email", kind="email", autocomplete="email"),)
 LINK_SENT_MESSAGE = (
     "Si cette adresse est celle d'un compte patient, "
     f"un lien de connexion valable {int(LINK_LIFETIME.total_seconds() // 60)} minutes "
     "vient d'être envoyé."
 )
 NO_LINK_MESSAGE = "Ce lien n'est pas valable. Demandez-en un nouveau."
-PASSWORD_FIELDS = (
-    FieldSpec(
-        "current_password", "Mot de passe actuel", kind="password", autocomplete="current-password"
-    ),
-    FieldSpec(
-        "new_password",
-        "Nouveau mot de passe",
-        kind="password",
-        autocomplete="new-password",
-        help="De 10 à 72 caractères, différent de l'actuel.",
-    ),
-)
 
 
-def sign_in_form(values: Mapping[str, str], error: DomainError | None = None) -> FormView:
-    return build_form(
-        title="Se connecter",
-        action="/sign-in",
-        submit_label="Se connecter",
-        specs=SIGN_IN_FIELDS,
-        values=values,
-        error=error,
-    )
+@dataclass(frozen=True, slots=True)
+class FormPage:
+    title: str
+    action: str
+    submit_label: str
+    form: WebForm
 
 
-def password_form(*, forced: bool, error: DomainError | None = None) -> FormView:
+def sign_in_page(form: SignInForm) -> FormPage:
+    return FormPage("Se connecter", "/sign-in", "Se connecter", form)
+
+
+def password_page(form: PasswordChangeForm, *, forced: bool) -> FormPage:
     title = "Choisissez votre mot de passe" if forced else "Changer mon mot de passe"
-    return build_form(
-        title=title,
-        action="/account/password",
-        submit_label="Enregistrer",
-        specs=PASSWORD_FIELDS,
-        values={},
-        error=error,
+    return FormPage(title, "/account/password", "Enregistrer", form)
+
+
+def link_request_page(form: LinkRequestForm) -> FormPage:
+    return FormPage(
+        "Recevoir un lien de connexion", "/sign-in/link/request", "Recevoir un lien", form
     )
 
 
@@ -68,18 +51,7 @@ class LinkContinueView:
     token: str = ""
     submit_label: str
     message: str
-    request_form: FormView | None
-
-
-def link_request_form(values: Mapping[str, str], error: DomainError | None = None) -> FormView:
-    return build_form(
-        title="Recevoir un lien de connexion",
-        action="/sign-in/link/request",
-        submit_label="Recevoir un lien",
-        specs=LINK_FIELDS,
-        values=values,
-        error=error,
-    )
+    request_form: FormPage | None
 
 
 def link_sent() -> LinkSentView:
@@ -103,7 +75,7 @@ def link_refused(error: DomainError) -> LinkContinueView:
         action="/sign-in/link",
         submit_label="Continuer",
         message=error.message,
-        request_form=link_request_form({}),
+        request_form=link_request_page(LinkRequestForm()),
     )
 
 

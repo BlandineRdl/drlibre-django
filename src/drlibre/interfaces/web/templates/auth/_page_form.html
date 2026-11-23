@@ -1,0 +1,6 @@
+<form method="post" action="{{ page.action }}" novalidate>
+  {% csrf_token %}
+  {% for hidden in hidden_fields %}<input type="hidden" name="{{ hidden.0 }}" value="{{ hidden.1 }}">{% endfor %}
+  {{ page.form }}
+  <div class="actions"><button type="submit">{{ page.submit_label }}</button></div>
+</form>

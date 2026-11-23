@@ -99,6 +99,9 @@ button.danger, [role="button"].danger, input[type="submit"].danger { --pico-back
 button.danger:hover, [role="button"].danger:hover { --pico-background-color: var(--dl-danger-hover); --pico-border-color: var(--dl-danger-hover); }
 a.danger-link { color: var(--dl-danger); }
 .field-error { color: var(--dl-danger); }
+.errorlist { list-style: none; padding: 0; margin: calc(var(--pico-spacing) * -0.75) 0 var(--pico-spacing); color: var(--dl-danger); font-size: 0.875em; }
+.errorlist li { list-style: none; }
+.helptext { display: block; }
 .error-summary { background: var(--dl-danger-bg); border: 1px solid #fecdca; border-left: 0.25rem solid var(--dl-danger); border-radius: var(--dl-radius); padding: var(--dl-space-3) var(--dl-space-4); margin-bottom: var(--dl-space-4); }
 .notice { background: var(--dl-info-bg); border: 1px solid #b9e6fe; border-left: 0.25rem solid var(--dl-info); border-radius: var(--dl-radius); padding: var(--dl-space-3) var(--dl-space-4); color: var(--dl-text); }
 .pagination { display: flex; flex-wrap: wrap; gap: var(--dl-space-3); align-items: center; margin-top: var(--dl-space-4); }

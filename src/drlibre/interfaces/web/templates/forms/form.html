@@ -1,0 +1,8 @@
+{% if form.errors %}
+<div role="alert" class="error-summary">
+  {% for message in form.non_field_errors %}<p><strong>{{ message }}</strong></p>{% empty %}<p><strong>{{ form.invalid_message }}</strong></p>{% endfor %}
+  <ul>{% for field in form.visible_fields %}{% if field.errors %}<li><a href="#{{ field.auto_id }}">{{ field.label }} : {{ field.errors.0 }}</a></li>{% endif %}{% endfor %}</ul>
+</div>
+{% endif %}
+{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+{% for field in form.visible_fields %}{{ field.as_field_group }}{% endfor %}

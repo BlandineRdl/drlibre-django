@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}{{ form.title }}{% endblock %}
+{% block title %}{{ page.title }}{% endblock %}
 {% block content %}
 <div class="narrow">
 <article>
-  <h1>{{ form.title }}</h1>
+  <h1>{{ page.title }}</h1>
   {% if intro %}<p>{{ intro }}</p>{% endif %}
-  {% include "_form.html" %}
+  {% include "auth/_page_form.html" %}
 </article>
-{% if link_form %}
+{% if link_page %}
 <article>
-  <h2>{{ link_form.title }}</h2>
+  <h2>{{ link_page.title }}</h2>
   <p>Patient ? Recevez un lien par email, sans mot de passe.</p>
-  {% include "_form.html" with form=link_form hidden_fields=None %}
+  {% include "auth/_page_form.html" with page=link_page hidden_fields=None %}
 </article>
 {% endif %}
 </div>

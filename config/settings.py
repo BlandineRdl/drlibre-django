@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     "drlibre.organisation.infrastructure.django",
     "drlibre.scheduling.infrastructure.django",
     "drlibre.interfaces.web",
+    # After the web app, so its templates override Django's form templates.
+    "django.forms",
 ]
 
 MIDDLEWARE = [
@@ -99,6 +101,7 @@ TEMPLATES = [
         },
     }
 ]
+FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 # Slow salted hash for passwords (spec 12.1); Django's hashers work without contrib.auth.
 PASSWORD_HASHERS = [
@@ -144,7 +147,7 @@ def smtp_mailers() -> dict[str, dict[str, object]]:
 MAILERS = smtp_mailers()
 DEFAULT_FROM_EMAIL = "DrLibre <no-reply@drlibre.localhost>"
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "fr"
 TIME_ZONE = env.default_time_zone
 USE_I18N = True
 USE_TZ = True
