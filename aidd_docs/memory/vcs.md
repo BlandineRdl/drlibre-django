@@ -1,6 +1,6 @@
 # VCS
 ## Platform
-- Platform: GitHub, repository `BlandineRdl/drlibre-django` (private), reached with the `gh` CLI.
+- Platform: GitHub, repository `BlandineRdl/drlibre-django` (public), reached with the `gh` CLI.
 
 ## Branches
 - `main` holds the stable code; work happens on `feat/...` branches cut from `main`.
