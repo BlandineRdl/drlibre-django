@@ -1,9 +1,9 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
 from drlibre.booking.application.ports.inbound import Appointment, HoldSummary
-from drlibre.interfaces.web.presenters.forms import FieldSpec, FormView, build_form
+from drlibre.interfaces.web.forms.booking import CodeForm, DetailsForm
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.search import SlotLinkView
 from drlibre.interfaces.web.presenters.slots import (
     clinician_booking_url,
@@ -12,40 +12,11 @@ from drlibre.interfaces.web.presenters.slots import (
     slot_label,
 )
 from drlibre.scheduling.application.ports.inbound import Slot
-from drlibre.shared_kernel.booking_policy import CODE_LIFETIME
-from drlibre.shared_kernel.errors import DomainError
 from drlibre.shared_kernel.ids import Id
 
 STEPS = ("Choix", "Informations", "Code", "Confirmation")
 REFRESHED_SLOTS = 12
 FIRST_AVAILABLE = "Premier praticien disponible"
-DETAILS_FIELDS = (
-    FieldSpec("full_name", "Nom complet", autocomplete="name"),
-    FieldSpec(
-        "birth_date",
-        "Date de naissance",
-        kind="date",
-        autocomplete="bday",
-        help="Format jour/mois/année selon votre navigateur.",
-    ),
-    FieldSpec("email", "Email", kind="email", autocomplete="email"),
-    FieldSpec("phone", "Téléphone", kind="tel", required=False, autocomplete="tel"),
-    FieldSpec("reason", "Motif", kind="textarea", required=False),
-    FieldSpec(
-        "accepted_terms",
-        "J'accepte les conditions et la notice de confidentialité",
-        kind="checkbox",
-        required=False,
-    ),
-)
-CODE_FIELDS = (
-    FieldSpec(
-        "code",
-        "Code reçu par email",
-        autocomplete="one-time-code",
-        help=f"6 chiffres, valables {int(CODE_LIFETIME.total_seconds() // 60)} minutes.",
-    ),
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +71,7 @@ class DetailsPageView:
     title: str
     steps: tuple[StepView, ...]
     summary: SummaryView
-    form: FormView
+    form: FormPage
     hidden_fields: tuple[tuple[str, str], ...]
     time_zone: str
 
@@ -123,7 +94,7 @@ class CodePageView:
     summary: SummaryView
     held_until: str
     notice: str
-    form: FormView
+    form: FormPage
     resend_action: str
     time_zone: str
 
@@ -170,22 +141,13 @@ def details_page(
     request: SlotRequest,
     context: SlotContext,
     start: datetime,
-    values: Mapping[str, str],
-    error: DomainError | None = None,
+    form: DetailsForm,
 ) -> DetailsPageView:
-    form = build_form(
-        title="Vos informations",
-        action="/booking/new",
-        submit_label="Recevoir un code",
-        specs=DETAILS_FIELDS,
-        values=values,
-        error=error,
-    )
     return DetailsPageView(
         title="Vos informations",
         steps=steps(1),
         summary=_summary(context, start),
-        form=form,
+        form=FormPage("Vos informations", "/booking/new", "Recevoir un code", form),
         hidden_fields=request.hidden_fields,
         time_zone=context.time_zone,
     )
@@ -208,18 +170,10 @@ def confirm_choice_page(
 def code_page(
     hold: HoldSummary,
     context: SlotContext,
+    form: CodeForm,
     *,
-    error: DomainError | None = None,
     notice: str = "",
 ) -> CodePageView:
-    form = build_form(
-        title="Code de vérification",
-        action=f"/booking/holds/{hold.hold_id}",
-        submit_label="Réserver",
-        specs=CODE_FIELDS,
-        values={},
-        error=error,
-    )
     until = local(hold.expires_at, context.time_zone)
     return CodePageView(
         title="Saisissez votre code",
@@ -227,7 +181,7 @@ def code_page(
         summary=_summary(context, hold.start),
         held_until=f"Créneau tenu jusqu'à {until:%H:%M}",
         notice=notice,
-        form=form,
+        form=FormPage("Code de vérification", f"/booking/holds/{hold.hold_id}", "Réserver", form),
         resend_action=f"/booking/holds/{hold.hold_id}/resend",
         time_zone=context.time_zone,
     )

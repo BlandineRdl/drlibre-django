@@ -7,5 +7,5 @@
   {% for fact in view.facts %}<dt>{{ fact.label }}</dt><dd>{% if fact.badge %}<span class="badge status-{{ fact.badge }}">{{ fact.value }}</span>{% else %}{{ fact.value }}{% endif %}</dd>{% endfor %}
 </dl>
 <p>L'annulation est définitive ; le patient en est informé.</p>
-{% include "_form.html" with form=view.form submit_class="danger" %}
+{% include "forms/page.html" with page=view.form %}
 {% endblock %}

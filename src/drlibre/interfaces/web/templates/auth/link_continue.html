@@ -15,7 +15,7 @@
 {% if view.request_form %}
 <article>
   <h2>{{ view.request_form.title }}</h2>
-  {% include "auth/_page_form.html" with page=view.request_form hidden_fields=None %}
+  {% include "forms/page.html" with page=view.request_form hidden_fields=None %}
 </article>
 {% endif %}
 {% endblock %}

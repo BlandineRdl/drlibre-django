@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from drlibre.booking.application.ports.inbound import (
+    MAX_CANCELLATION_REASON,
     AdminAppointmentFilter,
     AdminAppointmentRow,
     AppointmentFile,
@@ -15,9 +16,8 @@ from drlibre.booking.application.ports.inbound import (
 )
 from drlibre.identity.application.ports.inbound import PatientMatch
 from drlibre.interfaces.web.presenters.audit_labels import action_label
-from drlibre.interfaces.web.presenters.forms import ChoiceView, FormView, build_form
+from drlibre.interfaces.web.presenters.forms import ChoiceView, FieldSpec, FormView, build_form
 from drlibre.interfaces.web.presenters.portal import (
-    REASON_FIELD,
     STATUS_LABELS,
     WeekStripView,
     refusal_text,
@@ -45,6 +45,14 @@ CONSOLE_APPOINTMENTS_URL = "/console/appointments/"
 BOOK_URL = f"{CONSOLE_APPOINTMENTS_URL}book"
 EXPORT_URL = f"{CONSOLE_APPOINTMENTS_URL}export.csv"
 ZONE_NOTE = "Heures affichées dans le fuseau de l'hôpital de chaque rendez-vous, nommé."
+REASON_FIELD = (
+    FieldSpec(
+        "reason",
+        "Motif de l'annulation",
+        kind="textarea",
+        help=f"{MAX_CANCELLATION_REASON} caractères au plus.",
+    ),
+)
 SOURCE_LABELS = {
     Source.ONLINE: "En ligne",
     Source.ROUND_ROBIN: "Premier disponible",

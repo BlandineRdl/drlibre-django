@@ -1,4 +1,3 @@
-import re
 from collections.abc import Iterator
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
@@ -11,6 +10,7 @@ from drlibre.bootstrap.container import use_container
 from drlibre.identity.domain.user import Role
 from tests.builders import stored_session, stored_user
 from tests.integration.bookable import NOW, Bookable, bookable
+from tests.markup import attributes, described_by
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
 COOKIE = settings.SESSION_COOKIE_NAME
@@ -141,8 +141,9 @@ def test_invalid_details_show_errors_tied_to_fields_with_focus_on_the_first(
 
     body = response.content.decode()
     assert response.status_code == 400
-    assert re.search(r'id="field-full_name"[^>]*aria-invalid="true"[^>]*autofocus', body)
-    assert 'aria-describedby="error-email"' in body
+    name = attributes(body, "field-full_name")
+    assert (name["aria-invalid"], "autofocus" in name) == ("true", True)
+    assert "field-email_error" in described_by(body, "field-email")
 
 
 def test_a_wrong_code_keeps_the_hold_and_focuses_the_code_field_then_a_resend_sends_a_new_one(
@@ -156,9 +157,8 @@ def test_a_wrong_code_keeps_the_hold_and_focuses_the_code_field_then_a_resend_se
     again = client.get(resent["Location"])
 
     assert wrong.status_code == 400
-    assert re.search(
-        r'id="field-code"[^>]*aria-invalid="true"[^>]*autofocus', wrong.content.decode()
-    )
+    code = attributes(wrong.content.decode(), "field-code")
+    assert (code["aria-invalid"], "autofocus" in code) == ("true", True)
     assert "Créneau tenu jusqu&#x27;à 11:10" in wrong.content.decode()
     assert "Un nouveau code vient d&#x27;être envoyé." in again.content.decode()
 

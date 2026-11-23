@@ -24,7 +24,7 @@
 {% endif %}
 <section aria-labelledby="notes-heading">
   <h2 id="notes-heading">{{ view.notes.title }}</h2>
-  {% include "_form.html" with form=view.notes %}
+  {% include "forms/page.html" with page=view.notes %}
 </section>
 {% if view.strip %}
 <section aria-labelledby="move-heading" id="reschedule">

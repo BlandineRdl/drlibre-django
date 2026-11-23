@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from drlibre.interfaces.web.forms.auth import LinkRequestForm, PasswordChangeForm, SignInForm
-from drlibre.interfaces.web.forms.base import WebForm
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.shared_kernel.booking_policy import LINK_LIFETIME
 from drlibre.shared_kernel.errors import DomainError, ErrorCode
 
@@ -11,14 +11,6 @@ LINK_SENT_MESSAGE = (
     "vient d'être envoyé."
 )
 NO_LINK_MESSAGE = "Ce lien n'est pas valable. Demandez-en un nouveau."
-
-
-@dataclass(frozen=True, slots=True)
-class FormPage:
-    title: str
-    action: str
-    submit_label: str
-    form: WebForm
 
 
 def sign_in_page(form: SignInForm) -> FormPage:

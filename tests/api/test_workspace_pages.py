@@ -17,6 +17,7 @@ from drlibre.organisation.infrastructure.repositories import DjangoRooms
 from tests import builders_organisation as build
 from tests.builders import stored_session, stored_user
 from tests.integration.bookable import SLOT_START, Bookable, bookable
+from tests.markup import attributes
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db(transaction=True)]
 COOKIE = settings.SESSION_COOKIE_NAME
@@ -178,7 +179,7 @@ def test_notes_are_saved_apart_and_refused_beyond_the_limit(workspace: Workspace
     assert saved["Location"] == f"{workspace.base}?done=notes"
     assert workspace.stored().clinical_notes == "Tension 12/8"
     assert refused.status_code == 400
-    assert re.search(r'id="field-clinical_notes"[^>]*aria-invalid="true"', page(refused))
+    assert attributes(page(refused), "field-clinical_notes")["aria-invalid"] == "true"
     assert "Notes cliniques enregistrées" in main(workspace.client.get(workspace.base))
 
 
@@ -191,7 +192,7 @@ def test_cancelling_needs_a_reason_then_records_it_and_grows_the_history(
     file = main(workspace.client.get(done["Location"]))
 
     assert missing.status_code == 400
-    assert re.search(r'id="field-reason"[^>]*aria-invalid="true"', page(missing))
+    assert attributes(page(missing), "field-reason")["aria-invalid"] == "true"
     assert done["Location"] == f"{workspace.base}?done=cancelled"
     assert workspace.stored().cancellation_reason == "Praticien absent"
     assert "<td>RDV annulé</td><td>Praticien</td>" in file

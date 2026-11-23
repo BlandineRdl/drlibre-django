@@ -9,6 +9,8 @@ from drlibre.booking.application.ports.inbound import Appointment, HoldSummary
 from drlibre.bootstrap.container import container
 from drlibre.identity.application.ports.inbound import Identity
 from drlibre.interfaces.web.auth import identity_of, set_session_cookie, to_sign_in
+from drlibre.interfaces.web.forms.base import iso
+from drlibre.interfaces.web.forms.booking import CodeForm, DetailsForm
 from drlibre.interfaces.web.presenters.booking import (
     SlotContext,
     SlotRequest,
@@ -34,6 +36,7 @@ _INLINE = frozenset(
     }
 )
 _NOT_FOUND = DomainError(ErrorCode.NOT_FOUND, "Créneau introuvable.")
+INVALID = ErrorCode.INVALID_INPUT.http_status
 
 
 def _uuid(raw: str | None) -> Id | None:
@@ -167,29 +170,31 @@ def _visitor_flow(
     request: HttpRequest, slot: SlotRequest, start: datetime, context: SlotContext
 ) -> HttpResponse:
     if request.method == "GET":
-        view = details_page(slot, context, start, {})
+        view = details_page(slot, context, start, DetailsForm())
         return render(request, "booking/details.html", {"view": view})
-    values = {
-        key: request.POST.get(key, "")
-        for key in ("full_name", "birth_date", "email", "phone", "reason", "accepted_terms")
-    }
+    form = DetailsForm(request.POST)
+    if not form.is_valid():
+        view = details_page(slot, context, start, form)
+        return render(request, "booking/details.html", {"view": view}, status=INVALID)
+    typed = form.cleaned_data
     try:
         hold = container().create_hold.execute(
             appointment_type_id=slot.type_id,
             clinician_id=slot.clinician_id,
             start=start,
-            full_name=values["full_name"],
-            birth_date=values["birth_date"],
-            email=values["email"],
-            phone=values["phone"],
-            reason=values["reason"],
-            accepted_terms=values["accepted_terms"] == "on",
+            full_name=typed["full_name"],
+            birth_date=iso(typed["birth_date"]),
+            email=typed["email"],
+            phone=typed["phone"],
+            reason=typed["reason"],
+            accepted_terms=typed["accepted_terms"],
             network=request.META.get("REMOTE_ADDR", ""),
         )
     except DomainError as error:
         if error.code is ErrorCode.INVALID_INPUT:
-            view = details_page(slot, context, start, values, error)
-            return render(request, "booking/details.html", {"view": view}, status=400)
+            form.refuse(error)
+            view = details_page(slot, context, start, form)
+            return render(request, "booking/details.html", {"view": view}, status=INVALID)
         if error.code not in _INLINE:
             raise
         return _refused(
@@ -216,18 +221,23 @@ def hold(request: HttpRequest, hold_id: UUID) -> HttpResponse:
         return _expired(request, summary, context)
     if request.method == "GET":
         notice = RESENT if request.GET.get("resent") else ""
-        view = code_page(summary, context, notice=notice)
+        view = code_page(summary, context, CodeForm(), notice=notice)
         return render(request, "booking/code.html", {"view": view})
+    form = CodeForm(request.POST)
+    if not form.is_valid():
+        view = code_page(summary, context, form)
+        return render(request, "booking/code.html", {"view": view}, status=INVALID)
     try:
         verified = container().verify_hold.execute(
             hold_id=summary_id,
-            code=request.POST.get("code", ""),
+            code=form.cleaned_data["code"],
             user_agent=request.headers.get("User-Agent", ""),
         )
     except DomainError as error:
         if error.code is ErrorCode.INVALID_INPUT:
-            view = code_page(summary, context, error=error)
-            return render(request, "booking/code.html", {"view": view}, status=400)
+            form.refuse(error)
+            view = code_page(summary, context, form)
+            return render(request, "booking/code.html", {"view": view}, status=INVALID)
         if error.code is ErrorCode.NOT_FOUND:
             return _expired(request, summary, context)
         raise
@@ -273,7 +283,9 @@ def resend(request: HttpRequest, hold_id: UUID) -> HttpResponse:
             raise
         summary = container().view_hold.execute(hold_id=Id(hold_id))
         context = _context(summary.appointment_type_id, summary.clinician_id)
-        view = code_page(summary, context, error=error)
+        form = CodeForm()
+        form.refuse(error)
+        view = code_page(summary, context, form)
         return render(request, "booking/code.html", {"view": view}, status=error.code.http_status)
     return redirect(f"/booking/holds/{hold_id}?resent=1")
 

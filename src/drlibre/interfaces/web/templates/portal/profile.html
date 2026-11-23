@@ -8,6 +8,6 @@
   <dt>Email</dt><dd>{{ view.email }}</dd>
 </dl>
 <h2>{{ view.form.title }}</h2>
-{% include "_form.html" with form=view.form %}
+{% include "forms/page.html" with page=view.form %}
 {% if view.password_url %}<p><a href="{{ view.password_url }}">Changer mon mot de passe</a></p>{% endif %}
 {% endblock %}

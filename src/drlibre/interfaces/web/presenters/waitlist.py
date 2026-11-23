@@ -9,6 +9,8 @@ from drlibre.booking.application.ports.inbound import (
     WaitlistRow,
     WaitlistStatus,
 )
+from drlibre.interfaces.web.forms.portal import WaitlistJoinForm
+from drlibre.interfaces.web.presenters.form_page import FormPage
 from drlibre.interfaces.web.presenters.forms import (
     Choice,
     ChoiceView,
@@ -32,15 +34,12 @@ WAITLIST_STATUS_LABELS = {
 }
 STATUS_CHOICES = tuple(Choice(s.value, label) for s, label in WAITLIST_STATUS_LABELS.items())
 ZONE_NOTE = "Heures affichées dans le fuseau de l'hôpital de chaque entrée, nommé."
-JOIN_FIELDS = (
+ADD_FIELDS = (
+    FieldSpec("patient_email", "Email du patient", kind="email", autocomplete="off"),
     FieldSpec("appointment_type_id", "Type de RDV", kind="select"),
     FieldSpec("clinician_id", "Praticien préféré", kind="select", required=False),
     FieldSpec("from_date", "Du", kind="date", help="Premier jour où vous êtes disponible."),
     FieldSpec("to_date", "Au", kind="date", help="Dernier jour, inclus."),
-)
-ADD_FIELDS = (
-    FieldSpec("patient_email", "Email du patient", kind="email", autocomplete="off"),
-    *JOIN_FIELDS,
 )
 NOTICES = {
     "joined": "Inscription enregistrée.",
@@ -74,7 +73,7 @@ class WaitlistPageView:
     refusal: str
     entries: tuple[EntryCardView, ...]
     empty_text: str
-    form: FormView
+    form: FormPage
     zone_note: str
 
 
@@ -201,7 +200,7 @@ def join_form(
 
 def waitlist_page(
     rows: tuple[WaitlistRow, ...],
-    form: FormView,
+    form: WaitlistJoinForm,
     now: datetime,
     *,
     notice: str = "",
@@ -212,7 +211,7 @@ def waitlist_page(
         refusal=refusal_text(error),
         entries=tuple(entry_card(r, now) for r in rows),
         empty_text="Aucune inscription pour l'instant.",
-        form=form,
+        form=FormPage("S'inscrire", WAITLIST_URL, "S'inscrire", form),
         zone_note=ZONE_NOTE,
     )
 

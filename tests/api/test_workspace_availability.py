@@ -1,5 +1,3 @@
-import re
-
 import pytest
 from django.conf import settings
 from django.test import Client
@@ -9,6 +7,7 @@ from drlibre.organisation.domain.department import Department
 from drlibre.scheduling.infrastructure.django.models import AvailabilityRuleModel
 from tests.builders import stored_session, stored_user
 from tests.builders_scheduling import next_monday, stored_department, stored_profile
+from tests.markup import attributes
 
 pytestmark = [pytest.mark.integration, pytest.mark.django_db]
 
@@ -54,7 +53,8 @@ def test_an_overlapping_rule_re_renders_the_form_with_focus_on_the_field() -> No
     assert response.status_code == 400
     assert 'role="alert"' in body
     assert "chevauche la plage Lundi 09:00-12:00" in body
-    assert re.search(r'id="field-start"[^>]*aria-invalid="true"[^>]*autofocus', body)
+    start = attributes(body, "field-start")
+    assert (start["aria-invalid"], "autofocus" in start) == ("true", True)
 
 
 def test_the_admin_week_calendar_offers_no_write_action(admin_client: Client) -> None:
