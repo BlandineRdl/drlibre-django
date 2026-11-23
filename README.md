@@ -85,7 +85,7 @@ A subjective self-assessment, 0 to 10 per area:
 | Tests | 3 | pytest-bdd on fakes; no Django `TestCase` for business behaviour |
 | Admin | 0 | Not installed, see below |
 
-About 50% overall: Django is used well where it is used (about 85%), but several built-ins are replaced (about 40% coverage).
+About 55% overall: Django is used well where it is used (about 85%), but several built-ins are replaced (about 50% coverage).
 
 `django.contrib.admin` is left out on purpose. It writes through the ORM, so it would bypass the use cases: no audit entry in the transaction, no slot refresh, no locks, no dependents check. The console is a business feature of the admin role, not a table editor. A read-only admin for debugging would still require `contrib.auth`, `contrib.sessions` and `contrib.messages`, a second sign-in and raw session keys; `psql`, the console and `/fhir` already cover inspection.
 
