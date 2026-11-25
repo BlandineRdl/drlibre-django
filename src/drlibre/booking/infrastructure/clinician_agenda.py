@@ -1,3 +1,4 @@
+# ruff: noqa: S608  # SQL is composed from fixed fragments only; every value is a bound parameter.
 from datetime import datetime
 from typing import Any
 
@@ -13,6 +14,7 @@ from drlibre.booking.application.ports.outbound import (
     RoomsDay,
 )
 from drlibre.booking.infrastructure.patient_agenda import appointment_of
+from drlibre.persistence.slot_sql import NOT_HELD, ROOM_FREE
 from drlibre.shared_kernel.ids import Id
 from drlibre.shared_kernel.pagination import PAGE_SIZE, Page, PageRequest
 
@@ -77,15 +79,15 @@ WHERE a.status IN ('BOOKED', 'CHECKED_IN', 'COMPLETED')
 ORDER BY a.start, r.code
 """
 
-_NEXT_FREE = """
+_NEXT_FREE = (  # nosec B608
+    f"""
 SELECT MIN(s.start) AS start FROM scheduling_slot s
+JOIN organisation_appointmenttyperecord t ON t.id = s.appointment_type_id AND t.active
 WHERE s.clinician_id = %(clinician)s AND s.start >= %(after)s
-  AND NOT EXISTS (
-      SELECT 1 FROM booking_bookingholdrecord bh
-      WHERE bh.clinician_id = s.clinician_id AND bh.expires_at > %(now)s
-        AND s.start < bh."end" AND s."end" > bh.start
-  )
+  AND {NOT_HELD.format(buffer="t.buffer_minutes")}
+  AND {ROOM_FREE.format(kind="t", department="t.department_id")}
 """
+)
 
 
 def _rows(sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:

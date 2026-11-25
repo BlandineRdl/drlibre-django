@@ -5,6 +5,7 @@ from typing import Any
 
 from django.db import connection
 
+from drlibre.persistence.slot_sql import NOT_HELD, ROOM_FREE
 from drlibre.search.application.ports.outbound import SearchQueries
 from drlibre.search.domain.criteria import Moment, SearchCriteria, Sort, Window
 from drlibre.search.domain.horizon import Horizon
@@ -47,28 +48,6 @@ JOIN LATERAL (
     ORDER BY t.duration_minutes, t.name, t.id LIMIT 1
 ) ty ON true
 WHERE {conditions}
-"""
-
-_NOT_HELD = """
-NOT EXISTS (
-    SELECT 1 FROM booking_bookingholdrecord bh
-    WHERE bh.clinician_id = s.clinician_id AND bh.expires_at > %(now)s
-      AND s.start < bh."end" + make_interval(mins => {buffer}) AND s."end" > bh.start
-)
-"""
-
-# Like placement, a type with a room needs one active room of its department free all along.
-# The range overlap form lets PostgreSQL use the `appointment_room_period` index.
-_ROOM_FREE = """
-(NOT {kind}.needs_room OR EXISTS (
-    SELECT 1 FROM organisation_roomrecord r
-    WHERE r.department_id = {department} AND r.active
-      AND NOT EXISTS (
-          SELECT 1 FROM booking_appointmentrecord a
-          WHERE a.room_id = r.id AND a.status NOT IN ('CANCELLED', 'NO_SHOW')
-            AND tstzrange(a.start, a."end", '[)') && tstzrange(s.start, s."end", '[)')
-      )
-))
 """
 
 _MOMENTS = {
@@ -292,8 +271,8 @@ JOIN organisation_appointmenttyperecord t
 WHERE s.clinician_id = %(clinician)s AND s.appointment_type_id = %(type)s
   AND s.start >= greatest(%(start)s::timestamptz, %(from)s::timestamptz)
   AND s."end" <= least(%(end)s::timestamptz, %(to)s::timestamptz)
-  AND {_NOT_HELD.format(buffer="t.buffer_minutes")}
-  AND {_ROOM_FREE.format(kind="t", department="t.department_id")}
+  AND {NOT_HELD.format(buffer="t.buffer_minutes")}
+  AND {ROOM_FREE.format(kind="t", department="t.department_id")}
 ORDER BY s.start
 """
         )
@@ -317,8 +296,8 @@ SELECT t.id, t.name, t.duration_minutes, d.id AS department_id, d.name AS depart
         JOIN identity_userrecord u ON u.id = c.user_id AND u.active AND u.role = 'CLINICIAN'
         WHERE s.appointment_type_id = t.id AND c.department_id = d.id
           AND s.start >= %(from)s AND s."end" <= %(to)s
-          AND {_NOT_HELD.format(buffer="t.buffer_minutes")}
-          AND {_ROOM_FREE.format(kind="t", department="d.id")}) AS start
+          AND {NOT_HELD.format(buffer="t.buffer_minutes")}
+          AND {ROOM_FREE.format(kind="t", department="d.id")}) AS start
 FROM organisation_appointmenttyperecord t
 JOIN organisation_departmentrecord d ON d.id = t.department_id
 JOIN organisation_hospitalrecord h ON h.id = d.hospital_id AND h.active
@@ -392,8 +371,8 @@ def _slots(criteria: SearchCriteria, *, limit: int) -> str:
     filters = [
         "s.start >= %(from)s",
         "s.start < %(to)s",
-        _NOT_HELD.format(buffer="p.buffer_minutes"),
-        _ROOM_FREE.format(kind="p", department="p.department_id"),
+        NOT_HELD.format(buffer="p.buffer_minutes"),
+        ROOM_FREE.format(kind="p", department="p.department_id"),
     ]
     if criteria.from_date:
         filters.append("(s.start AT TIME ZONE p.time_zone)::date >= %(from_date)s")
