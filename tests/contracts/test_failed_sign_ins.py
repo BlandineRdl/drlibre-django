@@ -7,7 +7,6 @@ import redis
 from django.conf import settings
 
 from drlibre.identity.application.ports.outbound import FailedSignIns
-from drlibre.identity.domain.user import Email
 from drlibre.identity.infrastructure.failed_sign_ins import RedisFailedSignIns
 from tests.fakes.failed_sign_ins import InMemoryFailedSignIns
 
@@ -32,32 +31,43 @@ def failures(request: pytest.FixtureRequest) -> Iterator[FailedSignIns]:
 
 
 def test_failures_are_counted_since_an_instant(failures: FailedSignIns) -> None:
-    email = Email("ana@example.org")
     for minute in range(5):
-        failures.record(email, at=AT + timedelta(minutes=minute))
+        failures.record("email:ana@example.org", at=AT + timedelta(minutes=minute))
 
-    assert failures.count_since(email, since=AT) == 5
-    assert failures.count_since(email, since=AT + timedelta(minutes=3)) == 2
-    assert failures.count_since(Email("other@example.org"), since=AT) == 0
+    assert failures.count_since("email:ana@example.org", since=AT) == 5
+    assert failures.count_since("email:ana@example.org", since=AT + timedelta(minutes=3)) == 2
+    assert failures.count_since("network:192.0.2.1", since=AT) == 0
 
 
-def test_clear_forgets_the_address(failures: FailedSignIns) -> None:
-    email = Email("ana@example.org")
-    failures.record(email, at=AT)
+def test_a_forgotten_failure_no_longer_counts(failures: FailedSignIns) -> None:
+    kept = failures.record("network:192.0.2.1", at=AT)
+    dropped = failures.record("network:192.0.2.1", at=AT)
 
-    failures.clear(email)
+    failures.forget("network:192.0.2.1", dropped)
+    failures.forget("network:192.0.2.1", "unknown")
 
-    assert failures.count_since(email, since=AT) == 0
+    assert failures.count_since("network:192.0.2.1", since=AT) == 1
+    assert kept != dropped
+
+
+def test_clear_forgets_the_subject(failures: FailedSignIns) -> None:
+    failures.record("email:ana@example.org", at=AT)
+
+    failures.clear("email:ana@example.org")
+
+    assert failures.count_since("email:ana@example.org", since=AT) == 0
 
 
 @pytest.mark.integration
-def test_redis_keys_never_hold_the_email() -> None:
+def test_redis_keys_never_hold_the_email_or_network() -> None:
     client = redis.Redis.from_url(settings.REDIS_URL)
     prefix = f"drlibre-test:{uuid.uuid4().hex}"
-    RedisFailedSignIns(client, prefix=prefix).record(Email("ana@example.org"), at=AT)
+    adapter = RedisFailedSignIns(client, prefix=prefix)
+    adapter.record("email:ana@example.org", at=AT)
+    adapter.record("network:192.0.2.1", at=AT)
 
     keys = [key.decode() for key in client.scan_iter(f"{prefix}:*")]
 
-    assert len(keys) == 1
-    assert "ana" not in keys[0]
+    assert len(keys) == 2
+    assert not any("ana" in key or "192.0.2" in key for key in keys)
     client.delete(*keys)

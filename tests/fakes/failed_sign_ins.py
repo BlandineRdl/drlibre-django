@@ -1,18 +1,23 @@
+import uuid
 from datetime import datetime
 
 from drlibre.identity.application.ports.outbound import FailedSignIns
-from drlibre.identity.domain.user import Email
 
 
 class InMemoryFailedSignIns(FailedSignIns):
     def __init__(self) -> None:
-        self.failures: dict[str, list[datetime]] = {}
+        self.failures: dict[str, dict[str, datetime]] = {}
 
-    def record(self, email: Email, *, at: datetime) -> None:
-        self.failures.setdefault(email.value, []).append(at)
+    def record(self, subject: str, *, at: datetime) -> str:
+        failure = uuid.uuid4().hex
+        self.failures.setdefault(subject, {})[failure] = at
+        return failure
 
-    def count_since(self, email: Email, *, since: datetime) -> int:
-        return sum(1 for at in self.failures.get(email.value, []) if at >= since)
+    def count_since(self, subject: str, *, since: datetime) -> int:
+        return sum(1 for at in self.failures.get(subject, {}).values() if at >= since)
 
-    def clear(self, email: Email) -> None:
-        self.failures.pop(email.value, None)
+    def forget(self, subject: str, failure: str) -> None:
+        self.failures.get(subject, {}).pop(failure, None)
+
+    def clear(self, subject: str) -> None:
+        self.failures.pop(subject, None)

@@ -74,16 +74,20 @@ class PasswordHasher(Protocol):
 
 
 class FailedSignIns(Protocol):
-    def record(self, email: Email, *, at: datetime) -> None:
-        """Count one failed sign-in for this address at this instant."""
+    def record(self, subject: str, *, at: datetime) -> str:
+        """Count one failure of the subject (address or network) at this instant; return its id."""
         ...
 
-    def count_since(self, email: Email, *, since: datetime) -> int:
-        """Return how many failures this address has had since the instant."""
+    def count_since(self, subject: str, *, since: datetime) -> int:
+        """Return how many failures the subject has had since the instant, every record included."""
         ...
 
-    def clear(self, email: Email) -> None:
-        """Forget every failure of this address."""
+    def forget(self, subject: str, failure: str) -> None:
+        """Forget the one failure of the subject with this id; an unknown id changes nothing."""
+        ...
+
+    def clear(self, subject: str) -> None:
+        """Forget every failure of the subject."""
         ...
 
 

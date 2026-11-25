@@ -33,6 +33,7 @@ class Outcome:
         self.status: int | None = None
         self.body: dict[str, object] = {}
         self.password = ""
+        self.network = "192.0.2.1"
 
 
 @pytest.fixture
@@ -95,7 +96,7 @@ def attempt(world: FakeWorld, outcome: Outcome, email: str, password: str) -> No
     world.audit.entries.clear()
     try:
         outcome.signed_in = world.app.sign_in.execute(
-            email=email, password=password, user_agent="pytest"
+            email=email, password=password, user_agent="pytest", network=outcome.network
         )
         outcome.token = outcome.signed_in.token
         outcome.error = None
@@ -123,6 +124,32 @@ def failed_many(world: FakeWorld, outcome: Outcome, email: str, count: int, minu
     for _ in range(count):
         attempt(world, outcome, email, "not-the-password")
         world.clock.at += step
+
+
+@given(
+    parsers.parse(
+        "{count:d} sign-ins failed on as many addresses from one network in {minutes:d} minutes"
+    )
+)
+def network_failures(world: FakeWorld, outcome: Outcome, count: int, minutes: int) -> None:
+    step = timedelta(minutes=minutes) / count
+    for n in range(count):
+        attempt(world, outcome, f"nobody-{n}@example.org", "not-the-password")
+        world.clock.at += step
+
+
+@given(parsers.parse('"{email}" signed in with "{password}" {count:d} times'))
+def signed_in_many(
+    world: FakeWorld, outcome: Outcome, email: str, password: str, count: int
+) -> None:
+    for _ in range(count):
+        attempt(world, outcome, email, password)
+        world.clock.at += timedelta(minutes=1)
+
+
+@when("the next sign-in comes from another network")
+def other_network(outcome: Outcome) -> None:
+    outcome.network = "198.51.100.7"
 
 
 @when(parsers.parse("{amount:d} {unit} pass"))
@@ -368,7 +395,9 @@ def forced_change(world: FakeWorld, email: str) -> None:
 
 @then(parsers.parse('"{email}" can sign in with "{password}"'))
 def can_sign_in(world: FakeWorld, email: str, password: str) -> None:
-    assert world.app.sign_in.execute(email=email, password=password, user_agent="pytest")
+    assert world.app.sign_in.execute(
+        email=email, password=password, user_agent="pytest", network="192.0.2.1"
+    )
 
 
 @then(parsers.parse('the change is refused as invalid on "{field}"'))

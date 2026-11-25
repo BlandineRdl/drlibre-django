@@ -589,6 +589,9 @@ In-app notification text carries the time only: no names, reasons or emails.
 - An inactive user cannot sign in.
 - After 10 failures in 15 minutes for one email address, sign-in for that address is
   refused until the window passes. A success clears the count.
+- **[new]** After `NETWORK_HOURLY_LIMIT` failures (20 by default) in one hour from one network
+  address, whatever the email, sign-in from that address is refused until the window
+  passes. Successes are not counted.
 - Success, failure and lockout are audited with the email domain only.
 - After sign-in the user lands on their role's home: patient portal, clinician workspace
   or admin console.

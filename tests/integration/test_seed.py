@@ -138,6 +138,7 @@ def test_the_load_seed_signs_in_its_clinicians_and_fills_the_journal_and_notific
         email="load-clinician-000@drlibre.localhost",
         password=seed.DEMO_PASSWORD,
         user_agent="pytest",
+        network="192.0.2.1",
     )
     assert signed.token
     load = AppointmentRecord.objects.filter(clinician__department__code__startswith="LOAD-")

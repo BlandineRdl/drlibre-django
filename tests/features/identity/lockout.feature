@@ -34,3 +34,20 @@ Feature: Un compte est verrouillé après des échecs répétés
     Given "admin@example.org" failed to sign in 10 times in 10 minutes
     When "admin@example.org" signs in with "admin-password-1"
     Then the audit holds "auth.login_locked" with email domain "example.org"
+
+  Scenario: Règle §12.1 : après 20 échecs en une heure depuis un réseau, la connexion depuis ce réseau est refusée
+    Given 20 sign-ins failed on as many addresses from one network in 30 minutes
+    When "admin@example.org" signs in with "admin-password-1"
+    Then sign-in is refused with "Trop de tentatives depuis ce réseau. Réessayez plus tard."
+    And no session is opened
+
+  Scenario: Règle §12.1 : après 20 échecs en une heure depuis un réseau, la connexion depuis ce réseau est refusée (un autre réseau reste ouvert)
+    Given 20 sign-ins failed on as many addresses from one network in 30 minutes
+    When the next sign-in comes from another network
+    And "admin@example.org" signs in with "admin-password-1"
+    Then a ADMIN session lasting 12 hours is opened
+
+  Scenario: Règle §12.1 : après 20 échecs en une heure depuis un réseau, la connexion depuis ce réseau est refusée (les connexions réussies ne comptent pas)
+    Given "admin@example.org" signed in with "admin-password-1" 25 times
+    When "admin@example.org" signs in with "admin-password-1"
+    Then a ADMIN session lasting 12 hours is opened

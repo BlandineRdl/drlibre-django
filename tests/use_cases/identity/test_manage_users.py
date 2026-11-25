@@ -121,7 +121,9 @@ def signed_in_account(
     world: FakeWorld, outcome: Outcome, admin: User, role: str, email: str
 ) -> None:
     account(world, admin, role, email)
-    signed = world.app.sign_in.execute(email=email, password=TEMPORARY, user_agent="pytest")
+    signed = world.app.sign_in.execute(
+        email=email, password=TEMPORARY, user_agent="pytest", network="192.0.2.1"
+    )
     outcome.tokens[email] = signed.token
 
 
