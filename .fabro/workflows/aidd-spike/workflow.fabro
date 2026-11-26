@@ -1,0 +1,24 @@
+digraph AiddSpike {
+  graph [goal="Plan one backlog story with AIDD, approve it, then pass the fast gates"]
+
+  start [shape=Mdiamond, label="Start"]
+  exit  [shape=Msquare, label="Exit"]
+
+  plan [
+    label="aidd-dev:01-plan",
+    max_visits=3,
+    backend="acp",
+    acp.command="npx -y @agentclientprotocol/claude-agent-acp@0.112.0",
+    output_schema="routing",
+    prompt="Use the Skill tool to run aidd-dev:01-plan on aidd_docs/backlog/stories/un-utilisateur-change-son-mot-de-passe.md. Work autonomously, ask nothing. Cite which aidd_docs/memory files you relied on. End your answer with one JSON object: {\"outcome\": \"succeeded\", \"context_updates\": {\"plan_path\": \"<path of the plan you wrote>\", \"memory_cited\": [\"<memory files>\"]}}"
+  ]
+
+  approve [shape=hexagon, label="Approve plan"]
+
+  gates [label="gates fast", script="scripts/gates.sh fast", goal_gate=true]
+
+  start -> plan -> approve
+  approve -> gates [label="[A] Approve"]
+  approve -> plan  [label="[R] Revise"]
+  gates -> exit
+}

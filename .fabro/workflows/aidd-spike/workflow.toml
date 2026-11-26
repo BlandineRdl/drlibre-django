@@ -1,0 +1,7 @@
+_version = 1
+
+[workflow]
+graph = "workflow.fabro"
+
+[run]
+goal = "Spike: prove an ACP Claude Code node runs an AIDD skill with project memory, behind a human gate and a deterministic gate"
