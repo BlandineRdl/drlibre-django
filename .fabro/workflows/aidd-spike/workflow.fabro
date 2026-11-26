@@ -8,8 +8,7 @@ digraph AiddSpike {
     label="aidd-dev:01-plan",
     max_visits=3,
     backend="acp",
-    acp.command="npx -y @agentclientprotocol/claude-agent-acp@0.112.0",
-    output_schema="routing",
+    acp.command="env -u ANTHROPIC_API_KEY npx -y @agentclientprotocol/claude-agent-acp@0.112.0",
     prompt="Use the Skill tool to run aidd-dev:01-plan on aidd_docs/backlog/stories/un-utilisateur-change-son-mot-de-passe.md. Work autonomously, ask nothing. Cite which aidd_docs/memory files you relied on. End your answer with one JSON object: {\"outcome\": \"succeeded\", \"context_updates\": {\"plan_path\": \"<path of the plan you wrote>\", \"memory_cited\": [\"<memory files>\"]}}"
   ]
 
