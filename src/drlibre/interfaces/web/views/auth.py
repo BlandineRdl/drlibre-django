@@ -59,6 +59,7 @@ def sign_in(request: HttpRequest) -> HttpResponse:
             email=form.cleaned_data["email"],
             password=form.cleaned_data["password"],
             user_agent=request.headers.get("User-Agent", ""),
+            network=request.META.get("REMOTE_ADDR", ""),
         )
     except DomainError as error:
         form.refuse(error)

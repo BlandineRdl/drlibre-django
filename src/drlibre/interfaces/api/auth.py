@@ -32,6 +32,7 @@ def login(request: HttpRequest, payload: LoginIn, response: HttpResponse) -> Log
         email=payload.email,
         password=payload.password,
         user_agent=request.headers.get("User-Agent", ""),
+        network=request.META.get("REMOTE_ADDR", ""),
     )
     set_session_cookie(response, signed.token, signed.expires_at)
     return LoginOut(role=signed.role.value, home=HOMES[signed.role])

@@ -3,10 +3,16 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from drlibre.booking.domain.appointment import AppointmentStatus
-from drlibre.booking.infrastructure.repositories import DjangoAppointments
+from drlibre.booking.domain.appointment import AppointmentStatus, Source
+from drlibre.booking.domain.hold import BookingHold
+from drlibre.booking.domain.visitor_details import VisitorDetails
+from drlibre.booking.infrastructure.clinician_agenda import SqlClinicianAgenda
+from drlibre.booking.infrastructure.repositories import DjangoAppointments, DjangoHolds
 from drlibre.bootstrap.container import real_adapters, wire
 from drlibre.identity.infrastructure.repositories import DjangoUsers
+from drlibre.scheduling.application.ports.outbound import StoredSlot
+from drlibre.scheduling.domain.slot import Slot
+from drlibre.scheduling.infrastructure.slot_store import DjangoSlotStore
 from drlibre.shared_kernel.ids import Id
 from tests.builders import unique_email
 from tests.builders_booking import existing_appointment, patient_user, stored_scene
@@ -54,3 +60,60 @@ def test_the_day_follows_the_hospital_zone_around_midnight() -> None:
         (0, [starts[1]]),
         (23, [starts[2]]),
     ]
+
+
+def _store_slots(clinician: Id, kind: Id, starts: tuple[datetime, ...]) -> None:
+    rows = tuple(StoredSlot(clinician, kind, Slot(s, s + timedelta(minutes=30))) for s in starts)
+    DjangoSlotStore().replace(clinician, rows)
+
+
+def test_the_next_free_slot_leaves_the_buffer_after_a_hold() -> None:
+    """Story « agenda du jour » : le prochain créneau libre est réservable, marge comprise."""
+    scene = stored_scene(buffer_minutes=10)
+    clinician = scene.clinicians[0].id
+    held = NOW + timedelta(hours=1)
+    in_buffer, free = held + timedelta(minutes=30), held + timedelta(minutes=60)
+    _store_slots(clinician, scene.kind, (in_buffer, free))
+    details = VisitorDetails(
+        full_name="Ana Martin",
+        birth_date=date(1990, 1, 1),
+        email=unique_email("ana"),
+        phone=None,
+        reason=None,
+    )
+    DjangoHolds().add(
+        BookingHold.open(
+            clinician_id=clinician,
+            appointment_type_id=scene.kind,
+            start=held,
+            duration=timedelta(minutes=30),
+            source=Source.ONLINE,
+            details=details,
+            at=NOW,
+        )
+    )
+
+    assert SqlClinicianAgenda().next_free_slot(clinician, NOW, NOW) == free
+
+
+def test_the_next_free_slot_needs_a_free_room() -> None:
+    """Story « agenda du jour » : un créneau dont la seule salle est prise n'est pas libre."""
+    scene = stored_scene()
+    clinician, colleague = scene.clinicians[0].id, scene.clinicians[1].id
+    taken, free = NOW + timedelta(hours=1), NOW + timedelta(hours=2)
+    _store_slots(clinician, scene.kind, (taken, free))
+    patient = Id()
+    DjangoUsers().save(patient_user(patient, email=unique_email("patient")))
+    DjangoAppointments().add(
+        existing_appointment(
+            patient_id=patient,
+            clinician_id=colleague,
+            appointment_type_id=scene.kind,
+            start=taken,
+            end=taken + timedelta(minutes=30),
+            room_id=scene.room,
+            status=AppointmentStatus.BOOKED,
+        )
+    )
+
+    assert SqlClinicianAgenda().next_free_slot(clinician, NOW, NOW) == free

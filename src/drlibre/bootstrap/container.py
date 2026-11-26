@@ -665,6 +665,7 @@ def wire(a: Adapters) -> Container:
             hasher=a.hasher,
             failures=a.failures,
             tokens=a.tokens,
+            network_hourly_limit=a.booking.network_hourly_limit,
         ),
         sign_out=SignOutUseCase(clock=clock, uow=uow, audit=audit, sessions=a.sessions),
         authenticate_session=AuthenticateSessionUseCase(
@@ -1248,7 +1249,7 @@ def real_adapters(clock: Clock | None = None) -> Adapters:
         sessions=DjangoSessions(),
         api_tokens=DjangoApiTokens(),
         hasher=DjangoPasswordHasher(),
-        failures=RedisFailedSignIns(),
+        failures=RedisFailedSignIns(prefix=f"{settings.RATE_LIMIT_PREFIX}:signin"),
         tokens=SecretsTokenGenerator(),
         hospitals=DjangoHospitals(),
         specialties=DjangoSpecialties(),

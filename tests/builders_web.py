@@ -34,7 +34,7 @@ def fake_user(world: FakeWorld, *, user_id: Id, role: Role, name: str) -> User:
 def signed_in(world: FakeWorld, user: User) -> Client:
     """The real web views over the fake wiring, for a user holding a fake session."""
     signed = world.app.sign_in.execute(
-        email=user.email.value, password=PASSWORD, user_agent="tests"
+        email=user.email.value, password=PASSWORD, user_agent="tests", network="192.0.2.1"
     )
     client = Client()
     client.cookies[settings.SESSION_COOKIE_NAME] = signed.token

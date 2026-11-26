@@ -343,7 +343,10 @@ def console(world: FakeWorld, fake_container: Container) -> Client:
     )
     world.users.save(admin)
     signed = world.app.sign_in.execute(
-        email=admin.email.value, password="admin-password-1", user_agent="pytest"
+        email=admin.email.value,
+        password="admin-password-1",
+        user_agent="pytest",
+        network="192.0.2.1",
     )
     client = Client()
     client.cookies[settings.SESSION_COOKIE_NAME] = signed.token

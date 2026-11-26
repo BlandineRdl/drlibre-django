@@ -10,7 +10,7 @@
 
 ## Config
 - Environment variables come from a `.env` file read by pydantic-settings; a new variable is declared in the settings class and the committed example file.
-- `PUBLIC_BASE_URL` (default `http://localhost:8000`) builds the absolute links in emails; `NETWORK_HOURLY_LIMIT` (default 20) caps holds, codes and link requests per `REMOTE_ADDR` and kind, raise it for load runs.
+- `PUBLIC_BASE_URL` (default `http://localhost:8000`) builds the absolute links in emails; `NETWORK_HOURLY_LIMIT` (default 20) caps holds, codes, link requests and failed password sign-ins per `REMOTE_ADDR` and kind, raise it for load runs.
 
 ## Decisions
 - Hexagonal architecture per bounded context, so the domain stays pure Python and testable without Django.
@@ -48,6 +48,8 @@
 - Search text and city match through `unaccent(...) ILIKE unaccent(...)` (extension in `organisation.0004`), so « pediatrie » finds « Pédiatrie ».
 - Past slots and inactive clinicians are filtered at read time; the daily job only extends the horizon.
 - Hold expiry is checked in the slot query, never left to a scheduled job.
+- A stored slot is bookable through one SQL wording, `persistence/slot_sql.py` (`NOT_HELD`, `ROOM_FREE`), used by search and the clinician's next free slot.
+- Password sign-in records each try as a failure in Redis (`FailedSignIns`, per email and per network) before the hash check, then re-counts: concurrent tries never pass 10 per email or `NETWORK_HOURLY_LIMIT` per network; a success clears the email and forgets its network try.
 - Django stores session keys raw; the session store must keep only a hash.
 - Own session cookie `drlibre_session` (HttpOnly, SameSite=Lax, Secure with `HTTPS_ONLY`); `django.contrib.sessions` and `django.contrib.auth` stay uninstalled, Django's hashers work without them.
 - `SameOriginMiddleware` refuses unsafe methods from another origin, API included; CSRF stays on for web forms.

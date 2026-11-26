@@ -103,7 +103,7 @@ def type_fields(department: Department, code: str, minutes: int) -> dict[str, st
 
 def test_editing_a_types_duration_changes_its_department_slots_in_the_same_response() -> None:
     """Modifier la durée d'un type change les créneaux de son département dans la même réponse."""
-    app: Container = wire(dataclasses.replace(real_adapters(), clock=FixedClock(NOW)))
+    app: Container = wire(real_adapters(FixedClock(NOW)))
     department = stored_department()
     profile = stored_profile(department)
     code = build.code("T")
@@ -146,7 +146,7 @@ def test_slots_keep_their_local_hour_across_the_spring_time_change() -> None:
 
 def test_a_deleted_clinician_profile_leaves_no_slot() -> None:
     """Supprimer un profil praticien retire ses créneaux avec ses plages et ses absences."""
-    app: Container = wire(dataclasses.replace(real_adapters(), clock=FixedClock(NOW)))
+    app: Container = wire(real_adapters(FixedClock(NOW)))
     department = stored_department()
     stored_type(department)
     profile = stored_profile(department)
@@ -177,7 +177,7 @@ def ruled_profile(department: Department) -> tuple[Id, Id]:
 
 def test_changing_a_hospitals_time_zone_moves_its_clinicians_slots_in_the_same_response() -> None:
     """Règle §4 : la disponibilité est en heure locale de l'hôpital, son fuseau changé compris."""
-    app: Container = wire(dataclasses.replace(real_adapters(), clock=FixedClock(NOW)))
+    app: Container = wire(real_adapters(FixedClock(NOW)))
     department = stored_department()
     kind, profile = ruled_profile(department)
     hospital = DjangoHospitals().get(department.hospital_id)
@@ -201,7 +201,7 @@ def test_changing_a_hospitals_time_zone_moves_its_clinicians_slots_in_the_same_r
 
 def test_moving_a_department_to_another_hospital_moves_its_clinicians_slots() -> None:
     """Règle §4 : la disponibilité suit le fuseau du nouvel hôpital du département."""
-    app: Container = wire(dataclasses.replace(real_adapters(), clock=FixedClock(NOW)))
+    app: Container = wire(real_adapters(FixedClock(NOW)))
     department = stored_department()
     kind, profile = ruled_profile(department)
     elsewhere = dataclasses.replace(build.hospital(), time_zone="America/New_York")

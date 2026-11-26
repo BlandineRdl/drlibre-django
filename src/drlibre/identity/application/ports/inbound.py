@@ -52,7 +52,7 @@ class SignedIn:
 
 
 class SignIn(Protocol):
-    def execute(self, *, email: str, password: str, user_agent: str) -> SignedIn:
+    def execute(self, *, email: str, password: str, user_agent: str, network: str) -> SignedIn:
         """Open a session; raise unauthenticated with one message for every refusal."""
         ...
 

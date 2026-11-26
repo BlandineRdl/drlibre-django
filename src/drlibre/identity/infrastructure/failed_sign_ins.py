@@ -6,7 +6,6 @@ import redis
 from django.conf import settings
 
 from drlibre.identity.application.ports.outbound import FailedSignIns
-from drlibre.identity.domain.user import Email
 
 # Housekeeping only: keys outlive any lockout window, the window itself is the caller's.
 _KEY_TTL_SECONDS = 24 * 3600
@@ -24,19 +23,23 @@ class RedisFailedSignIns(FailedSignIns):
             self._client = redis.Redis.from_url(settings.REDIS_URL)
         return self._client
 
-    def _key(self, email: Email) -> str:
-        # No email in Redis: the key is a hash of the address.
-        return f"{self._prefix}:{hashlib.sha256(email.value.encode()).hexdigest()}"
+    def _key(self, subject: str) -> str:
+        # No email or network address in Redis: the key is a hash of the subject.
+        return f"{self._prefix}:{hashlib.sha256(subject.encode()).hexdigest()}"
 
-    def record(self, email: Email, *, at: datetime) -> None:
-        key = self._key(email)
+    def record(self, subject: str, *, at: datetime) -> str:
+        key, failure = self._key(subject), uuid.uuid4().hex
         pipe = self._redis().pipeline()
-        pipe.zadd(key, {uuid.uuid4().hex: at.timestamp()})
+        pipe.zadd(key, {failure: at.timestamp()})
         pipe.expire(key, _KEY_TTL_SECONDS)
         pipe.execute()
+        return failure
 
-    def count_since(self, email: Email, *, since: datetime) -> int:
-        return self._redis().zcount(self._key(email), since.timestamp(), "+inf")
+    def count_since(self, subject: str, *, since: datetime) -> int:
+        return self._redis().zcount(self._key(subject), since.timestamp(), "+inf")
 
-    def clear(self, email: Email) -> None:
-        self._redis().delete(self._key(email))
+    def forget(self, subject: str, failure: str) -> None:
+        self._redis().zrem(self._key(subject), failure)
+
+    def clear(self, subject: str) -> None:
+        self._redis().delete(self._key(subject))
